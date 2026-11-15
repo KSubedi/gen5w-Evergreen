@@ -2,4 +2,6 @@ dist/
 payloads/
 tools/mock/cars.local
 src/carplay-ar/build/
+src/system-dump/build/
 tools/__pycache__/
+tools/system-dump/__pycache__/

@@ -1,0 +1,44 @@
+name: System dump collector
+
+on:
+  push:
+    paths:
+      - 'src/system-dump/**'
+      - 'kits/system-dump/**'
+      - 'tools/*system-dump*'
+      - 'tools/system-dump/**'
+      - '.github/workflows/system-dump.yml'
+  pull_request:
+    paths:
+      - 'src/system-dump/**'
+      - 'kits/system-dump/**'
+      - 'tools/*system-dump*'
+      - 'tools/system-dump/**'
+      - '.github/workflows/system-dump.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Fetch pinned Zig compiler
+        run: |
+          curl -fL --retry 3 https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz -o "$RUNNER_TEMP/zig.tar.xz"
+          echo "24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+      - name: Build static ARM helper, test failures and resume, package kit
+        run: |
+          export ZIG="$RUNNER_TEMP/zig-x86_64-linux-0.14.1/zig"
+          sh src/system-dump/build.sh
+          CC="$ZIG cc" python3 tools/test-system-dump.py
+          python3 tools/build-system-dump-collector.py
+          git diff --exit-code -- patches packages
+      - name: Verify ARM execution and image round trip under qemu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user
+          "$RUNNER_TEMP/zig-x86_64-linux-0.14.1/zig" cc -target arm-linux-musleabi -mcpu=cortex_a9 -static -Os -DDUMP_TEST src/system-dump/collector.c -o "$RUNNER_TEMP/collector-arm-fixture"
+          python3 tools/system-dump/arm-smoke.py src/system-dump/build/collector-arm "$RUNNER_TEMP/collector-arm-fixture"
