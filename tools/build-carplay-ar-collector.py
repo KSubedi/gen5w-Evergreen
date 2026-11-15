@@ -10,7 +10,8 @@ out.parent.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
     for name in ("NEMESIS.data", "NEMESIS.sh"):
         archive.write(ROOT / "kits/ar-stock" / name, name)
-    archive.write(ROOT / "patches/ev6/stock", "expected-stock.txt")
+    archive.writestr("expected-stock.txt", (ROOT / "patches/ev6/stock").read_text()
+                     + (ROOT / "kits/ar-stock/extra-stock.txt").read_text())
     archive.writestr("README.txt", """2022-24 US EV6, firmware 260507. Requires NEMESIS.
 Unzip these files onto an empty USB drive, keeping NEMESIS.data at its root.
 With the car parked and head unit running, insert the drive and run the script

@@ -23,11 +23,13 @@ failed=0
 while read -r name want; do
     case "$name" in
         HKMC_DiPO.apk|HKMC_DiPO.odex|HKMC_GPM.apk|HKMC_GPM.odex|HKMC_Navi_ExSL.apk|HKMC_Navi_ExSL.odex|Iap2ServerApp.apk|Iap2ServerApp.odex) dir=app ;;
-        libautoreceiver_infobank.so) dir=lib ;;
+        libautoreceiver_infobank.so|libCarPlayCore.so|libCarPlayAudio.so|libCarPlayUtils.so) dir=lib ;;
         *) echo "Unexpected stock-list entry" >> "$REPORT"; exit 1 ;;
     esac
     found=0
-    for file in "$SOURCE/data/nemesis/backup/projection.tbt/$name" "$SOURCE/system/$dir/$name"; do
+    for file in "$SOURCE/data/nemesis/backup/projection.tbt/$name" \
+        "$SOURCE/data/nemesis/backup/wireless.carplay.bt/$name" \
+        "$SOURCE/data/nemesis/backup/carplay.wifi.audio/$name" "$SOURCE/system/$dir/$name"; do
         [ -f "$file" ] || continue
         value=$(md5 "$file" 2>/dev/null) || continue
         set -- $value

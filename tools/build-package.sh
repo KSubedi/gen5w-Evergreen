@@ -31,6 +31,13 @@ cp "$ROOT/tools/lpatch/lpatch" "$STAGE/inner/tools/lpatch"
 cp "$ROOT"/recipes/*.recipe "$STAGE/inner/recipes/"
 cp -R "$PATCHES" "$STAGE/inner/patches"
 rm -f "$STAGE/inner/patches/README.md"
+if [ -n "$EVERGREEN_PATCHES_DIR" ] && [ -f "$PATCHES/../ar-build.json" ]; then
+    python3 "$ROOT/tools/check-carplay-ar-build.py" "$PATCHES" "$PATCHES/../ar-build.json" || {
+        rm -rf "$STAGE"
+        exit 1
+    }
+    cp "$PATCHES/../ar-build.json" "$STAGE/inner/AR_BUILD.json"
+fi
 # which source this package was built from; logged at install, read by the Leafia kit
 echo "$(git -C "$ROOT" describe --always --dirty 2>/dev/null || echo unknown) $(date -u +%Y-%m-%d)" > "$STAGE/inner/BUILD"
 mkdir -p "$STAGE/outer/packages"

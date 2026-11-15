@@ -3,6 +3,8 @@
 import importlib.util
 import io
 import os
+import json
+import copy
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +25,7 @@ def load(name, file):
 
 patcher = load("patch_ar", "patch-carplay-ar.py")
 builder = load("build_ar", "build-carplay-ar.py")
+verifier = load("verify_ar", "check-carplay-ar-build.py")
 HELPERS = ROOT / "src/carplay-ar/build/smali"
 LPATCH = ROOT / "tools/lpatch/lpatch-host"
 FIXTURE = """.class public Lsynthetic/Phone;
@@ -73,6 +76,18 @@ class PatchTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             patcher.patch(self.tree, ROOT / "src/carplay-ar/stubs", 1)
 
+    def test_inspection_reports_method_and_registers_without_changing_tree(self):
+        sites = patcher.inspect(self.tree)
+        self.assertEqual(sites[0]["file"], "Phone.smali")
+        self.assertEqual(sites[0]["method"], "turn(Lcom/hkmc/cluster/NavigationCluster;IIFFIIIII)V")
+        self.assertEqual(sites[0]["registers"], "{p0 .. p9}")
+        self.assertEqual(self.source.read_text(), FIXTURE)
+
+    def test_cluster_call_outside_method_rejected(self):
+        self.source.write_text(FIXTURE + '    invoke-virtual/range {p0 .. p9}, ' + patcher.NC + '->updateTBTInfo' + patcher.SIG + '\n')
+        with self.assertRaises(ValueError):
+            patcher.inspect(self.tree)
+
     def test_private_builder_round_trip(self):
         temp = Path(self.tmp.name)
         stock = temp / "stock/app"
@@ -95,14 +110,37 @@ class PatchTest(unittest.TestCase):
         (patches / "synthetic/stock").write_text("".join(name + " " + builder.md5(stock / name) + "\n"
                                                   for name in ("HKMC_DiPO.apk", "HKMC_DiPO.odex")))
         output = temp / "output"
-        report = builder.build(stock.parent, "synthetic", output, HELPERS, 1, patches, LPATCH)
+        plan = builder.inspect_build(stock.parent, "synthetic", patches, LPATCH)
+        self.assertEqual([b["calls"] for b in plan["builds"]], [1,1])
+        stale = copy.deepcopy(plan)
+        stale["builds"][0]["base_dex_sha256"] = "0" * 64
+        with self.assertRaises(ValueError):
+            builder.build(stock.parent, "synthetic", temp / "stale-output", HELPERS, patches=patches, lpatch=LPATCH, plan=stale)
+        self.assertFalse((temp / "stale-output").exists())
+        report = builder.build(stock.parent, "synthetic", output, HELPERS, patches=patches, lpatch=LPATCH, plan=plan)
         self.assertEqual(len(report["builds"]), 2)
         self.assertFalse(report["on_car_tested"])
+        self.assertEqual(json.loads((output / "call-sites.json").read_text()), plan)
+        verifier.validate(output / "patches", output / "ar-build.json")
         self.assertEqual(manifest.read_text().count("original.lpd"), 2)
         self.assertEqual((output / "patches/synthetic/manifest").read_text().count(".ar.lpd"), 2)
         self.assertFalse(list(output.rglob("*.apk")))
         self.assertFalse(list(output.rglob("*.dex")))
         self.assertFalse(list(output.rglob("*.odex")))
+        # Exercise the package boundary with generated deltas and provenance.
+        shutil.copytree(ROOT / "patches", output / "patches", dirs_exist_ok=True)
+        package = temp / "synthetic-package.zip"
+        subprocess.run(["sh", str(ROOT / "tools/build-package.sh"), str(package)],
+                       env=dict(os.environ, EVERGREEN_PATCHES_DIR=str(output / "patches")), check=True)
+        with zipfile.ZipFile(package) as outer:
+            with zipfile.ZipFile(io.BytesIO(outer.read("packages/wireless.carplay.aa.zip"))) as inner:
+                self.assertEqual(json.loads(inner.read("AR_BUILD.json")), report)
+                self.assertEqual(inner.read("patches/" + report["builds"][0]["patch"]),
+                                 (output / "patches" / report["builds"][0]["patch"]).read_bytes())
+        generated = output / "patches" / report["builds"][0]["patch"]
+        generated.write_bytes(generated.read_bytes() + b"corrupted")
+        with self.assertRaises(ValueError):
+            verifier.validate(output / "patches", output / "ar-build.json")
         with self.assertRaises(ValueError):
             builder.build(stock.parent, "synthetic", output, HELPERS, 1, patches, LPATCH)
         (stock / "HKMC_DiPO.odex").write_bytes(b"wrong firmware")
@@ -130,6 +168,16 @@ class PackageTest(unittest.TestCase):
             result = subprocess.run(["sh", str(ROOT / "tools/build-package.sh"), str(rejected)], env=env)
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(rejected.exists())
+
+    def test_invalid_ar_report_cannot_be_packaged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            shutil.copytree(ROOT / "patches", tmp / "patches")
+            (tmp / "ar-build.json").write_text('{}')
+            result = subprocess.run(["sh", str(ROOT / "tools/build-package.sh"), str(tmp / "bad.zip")],
+                                    env=dict(os.environ, EVERGREEN_PATCHES_DIR=str(tmp / "patches")))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((tmp / "bad.zip").exists())
 
 
 class CollectorTest(unittest.TestCase):
@@ -200,7 +248,56 @@ class CollectorTest(unittest.TestCase):
         builder.run(sys.executable, ROOT / "tools/build-carplay-ar-collector.py", output)
         with zipfile.ZipFile(output) as archive:
             self.assertEqual(set(archive.namelist()), {"NEMESIS.data", "NEMESIS.sh", "expected-stock.txt", "README.txt"})
-            self.assertEqual(archive.read("expected-stock.txt"), (ROOT / "patches/ev6/stock").read_bytes())
+            self.assertEqual(archive.read("expected-stock.txt"), (ROOT / "patches/ev6/stock").read_bytes()
+                             + (ROOT / "kits/ar-stock/extra-stock.txt").read_bytes())
+
+
+class ControlTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.usb = self.root / "usb"
+        self.usb.mkdir()
+        self.package = self.root / "car/data/nemesis/apps/wireless.carplay.aa"
+        self.package.mkdir(parents=True)
+        self.marker = self.package / "ar-hud.enabled"
+        bin = self.root / "bin"
+        bin.mkdir()
+        getprop = bin / "getprop"
+        getprop.write_text('#!/bin/sh\necho "$AR_TEST_PRODUCT"\n')
+        getprop.chmod(0o755)
+        self.env = dict(os.environ, EVERGREEN_AR_SOURCE_ROOT=str(self.root / "car"),
+                        AR_TEST_PRODUCT="CVEV.USA.0000.V015.012.260507", PATH=str(bin)+os.pathsep+os.environ["PATH"])
+
+    def control(self, mode):
+        (self.usb / "AR_MODE").write_text(mode+'\n')
+        return subprocess.run(["sh", str(ROOT / "kits/ar-control/NEMESIS.sh")], cwd=self.usb,
+                              env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    def test_regular_evergreen_cannot_be_enabled(self):
+        self.assertNotEqual(self.control("enable").returncode, 0)
+        self.assertFalse(self.marker.exists())
+
+    def test_enable_status_disable_changes_only_marker(self):
+        report = self.package / "AR_BUILD.json"
+        report.write_text('{"variant": "ev6"}\n')
+        self.assertEqual(self.control("enable").returncode, 0)
+        self.assertTrue(self.marker.is_file())
+        self.assertIn(b"is enabled", self.control("status").stdout)
+        self.assertEqual(self.control("disable").returncode, 0)
+        self.assertFalse(self.marker.exists())
+        self.assertIn(b"is disabled", self.control("status").stdout)
+        self.assertEqual(report.read_text(), '{"variant": "ev6"}\n')
+
+    def test_wrong_firmware_and_unknown_mode_rejected_but_disable_available(self):
+        (self.package / "AR_BUILD.json").write_text('{"variant": "ev6"}\n')
+        self.env["AR_TEST_PRODUCT"]="CVEV.CAN.0000.V015.011.260206"
+        self.assertNotEqual(self.control("enable").returncode, 0)
+        self.assertNotEqual(self.control("unexpected").returncode, 0)
+        self.marker.touch()
+        self.assertEqual(self.control("disable").returncode, 0)
+        self.assertFalse(self.marker.exists())
 
 
 if __name__ == "__main__":

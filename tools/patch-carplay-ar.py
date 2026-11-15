@@ -15,6 +15,30 @@ SIG = "(IIFFIIIII)V"
 FORWARD = "Lorg/evergreen/carplay/ArHudForwarder;->update(" + NC + SIG[1:]
 CALL = re.compile(r"^(\s*)invoke-virtual/range\s+(\{[^}\n]+\}),\s*"
                   + re.escape(NC + "->updateTBTInfo" + SIG) + r"\s*$", re.M)
+HELPER_NAMES = {"ArHudTurns.smali", "ArHudForwarder.smali", "ArHudDistance.smali", "ArHudProgress.smali"}
+
+
+def inspect(tree):
+    """Return method/line call sites, rejecting unsupported signatures and registers."""
+    sites = []
+    for path in sorted(Path(tree).rglob("*.smali")):
+        method = None
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            if line.lstrip().startswith(".method "):
+                method = line.strip().split()[-1]
+            if line.lstrip().startswith(".end method"):
+                method = None
+            if NC + "->updateTBTInfo" not in line or line.lstrip().startswith("#"):
+                continue
+            match = CALL.fullmatch(line)
+            if not match or method is None:
+                raise ValueError("unsupported cluster call shape in " + str(path))
+            regs = re.fullmatch(r"\{([vp])(\d+)\s+\.\.\s+\1(\d+)\}", match[2])
+            if not regs or int(regs[3]) - int(regs[2]) != 9:
+                raise ValueError("expected receiver plus nine one-word arguments in " + str(path))
+            sites.append({"file": str(path.relative_to(tree)), "method": method,
+                          "line": number, "registers": match[2]})
+    return sites
 
 
 def patch(tree, helpers, expected_calls):
@@ -27,12 +51,13 @@ def patch(tree, helpers, expected_calls):
     if (tree / "org/evergreen/carplay").exists():
         raise ValueError("AR helpers already present; start from the original Evergreen dex")
     own = helpers / "org/evergreen/carplay"
-    if {p.name for p in helpers.rglob("*.smali")} != {"ArHudTurns.smali", "ArHudForwarder.smali"}:
-        raise ValueError("build exactly the two AR helper classes first (no OEM stubs)")
-    for name in ("ArHudTurns.smali", "ArHudForwarder.smali"):
+    if {p.name for p in helpers.rglob("*.smali")} != HELPER_NAMES:
+        raise ValueError("build exactly the four AR helper classes first (no OEM stubs)")
+    for name in HELPER_NAMES:
         if not (own / name).is_file():
             raise ValueError("helper package does not match org.evergreen.carplay")
     edits, count = [], 0
+    sites = inspect(tree)
     for path in sources:
         text = path.read_text()
         calls = [line for line in text.splitlines()
@@ -47,7 +72,7 @@ def patch(tree, helpers, expected_calls):
         count += len(matches)
         if matches:
             edits.append((path, CALL.sub(lambda m: m[1] + "invoke-static/range " + m[2] + ", " + FORWARD, text)))
-    if count != expected_calls:
+    if count != expected_calls or count != len(sites):
         raise ValueError("expected %d cluster calls, found %d; inspect this firmware first" % (expected_calls, count))
     # Validate the complete tree before making any changes.
     for path, text in edits:

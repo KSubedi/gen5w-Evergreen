@@ -25,12 +25,25 @@ from a rounded distance. Directions skipped by Evergreen's existing parser are
 still skipped: this prototype does not repair missing maneuver metadata.
 
 Distances come from the existing display distance, converted from the cluster's
-units (m/km/mi/ft/yd). They are rounded; smooth interpolation/exact distances
-are not implemented. The separate trap frame is untouched, so this does not
+units (m/km/mi/ft/yd). They are rounded; the live adapter does not yet consume exact iAP2 distances. The separate trap frame is untouched, so this does not
 implement the cluster's filling distance bar or overwrite speed-limit data.
-This maps existing icon information, rather than introducing a second iAP2 parser.
+The source also includes reusable, tested foundations for richer integration:
 
-The AR flag is **off by default**. On a generated and mock-tested experimental
+- Raw maneuver metadata conversion, including driving side, junction and explicit arrival state.
+- Monotonic distance interpolation using time-to-turn, limited to 1.5 seconds of extrapolation.
+- A five-second progress lease and a merge helper that preserves all other 17 trap-frame arguments.
+
+Those three foundations are **not connected to DiPO or the OEM trap sender yet**.
+Their hook locations and the progress argument index need the actual stock
+apps/framework. No guessed index or background sender is installed.
+
+The AR flag is **off by default**. Generate optional USB controls with
+`python3 tools/build-carplay-ar-controls.py`: enable, disable and status archives
+run through NEMESIS. Enable/status require an installed generated AR build and
+US EV6 firmware 260507. Disable remains available without either prerequisite.
+They change only the package's flag, never `/system`, and do not restart CarPlay.
+
+The following manual commands provide the same toggle. On a generated and mock-tested experimental
 build, enable it while parked using NEMESIS:
 
 ```sh
@@ -73,17 +86,19 @@ the full mock install needs the rest of the stock tree too. Do not upload keys,
 account data or other private kit output. The builder checks those two files
 against `patches/ev6/stock` before rebuilding anything.
 
-Inspect a temporary disassembly of the current reconstructed DiPO and count
-calls to `NavigationCluster.updateTBTInfo`. Supply that count explicitly using
-`--expected-calls`; an unverified guess must not be silently accepted. The tool
-refuses unsupported call shapes or a different count. Both turn-by-turn and
-Bluetooth bridge builds must have the inspected count; otherwise inspect and
-adapt the tool for that variant.
+First export an inspection plan. Review the method locations, register shapes
+and call counts for **both** reconstructed variants. The build checks this
+plan's stock, base patch and DEX fingerprints again before changing anything.
+A changed input or unsupported call shape fails the build.
 
 ```sh
 python3 tools/build-carplay-ar.py --variant ev6 \
+  --stock /private/LEAFIA/private/stock --inspect \
+  --out /private/ev6-call-sites.json
+# Review /private/ev6-call-sites.json before building.
+python3 tools/build-carplay-ar.py --variant ev6 \
   --stock /private/LEAFIA/private/stock --out /private/evergreen-ar \
-  --expected-calls INSPECTED_COUNT
+  --plan /private/ev6-call-sites.json
 EVERGREEN_PATCHES_DIR=/private/evergreen-ar/patches \
   sh tools/build-package.sh dist/Evergreen_CarPlay_AR-experimental.zip
 MOCK_SH=mksh MOCK_NEMESIS=1.15 sh tools/mock/install-test.sh \
@@ -94,7 +109,10 @@ MOCK_SH=mksh MOCK_NEMESIS=1.15 sh tools/mock/install-test.sh \
 Generation reconstructs the existing DiPO variants and verifies their manifest
 APK hashes before modifying them. New builds are assembled twice and compared,
 disassembled again, and round-trip checked through lpatch. Only deltas and a
-build report leave the temporary working directory. The committed patch sets
+build report and call-site plan leave the temporary working directory. The report
+records input/helper/output SHA-256 fingerprints and which adapters are wired.
+Packaging verifies both AR deltas against that report and includes it as
+`AR_BUILD.json` for the USB controls. The committed patch sets
 stay unchanged; unrelated variants and the universal build are not updated.
 The generated manifest records the new APK hashes for the normal installer.
 The compatibility website will still describe the committed builds until the
@@ -130,14 +148,14 @@ python3 tools/build-carplay-ar-collector.py
 
 Unzip `dist/EV6-260507-stock-collector.zip` to an empty USB drive, run through
 NEMESIS while parked, and retrieve `EV6-AR-STOCK`. It writes only to the USB
-drive, checks the nine known stock files against the EV6 manifest and uses an
-exact matching `projection.tbt` backup if the live file has been modified.
+drive, checks nine stock app files plus three stock CarPlay libraries against known
+hashes and searches the projection, Bluetooth and audio backups when live files
+have been modified.
 It additionally copies framework JAR/ODEX code for call-site inspection.
 It collects no keys, logs, account data, phone data, or security partitions.
 Generated stock files are private and must not be committed. This collection
 is enough for AR patch generation and interface inspection; a full mock system
-may additionally need the other baseline firmware files used by Evergreen's
-wireless/audio parts.
+may additionally need other baseline firmware files not present in those backups.
 
 Sources: [Kia software catalog](https://update.kia.com/US/EN/updateNoticeView/software-version),
 [nudl](https://github.com/chenxiaolong/nudl),
