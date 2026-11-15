@@ -10,8 +10,11 @@ LAUNCH=$USB/SYSTEM-DUMP-LAUNCH.txt
 [ ! -L "$LAUNCH" ] && { [ ! -e "$LAUNCH" ] || [ -f "$LAUNCH" ]; } || exit 1
 # A direct write distinguishes USB write failure from log-stream setup failure.
 # Avoid exec-only redirection: the first on-car diagnostic retry left an empty log.
-echo "=== Evergreen system dump launch v3 ===" >> "$LAUNCH" || exit 1
+echo "=== Evergreen system dump launch v4 ===" >> "$LAUNCH" || exit 1
 echo "USB=$USB shell=${KSH_VERSION:-unknown}" >> "$LAUNCH"
+# Closing a shell redirection does not flush USB writeback. Persist the initial
+# checkpoint now, and the complete error below before NEMESIS reports a result.
+sync || exit 1
 run_collector() {
 STEP=validate-kit
 [ -f collector-arm ] && [ -f collector.md5 ] || { echo "Incomplete collector kit."; return 1; }
@@ -53,4 +56,5 @@ return "$RC"
 run_collector >> "$LAUNCH" 2>&1
 RC=$?
 echo "Launcher exit=$RC step=$STEP" >> "$LAUNCH"
+sync || exit 1
 exit "$RC"

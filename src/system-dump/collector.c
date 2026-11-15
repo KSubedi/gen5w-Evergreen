@@ -58,7 +58,12 @@ static void notify(const char *message) {
 
 static double seconds(void) { struct timespec t; if(clock_gettime(CLOCK_MONOTONIC,&t))return 0;return t.tv_sec+t.tv_nsec/1e9; }
 static void caught(int signum) { (void)signum;stopping=1; }
-static void die(const char *message) { fprintf(stderr,"%s: %s\n",message,strerror(errno));exit(1); }
+static void die(const char *message) {
+    fprintf(stderr,"%s: %s\n",message,strerror(errno));
+    /* Early mount/source failures precede worker status updates. Persist their
+     * diagnostic too; closing a file alone leaves USB writeback pending. */
+    fflush(stderr);(void)fsync(STDERR_FILENO);exit(1);
+}
 static int exists(const char *path) { struct stat s;return lstat(path,&s)==0; }
 static void sync_directory(void) {
     /* FAT implementations can reject directory fsync. File fsync is mandatory. */
@@ -267,8 +272,10 @@ int main(int argc,char **argv) {
 #endif
     int lock=open(lockname,O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);if(lock<0)die("open collector lock");
     if(flock(lock,LOCK_EX|LOCK_NB)){fprintf(stderr,"A collector is already running. Read SYSTEM-DUMP/STATUS.txt; do not start another.\n");return 1;}
-    discover();healthy_source();posix_fadvise(source,0,0,POSIX_FADV_SEQUENTIAL);
     int log=open("collector.log",O_WRONLY|O_CREAT|O_APPEND|O_NOFOLLOW|O_CLOEXEC,0600);if(log<0)die("open log");
+    if(dup2(log,STDERR_FILENO)<0)die("redirect startup log");
+    setvbuf(stderr,NULL,_IONBF,0);
+    discover();healthy_source();posix_fadvise(source,0,0,POSIX_FADV_SEQUENTIAL);
     if(!strcmp(argv[1],"--start")){
         /* Double fork: no terminal/Manager lifetime dependency. Readiness is a byte, not EOF. */
         int ready[2];if(pipe(ready))die("create readiness pipe");pid_t child=fork();if(child<0)die("fork worker");

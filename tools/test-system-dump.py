@@ -108,6 +108,14 @@ class DumpTest(unittest.TestCase):
         self.assertFalse(list(self.dump.glob("*.bin")))
         self.assertEqual(self.run_dump().returncode, 0, self.log())
 
+    def test_startup_source_failure_is_logged_before_worker(self):
+        self.source.unlink()
+        result = subprocess.run(self.command("--start"), env=self.env, capture_output=True, timeout=5)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("open system read-only", self.log())
+        self.assertFalse((self.dump / "STATUS.txt").exists())
+        self.assertFalse((self.dump / "COMPLETE").exists())
+
     def test_changed_source_rejected(self):
         self.assertEqual(self.run_dump().returncode, 0)
         self.source.write_bytes(b"X" + self.data[1:])

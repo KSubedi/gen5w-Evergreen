@@ -21,6 +21,9 @@ class LauncherTest(unittest.TestCase):
             for name, text in {
                 'md5': '#!/bin/sh\nmd5sum "$@"\n',
                 'getprop': '#!/bin/sh\necho CVEV.USA.260507\n',
+                # Snapshot the log at every flush so errors cannot pass tests
+                # merely because the host's page cache makes them readable.
+                'sync': '#!/bin/sh\ncat SYSTEM-DUMP-LAUNCH.txt > flushed-log\necho flush >> flush-count\n',
             }.items():
                 path = bin_dir / name
                 path.write_text(text)
@@ -37,8 +40,10 @@ class LauncherTest(unittest.TestCase):
             self.assertEqual(run().returncode, 1)
             log = usb / 'SYSTEM-DUMP-LAUNCH.txt'
             self.assertIn('Incomplete collector kit', log.read_text())
-            self.assertIn('launch v3', log.read_text())
+            self.assertIn('launch v4', log.read_text())
             self.assertIn('Launcher exit=1 step=validate-kit', log.read_text())
+            self.assertEqual(log.read_bytes(), (usb / 'flushed-log').read_bytes())
+            self.assertEqual((usb / 'flush-count').read_text().splitlines(), ['flush', 'flush'])
             helper = usb / 'collector-arm'
             helper.write_text('#!/bin/sh\necho "synthetic native mount refusal" >&2\nexit 7\n')
             import hashlib
@@ -48,6 +53,8 @@ class LauncherTest(unittest.TestCase):
             self.assertIn('Incomplete collector kit', text)
             self.assertIn('synthetic native mount refusal', text)
             self.assertIn('Launcher exit=7 step=start-native', text)
+            self.assertEqual(log.read_bytes(), (usb / 'flushed-log').read_bytes())
+            self.assertEqual(len((usb / 'flush-count').read_text().splitlines()), 4)
             log.unlink()
             target = root / 'untouched'
             target.write_text('original')
