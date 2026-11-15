@@ -132,5 +132,76 @@ class PackageTest(unittest.TestCase):
             self.assertFalse(rejected.exists())
 
 
+class CollectorTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.usb = self.root / "usb"
+        self.usb.mkdir()
+        self.source = self.root / "car"
+        self.live = self.source / "system/app/HKMC_DiPO.apk"
+        self.live.parent.mkdir(parents=True)
+        self.live.write_bytes(b"our synthetic stock app")
+        (self.usb / "expected-stock.txt").write_text("HKMC_DiPO.apk " + builder.md5(self.live) + "\n")
+        firmware = self.source / "system/framework"
+        firmware.mkdir()
+        (firmware / "automotive.jar").write_bytes(b"our synthetic interface")
+        secrets = self.source / "system/etc"
+        secrets.mkdir()
+        (secrets / "image.dat").write_bytes(b"must not collect")
+        bin = self.root / "bin"
+        bin.mkdir()
+        commands = {"getprop": '#!/bin/sh\necho "$AR_TEST_PRODUCT"\n',
+                    "md5": '#!/bin/sh\nexec md5sum "$@"\n'}
+        for name, text in commands.items():
+            path = bin / name
+            path.write_text(text)
+            path.chmod(0o755)
+        self.env = dict(os.environ, EVERGREEN_AR_SOURCE_ROOT=str(self.source),
+                        AR_TEST_PRODUCT="CVEV.USA.0000.V015.012.260507",
+                        PATH=str(bin) + os.pathsep + os.environ["PATH"])
+
+    def collect(self):
+        return subprocess.run(["sh", str(ROOT / "kits/ar-stock/NEMESIS.sh")],
+                              cwd=self.usb, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    def test_stock_backup_and_source_unchanged(self):
+        backup = self.source / "data/nemesis/backup/projection.tbt/HKMC_DiPO.apk"
+        backup.parent.mkdir(parents=True)
+        shutil.copyfile(self.live, backup)
+        self.live.write_bytes(b"modified live app")
+        before = {p.relative_to(self.source): p.read_bytes() for p in self.source.rglob("*") if p.is_file()}
+        self.assertEqual(self.collect().returncode, 0)
+        output = self.usb / "EV6-AR-STOCK"
+        self.assertEqual((output / "stock/app/HKMC_DiPO.apk").read_bytes(), backup.read_bytes())
+        self.assertTrue((output / "stock/framework/automotive.jar").exists())
+        self.assertFalse(list(output.rglob("image.dat")))
+        after = {p.relative_to(self.source): p.read_bytes() for p in self.source.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
+        report = (output / "report.txt").read_bytes()
+        self.assertNotEqual(self.collect().returncode, 0)
+        self.assertEqual((output / "report.txt").read_bytes(), report)
+
+    def test_wrong_firmware_writes_nothing(self):
+        self.env["AR_TEST_PRODUCT"] = "CVEV.USA.0000.V014.011.251120"
+        self.assertNotEqual(self.collect().returncode, 0)
+        self.assertFalse((self.usb / "EV6-AR-STOCK").exists())
+
+    def test_modified_app_without_stock_is_reported(self):
+        self.live.write_bytes(b"wrong app")
+        self.assertNotEqual(self.collect().returncode, 0)
+        output = self.usb / "EV6-AR-STOCK"
+        self.assertFalse((output / "stock/app/HKMC_DiPO.apk").exists())
+        self.assertIn("MISSING_STOCK", (output / "report.txt").read_text())
+
+    def test_collector_archive_contains_no_firmware_or_keys(self):
+        output = self.root / "collector.zip"
+        builder.run(sys.executable, ROOT / "tools/build-carplay-ar-collector.py", output)
+        with zipfile.ZipFile(output) as archive:
+            self.assertEqual(set(archive.namelist()), {"NEMESIS.data", "NEMESIS.sh", "expected-stock.txt", "README.txt"})
+            self.assertEqual(archive.read("expected-stock.txt"), (ROOT / "patches/ev6/stock").read_bytes())
+
+
 if __name__ == "__main__":
     unittest.main()

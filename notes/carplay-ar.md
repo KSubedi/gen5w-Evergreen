@@ -1,8 +1,8 @@
 # CarPlay AR HUD prototype
 
 Target: the owner's **2022 Kia EV6 GT-Line, USA**, reported to be on the latest
-head-unit firmware. Evergreen's matching US EV6 patch set is `ev6` (260507).
-The exact version string and matching stock file hashes must be checked before
+head-unit firmware, subsequently confirmed as **260507**. Evergreen's matching US EV6 patch set is `ev6`.
+Matching stock file hashes must be checked before
 building a car package. No car has tested this fork's implementation yet.
 
 ## Implementation and limits
@@ -112,6 +112,36 @@ new deltas are promoted and `tools/compat-built.py` is run.
   speed limits and a car without HUD where practical.
 - Keep this on the development branch; no stable version bump or release tag
   until the generated builds and rollback have been verified.
+
+## Obtaining stock files
+
+The public Kia update catalog and nudl both identify the US 2022-24 EV6 update
+as `CV_E.USA.S5W_M.V015.012.260507`. The official system archive was downloaded
+and its complete uncompressed CRC32 verified as `82DB0F65` (2,462,935,040 bytes).
+It contains `enc_system/enc_system.ext4` (2,146,435,088 bytes): the Android image
+is encrypted. Downloading that archive alone does not supply usable stock APKs
+or ODEX files; none were decrypted or hash-verified during this work.
+
+The stock-only collector avoids needing an encryption key. Build it with:
+
+```sh
+python3 tools/build-carplay-ar-collector.py
+```
+
+Unzip `dist/EV6-260507-stock-collector.zip` to an empty USB drive, run through
+NEMESIS while parked, and retrieve `EV6-AR-STOCK`. It writes only to the USB
+drive, checks the nine known stock files against the EV6 manifest and uses an
+exact matching `projection.tbt` backup if the live file has been modified.
+It additionally copies framework JAR/ODEX code for call-site inspection.
+It collects no keys, logs, account data, phone data, or security partitions.
+Generated stock files are private and must not be committed. This collection
+is enough for AR patch generation and interface inspection; a full mock system
+may additionally need the other baseline firmware files used by Evergreen's
+wireless/audio parts.
+
+Sources: [Kia software catalog](https://update.kia.com/US/EN/updateNoticeView/software-version),
+[nudl](https://github.com/chenxiaolong/nudl),
+[Gen5W image-encryption research](https://github.com/cantcs/HKG_Gen5W_ReverseEngineer).
 
 ## Research credits
 
