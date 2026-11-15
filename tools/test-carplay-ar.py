@@ -5,6 +5,7 @@ import io
 import os
 import json
 import copy
+import hashlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -26,6 +27,7 @@ def load(name, file):
 patcher = load("patch_ar", "patch-carplay-ar.py")
 builder = load("build_ar", "build-carplay-ar.py")
 verifier = load("verify_ar", "check-carplay-ar-build.py")
+installer = load("install_ar", "build-carplay-ar-installer.py")
 HELPERS = ROOT / "src/carplay-ar/build/smali"
 LPATCH = ROOT / "tools/lpatch/lpatch-host"
 FIXTURE = """.class public Lsynthetic/Phone;
@@ -150,6 +152,79 @@ class PatchTest(unittest.TestCase):
 
 
 class PackageTest(unittest.TestCase):
+    def test_enabled_installer_is_restricted_and_preserves_verified_deltas(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            patches = tmp / "patches"
+            shutil.copytree(ROOT / "patches", patches)
+            report = {"schema": 1, "variant": "ev6", "on_car_tested": False, "enabled_by_default": False,
+                      "features": {"icon_ar": True, "metadata_adapter": False, "distance_adapter": False,
+                                   "progress_adapter": False}, "builds": []}
+            manifest = patches / "ev6/manifest"
+            lines = manifest.read_text().splitlines()
+            for part in ("2_tbt", "3_bridge"):
+                name = "ev6/HKMC_DiPO." + part.split("_", 1)[1] + ".ar.lpd"
+                data = ("synthetic package fixture " + part).encode()
+                (patches / name).write_bytes(data)
+                checksum = "0" * 32
+                lines = [part + " app HKMC_DiPO " + name + " " + checksum
+                         if line.split()[:3] == [part, "app", "HKMC_DiPO"] else line for line in lines]
+                report["builds"].append({"part": part, "patch": name, "calls": 1,
+                                         "patch_sha256": hashlib.sha256(data).hexdigest(), "apk_md5": checksum})
+            manifest.write_text("\n".join(lines)+"\n")
+            report_path = tmp / "ar-build.json"
+            report_path.write_text(json.dumps(report))
+            output = tmp / "ar.zip"
+            with self.assertRaises(ValueError):
+                installer.build(patches, output, False)
+            installer.build(patches, output, True)
+            self.assertFalse(json.loads(report_path.read_text())["enabled_by_default"])
+            with zipfile.ZipFile(output) as outer:
+                self.assertIn("README-AR.txt", outer.namelist())
+                with zipfile.ZipFile(io.BytesIO(outer.read("packages/wireless.carplay.aa.zip"))) as inner:
+                    descriptor = inner.read("NEMESIS.data").decode()
+                    self.assertIn('os="CVEV.USA.*.260507"', descriptor)
+                    self.assertIn("package-version=1.2.0-ar.1", descriptor)
+                    self.assertIn("preinstall=scripts/ar-pre.sh", descriptor)
+                    self.assertIn("name=evlog-offload", descriptor)
+                    self.assertIn("name=wifi-client-warn", descriptor)
+                    self.assertIn("ar-hud.enabled", inner.namelist())
+                    self.assertTrue((inner.getinfo("tools/lpatch").external_attr >> 16) & 0o111)
+                    deployed = json.loads(inner.read("AR_BUILD.json"))
+                    self.assertTrue(deployed["enabled_by_default"])
+                    self.assertEqual(deployed["activation"], "explicit-experimental-installer")
+                    self.assertEqual(json.loads(inner.read("AR_INSTALL.json"))["enable_requested"], True)
+                    for build in report["builds"]:
+                        self.assertEqual(hashlib.sha256(inner.read("patches/"+build["patch"])).hexdigest(), build["patch_sha256"])
+            with self.assertRaises(ValueError):
+                installer.build(patches, output, True)
+            report["enabled_by_default"] = True
+            report_path.write_text(json.dumps(report))
+            with self.assertRaises(ValueError):
+                verifier.validate(patches, report_path)
+
+    def test_installer_firmware_guard_before_original_preinstall(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / "scripts").mkdir()
+            (tmp / "scripts/pre.sh").write_text('echo delegated > PRE_RAN\n')
+            for name in ("AR_BUILD.json", "AR_INSTALL.json", "ar-hud.enabled"):
+                (tmp / name).write_text("synthetic\n")
+            bin = tmp / "bin"
+            bin.mkdir()
+            (bin / "getprop").write_text('#!/bin/sh\necho "$AR_TEST_PRODUCT"\n')
+            (bin / "getprop").chmod(0o755)
+            script = (ROOT / "kits/ar-installer/ar-pre.sh").read_text()
+            script = script.replace("export PATH=", "export PATH=" + str(bin) + ":").replace("exec /system/bin/sh", "exec /bin/sh")
+            (tmp / "guard.sh").write_text(script)
+            for product, expected in (("CVEV.CAN.0000.V015.011.260206", False),
+                                      ("CVEV.USA.0000.V014.011.251120", False),
+                                      ("CVEV.USA.0000.V015.012.260507", True)):
+                result = subprocess.run(["sh", "guard.sh"], cwd=tmp,
+                                        env=dict(os.environ, AR_TEST_PRODUCT=product), capture_output=True)
+                self.assertEqual(result.returncode == 0, expected)
+                self.assertEqual((tmp / "PRE_RAN").exists(), expected)
+
     def test_override_is_packaged_and_cars_table_is_checked(self):
         with tempfile.TemporaryDirectory() as temp:
             temp = Path(temp)

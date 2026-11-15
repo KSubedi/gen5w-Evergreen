@@ -39,6 +39,7 @@ fi
 for t in qemu-arm-static unzip md5sum; do
     command -v $t > /dev/null || { echo "missing: $t" >&2; exit 2; }
 done
+QEMU=$(command -v qemu-arm-static)
 ZIP=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); PROD=$2; TD=$3; SRC=$4
 SH=${MOCK_SH:-/bin/sh}
 X=$(mktemp -d "${TMPDIR:-/tmp}/mock-hu.XXXX"); R=$X/root
@@ -109,7 +110,7 @@ if [ "$MOCK_ANDROID_DOWN" = 1 ]; then
     cp "$X/stub/am" "$X/stub/settings"
     cp "$X/stub/am" "$X/stub/pm"
 fi
-printf '#!/bin/sh\nexec qemu-arm-static %s/pkg/tools/lpatch "$@"\n' "$X" > "$X/stub/lpatch_q"
+printf '#!/bin/sh\nexec "%s" "%s/pkg/tools/lpatch" "$@"\n' "$QEMU" "$X" > "$X/stub/lpatch_q"
 chmod 755 "$X"/stub/*
 
 # unpack the package and point its scripts at the sandbox instead of the real paths
@@ -134,8 +135,10 @@ stopped_left() { ls "$X" | grep '^pm_disabled_' | sed 's/^pm_disabled_//' | tr '
 [ "$MOCK_ADB_TCP" = 1 ] && echo 1 > "$X/prop_persist.service.adb.tcp.enable"
 adb_props() { echo "enable=$(cat "$X/prop_persist.service.adb.tcp.enable" 2>/dev/null) port=$(cat "$X/prop_persist.adb.tcp.port" 2>/dev/null)"; }
 cd "$X/pkg"; export LPATCH="$X/stub/lpatch_q"
+PRE_HOOK=$(sed -n 's/^preinstall=//p' NEMESIS.data)
+case "$PRE_HOOK" in scripts/pre.sh|scripts/ar-pre.sh) ;; *) echo "unsupported mock preinstall hook: $PRE_HOOK"; exit 2 ;; esac
 ok=1
-if "$SH" scripts/pre.sh > "$X/pre.log" 2>&1; then
+if "$SH" "$PRE_HOOK" > "$X/pre.log" 2>&1; then
     "$SH" scripts/post.sh > "$X/post.log" 2>&1 || true
     if grep -q 'all parts installed' "$X/post.log"; then
         echo "INSTALL OK $(grep -o -E "(full|basic) mode[^)]*" "$X/post.log" | head -1)"

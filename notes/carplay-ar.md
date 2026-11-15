@@ -37,7 +37,11 @@ Those three foundations are **not connected to DiPO or the OEM trap sender yet**
 Their hook locations and the progress argument index need the actual stock
 apps/framework. No guessed index or background sender is installed.
 
-The AR flag is **off by default**. Generate optional USB controls with
+The helper's AR flag is **off by default**. The separate, explicitly selected
+`1.2.0-ar.1` experimental installer includes the enable flag and restricts
+installation to US EV6 firmware 260507. Its deployment report records that opt-in;
+the normal Evergreen installer and private delta builder remain disabled by default.
+Generate optional USB controls with
 `python3 tools/build-carplay-ar-controls.py`: enable, disable and status archives
 run through NEMESIS. Enable/status require an installed generated AR build and
 US EV6 firmware 260507. Disable remains available without either prerequisite.
@@ -106,6 +110,21 @@ MOCK_SH=mksh MOCK_NEMESIS=1.15 sh tools/mock/install-test.sh \
   CVEV.USA.0000.V015.012.260507 cvev_us /private/LEAFIA/private/stock
 ```
 
+To build the labelled, enabled experimental installer after reviewing the plan
+and generating the real deltas:
+
+```sh
+python3 tools/build-carplay-ar-installer.py \
+  --patches /private/evergreen-ar/patches --enable-ar
+```
+
+This retains the package id `wireless.carplay.aa` for a NEMESIS update, sets the
+package version to `1.2.0-ar.1`, preserves existing services, narrows the package's
+OS descriptor, and adds an early firmware guard before the original preinstall.
+It includes instructions and uses the same stock gates/backups/uninstall. It is
+a NEMESIS application package, not a firmware flash. The generated package holds
+only deltas and our source-derived helper payload; no complete OEM apps.
+
 Generation reconstructs the existing DiPO variants and verifies their manifest
 APK hashes before modifying them. New builds are assembled twice and compared,
 disassembled again, and round-trip checked through lpatch. Only deltas and a
@@ -120,11 +139,21 @@ new deltas are promoted and `tools/compat-built.py` is run.
 
 ## Validation status and next steps
 
-- Helper compilation to DEX and synthetic host tests pass locally.
-- Real EV6 stock inputs are not yet available in this workspace.
-- Firmware-specific call-site inspection, real delta generation and a full
-  mock install/uninstall restoring stock are pending those inputs.
-- No installable AR package has been produced for a real car.
+- Helper compilation, 509 Java checks and 19 synthetic integration tests pass locally.
+- The owner's collection supplied all 12 known app/library files with matching
+  US EV6 260507 stock hashes, plus the framework JAR/ODEX files. They stay private.
+- The framework confirms `NavigationCluster.updateTBTInfo(IIFFIIIII)V`. Each
+  reconstructed DiPO variant has one inspected receiver-plus-nine-argument call
+  in `com/daudio/app/dipo/e/u.a(Integer,Object)`. The existing app passes zero
+  distance/bar error flags and already maps display units into cluster units.
+- Both real DiPO delta builds assemble deterministically, disassemble, and
+  round-trip to their expected DEX/APK hashes.
+- Mock full-mode install/uninstall passes using mksh and the actual ARM lpatch
+  under qemu. Uninstall restores the tested `/system` tree byte for byte. The
+  apps/libraries/framework are real; missing build.prop/Wi-Fi configuration and
+  codec-presence checks use clearly marked synthetic fixtures. The mock's
+  dexopt is a stub, so this does not verify Dalvik or codec runtime behavior.
+- An enabled EV6-only `1.2.0-ar.1` installer is built for an initial car test.
 - On-car verification is pending: ordinary turns, forks, highway exits,
   roundabouts, rerouting, app/source changes, route ending, AR disabled,
   speed limits and a car without HUD where practical.

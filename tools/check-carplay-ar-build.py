@@ -24,8 +24,10 @@ def validate(patches, report):
     variant = data.get("variant")
     if data.get("schema") != 1 or not isinstance(variant, str) or Path(variant).name != variant or variant in (".", ".."):
         raise ValueError("unsupported AR build report")
-    if data.get("on_car_tested") is not False or data.get("enabled_by_default") is not False:
-        raise ValueError("prototype report must explicitly be untested and opt-in")
+    enabled = data.get("enabled_by_default")
+    if (data.get("on_car_tested") is not False or type(enabled) is not bool
+            or (enabled and data.get("activation") != "explicit-experimental-installer")):
+        raise ValueError("prototype report must explicitly be untested and opted in when enabled")
     features = data.get("features", {})
     if features != {"icon_ar": True, "metadata_adapter": False, "distance_adapter": False, "progress_adapter": False}:
         raise ValueError("unknown AR adapter capabilities; inspect this build before packaging")
