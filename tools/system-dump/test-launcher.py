@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import subprocess
+import shlex
 import tempfile
 import unittest
 
@@ -32,10 +33,12 @@ class LauncherTest(unittest.TestCase):
             script.write_text(source)
             env = dict(os.environ, PATH=str(bin_dir) + ':' + os.environ['PATH'])
             def run():
-                return subprocess.run(['sh', str(script)], cwd=usb, env=env, capture_output=True)
+                return subprocess.run(shlex.split(os.environ.get('DUMP_TEST_SHELL', 'sh')) + [str(script)], cwd=usb, env=env, capture_output=True)
             self.assertEqual(run().returncode, 1)
             log = usb / 'SYSTEM-DUMP-LAUNCH.txt'
             self.assertIn('Incomplete collector kit', log.read_text())
+            self.assertIn('launch v3', log.read_text())
+            self.assertIn('Launcher exit=1 step=validate-kit', log.read_text())
             helper = usb / 'collector-arm'
             helper.write_text('#!/bin/sh\necho "synthetic native mount refusal" >&2\nexit 7\n')
             import hashlib
