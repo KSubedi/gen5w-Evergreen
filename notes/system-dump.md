@@ -13,7 +13,9 @@ collector to retrieve the original app/library backups too.
 The packaged [instructions](../kits/system-dump/README.txt) cover USB preparation,
 keeping the EV powered, progress, stopping/resuming and computer-side extraction.
 The launch dialog only confirms startup. `SYSTEM-DUMP/STATUS.txt` and `COMPLETE`
-indicate collection results; a best-effort OEM toast also announces the outcome.
+indicate collection results. The launcher appends startup failures to
+`SYSTEM-DUMP-LAUNCH.txt` at the USB root, including errors before native logging
+opens (lock, mount validation and block-device access); a best-effort OEM toast also announces the outcome.
 
 ## Implementation
 

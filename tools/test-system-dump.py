@@ -64,6 +64,10 @@ class DumpTest(unittest.TestCase):
     def log(self):
         return (self.dump / "collector.log").read_text()
 
+    def test_launcher_diagnostics(self):
+        import sys
+        subprocess.run([sys.executable, str(ROOT / "tools/system-dump/test-launcher.py")], check=True)
+
     def test_roundtrip_checksums_assembly_and_repeat(self):
         self.assertEqual(self.run_dump().returncode, 0, self.log())
         info = verifier.verify(self.dump, self.root / "system.img")

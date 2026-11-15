@@ -36,6 +36,10 @@ to resume. It will not automatically run while Android is down.
 
 Watch SYSTEM-DUMP/STATUS.txt, using an existing ADB connection if desired:
   adb shell "cat /storage/usb0/SYSTEM-DUMP/STATUS.txt"
+If NEMESIS says operation failed, keep SYSTEM-DUMP-LAUNCH.txt at the USB root.
+It appends launcher steps, the /system mount entry and native startup errors,
+even when STATUS.txt and collector.log have not been created. Share just this
+small text file privately for diagnosis; no image upload is needed.
 The mount may instead be usb1 or usb2. collector.log records errors and chunk
 completion. A best-effort head-unit toast announces completion/pause/error;
 STATUS.txt and COMPLETE are authoritative if the toast is missed or unsupported.
