@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.2.0-ar.1"
+VERSION = "1.2.0.101"
 
 
 def verifier():
@@ -72,6 +72,14 @@ def build(patches, output, enable_ar):
         original = field(original, "os", '"CVEV.USA.*.260507"')
         original = field(original, "preinstall", "scripts/ar-pre.sh")
         original = field(original, "repository", "https://github.com/KSubedi/gen5w-Evergreen")
+        # Validate the FINAL descriptor, after all experimental overrides.
+        # NEMESIS permits dotted numbers only, not SemVer prerelease suffixes.
+        checked_descriptor = Path(temp) / "NEMESIS.data"
+        checked_descriptor.write_text(original)
+        checked_cars = Path(temp) / "cars"
+        checked_cars.write_text("CVEV.USA. ev6 Kia EV6 (US)\n")
+        subprocess.run(["python3", str(ROOT / "tools/check-descriptor.py"),
+                        str(checked_descriptor), str(checked_cars)], check=True)
         files["NEMESIS.data"] = original.encode()
         files["scripts/ar-pre.sh"] = (ROOT / "kits/ar-installer/ar-pre.sh").read_bytes()
         modes["scripts/ar-pre.sh"] = 0o755

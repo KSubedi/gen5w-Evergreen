@@ -38,7 +38,7 @@ Their hook locations and the progress argument index need the actual stock
 apps/framework. No guessed index or background sender is installed.
 
 The helper's AR flag is **off by default**. The separate, explicitly selected
-`1.2.0-ar.1` experimental installer includes the enable flag and restricts
+`1.2.0.101` experimental installer includes the enable flag and restricts
 installation to US EV6 firmware 260507. Its deployment report records that opt-in;
 the normal Evergreen installer and private delta builder remain disabled by default.
 Generate optional USB controls with
@@ -119,7 +119,7 @@ python3 tools/build-carplay-ar-installer.py \
 ```
 
 This retains the package id `wireless.carplay.aa` for a NEMESIS update, sets the
-package version to `1.2.0-ar.1`, preserves existing services, narrows the package's
+package version to `1.2.0.101`, preserves existing services, narrows the package's
 OS descriptor, and adds an early firmware guard before the original preinstall.
 It includes instructions and uses the same stock gates/backups/uninstall. It is
 a NEMESIS application package, not a firmware flash. The generated package holds
@@ -153,7 +153,12 @@ new deltas are promoted and `tools/compat-built.py` is run.
   apps/libraries/framework are real; missing build.prop/Wi-Fi configuration and
   codec-presence checks use clearly marked synthetic fixtures. The mock's
   dexopt is a stub, so this does not verify Dalvik or codec runtime behavior.
-- An enabled EV6-only `1.2.0-ar.1` installer is built for an initial car test.
+- The first `1.2.0-ar.1` package was refused immediately on the car. NEMESIS's
+  metadata parser rejects non-numeric package versions; the earlier mock tested
+  hooks without parsing that field. The replacement uses `1.2.0.101` and the
+  builder validates the final narrowed descriptor after all overrides. A
+  regression check rejects the old version before publishing any installer.
+- An enabled EV6-only `1.2.0.101` installer is built for the next car test.
 - On-car verification is pending: ordinary turns, forks, highway exits,
   roundabouts, rerouting, app/source changes, route ending, AR disabled,
   speed limits and a car without HUD where practical.

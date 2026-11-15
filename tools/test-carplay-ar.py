@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -184,7 +185,7 @@ class PackageTest(unittest.TestCase):
                 with zipfile.ZipFile(io.BytesIO(outer.read("packages/wireless.carplay.aa.zip"))) as inner:
                     descriptor = inner.read("NEMESIS.data").decode()
                     self.assertIn('os="CVEV.USA.*.260507"', descriptor)
-                    self.assertIn("package-version=1.2.0-ar.1", descriptor)
+                    self.assertIn("package-version=1.2.0.101", descriptor)
                     self.assertIn("preinstall=scripts/ar-pre.sh", descriptor)
                     self.assertIn("name=evlog-offload", descriptor)
                     self.assertIn("name=wifi-client-warn", descriptor)
@@ -198,6 +199,10 @@ class PackageTest(unittest.TestCase):
                         self.assertEqual(hashlib.sha256(inner.read("patches/"+build["patch"])).hexdigest(), build["patch_sha256"])
             with self.assertRaises(ValueError):
                 installer.build(patches, output, True)
+            with mock.patch.object(installer, "VERSION", "1.2.0-ar.1"):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    installer.build(patches, tmp / "bad-version.zip", True)
+            self.assertFalse((tmp / "bad-version.zip").exists())
             report["enabled_by_default"] = True
             report_path.write_text(json.dumps(report))
             with self.assertRaises(ValueError):

@@ -1,6 +1,8 @@
-EVERGREEN 1.2.0-ar.1 -- EXPERIMENTAL CARPLAY AR HUD
+EVERGREEN 1.2.0.101 -- EXPERIMENTAL CARPLAY AR HUD (TEST 2)
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
+This replaces the rejected 1.2.0-ar.1 package. NEMESIS requires a numeric
+package-version; the first package was refused before installation.
 
 WHAT THIS FIRST BUILD DOES
 Keeps Evergreen's wireless CarPlay/Android Auto and audio implementation.

@@ -32,6 +32,7 @@
 #
 # Needs: qemu-arm-static (runs the ARM lpatch), unzip, md5sum.
 set -e
+DESC_CHECK=$(cd "$(dirname "$0")/.." && pwd)/check-descriptor.py
 if [ $# -ne 4 ] || [ "$1" = -h ] || [ "$1" = --help ]; then
     sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
@@ -115,6 +116,10 @@ chmod 755 "$X"/stub/*
 
 # unpack the package and point its scripts at the sandbox instead of the real paths
 (cd "$X" && unzip -q "$ZIP" packages/wireless.carplay.aa.zip && unzip -q packages/wireless.carplay.aa.zip -d pkg)
+# Hooks alone do not exercise NEMESIS's metadata parser. Check the actual inner
+# descriptor too. Leave car coverage empty: some mocks intentionally test fallback.
+: > "$X/descriptor-cars"
+python3 "$DESC_CHECK" "$X/pkg/NEMESIS.data" "$X/descriptor-cars"
 find "$X/pkg" -name '*.sh' | while read -r f; do
     sed -i -e "1s|^#!.*|#!/bin/sh|" -e "s|/system/|$R/system/|g" -e "s|/data/|$R/data/|g" \
         -e "s|/storage/|$R/storage/|g" -e "s|/sys/class/|$R/sys/class/|g" -e "s|/mnt/media_rw/|$R/mnt/media_rw/|g" \
