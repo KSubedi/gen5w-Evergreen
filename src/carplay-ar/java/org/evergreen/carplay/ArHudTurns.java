@@ -38,6 +38,18 @@ public final class ArHudTurns {
         return Float.isInfinite(meters) ? -1f : meters;
     }
 
+    public static float fromMeters(float meters, int unit) {
+        if (meters(meters, 0) < 0f) return -1f;
+        switch (unit) {
+            case 0: return meters;
+            case 1: return meters / 1000f;
+            case 2: return meters / 1609.344f;
+            case 3: return meters / 0.3048f;
+            case 4: return meters / 0.9144f;
+            default: return -1f;
+        }
+    }
+
     /** Raw iAP2 metadata entry point, ready for the firmware-specific parser adapter.
      * This is not called by the icon-only DiPO forwarder. Exact meters are item 10,
      * drivingSide is 0 (right-hand traffic) or 1 (left-hand traffic), and junction

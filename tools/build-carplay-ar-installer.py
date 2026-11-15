@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.2.0.101"
+VERSION = "1.2.0.102"
 
 
 def verifier():
@@ -72,6 +72,9 @@ def build(patches, output, enable_ar):
         original = field(original, "os", '"CVEV.USA.*.260507"')
         original = field(original, "preinstall", "scripts/ar-pre.sh")
         original = field(original, "repository", "https://github.com/KSubedi/gen5w-Evergreen")
+        if data['schema']==2:
+            original=field(original,'postinstall','scripts/ar-post.sh')
+            original=field(original,'short-desc','"Experimental smooth CarPlay AR; EV6 USA 260507 only"')
         # Validate the FINAL descriptor, after all experimental overrides.
         # NEMESIS permits dotted numbers only, not SemVer prerelease suffixes.
         checked_descriptor = Path(temp) / "NEMESIS.data"
@@ -83,6 +86,9 @@ def build(patches, output, enable_ar):
         files["NEMESIS.data"] = original.encode()
         files["scripts/ar-pre.sh"] = (ROOT / "kits/ar-installer/ar-pre.sh").read_bytes()
         modes["scripts/ar-pre.sh"] = 0o755
+        if data['schema']==2:
+            files['scripts/ar-post.sh']=(ROOT/'kits/ar-installer/ar-post.sh').read_bytes()
+            modes['scripts/ar-post.sh']=0o755
         files["ar-hud.enabled"] = b"Explicit opt-in by the experimental AR installer.\n"
         data = json.loads(files["AR_BUILD.json"])
         data["enabled_by_default"] = True
@@ -92,6 +98,8 @@ def build(patches, output, enable_ar):
             "enable_requested": True, "source_build_report_sha256": hashlib.sha256(source_report.read_bytes()).hexdigest(),
             "on_car_tested": False}, indent=2)+"\n").encode()
         readme = (ROOT / "kits/ar-installer/README.txt").read_bytes()
+        if data['schema']==1:
+            readme=b"BASIC-ONLY PACKAGE: the advanced adapters described below are not wired in this schema-1 build.\n\n"+readme
         files["README-AR.txt"] = readme
         # The normal verifier remains usable on the deployment report too.
         report = Path(temp) / "deployment-report.json"

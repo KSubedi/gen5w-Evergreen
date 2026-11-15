@@ -185,7 +185,7 @@ class PackageTest(unittest.TestCase):
                 with zipfile.ZipFile(io.BytesIO(outer.read("packages/wireless.carplay.aa.zip"))) as inner:
                     descriptor = inner.read("NEMESIS.data").decode()
                     self.assertIn('os="CVEV.USA.*.260507"', descriptor)
-                    self.assertIn("package-version=1.2.0.101", descriptor)
+                    self.assertIn("package-version="+installer.VERSION, descriptor)
                     self.assertIn("preinstall=scripts/ar-pre.sh", descriptor)
                     self.assertIn("name=evlog-offload", descriptor)
                     self.assertIn("name=wifi-client-warn", descriptor)
@@ -358,6 +358,20 @@ class ControlTest(unittest.TestCase):
     def test_regular_evergreen_cannot_be_enabled(self):
         self.assertNotEqual(self.control("enable").returncode, 0)
         self.assertFalse(self.marker.exists())
+
+    def test_basic_and_advanced_switches_preserve_overall_ar(self):
+        report=self.package/'AR_BUILD.json'
+        report.write_text('{"variant": "ev6", "schema": 2}\n')
+        self.marker.touch()
+        self.assertEqual(self.control('basic').returncode,0)
+        disabled=self.package/'ar-advanced.disabled'
+        self.assertTrue(disabled.is_file());self.assertTrue(self.marker.is_file())
+        self.assertIn(b'basic AR',self.control('status').stdout)
+        self.assertEqual(self.control('advanced').returncode,0)
+        self.assertFalse(disabled.exists());self.assertTrue(self.marker.is_file())
+        self.control('basic');report.write_text('{"variant": "ev6", "schema": 1}\n')
+        self.assertNotEqual(self.control('advanced').returncode,0)
+        self.assertTrue(disabled.is_file())
 
     def test_enable_status_disable_changes_only_marker(self):
         report = self.package / "AR_BUILD.json"

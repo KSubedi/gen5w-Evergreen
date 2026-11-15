@@ -15,7 +15,8 @@ SIG = "(IIFFIIIII)V"
 FORWARD = "Lorg/evergreen/carplay/ArHudForwarder;->update(" + NC + SIG[1:]
 CALL = re.compile(r"^(\s*)invoke-virtual/range\s+(\{[^}\n]+\}),\s*"
                   + re.escape(NC + "->updateTBTInfo" + SIG) + r"\s*$", re.M)
-HELPER_NAMES = {"ArHudTurns.smali", "ArHudForwarder.smali", "ArHudDistance.smali", "ArHudProgress.smali"}
+HELPER_NAMES = {name + ".smali" for name in ("ArHudTurns", "ArHudForwarder", "ArHudDistance", "ArHudProgress",
+                "ArHudMotion", "ArHudSample", "ArHudRoute", "ArHudIpc", "ArHudRuntime", "ArHudTrap")}
 
 
 def inspect(tree):
@@ -52,7 +53,7 @@ def patch(tree, helpers, expected_calls):
         raise ValueError("AR helpers already present; start from the original Evergreen dex")
     own = helpers / "org/evergreen/carplay"
     if {p.name for p in helpers.rglob("*.smali")} != HELPER_NAMES:
-        raise ValueError("build exactly the four AR helper classes first (no OEM stubs)")
+        raise ValueError("build exactly the ten AR helper classes first (no OEM stubs)")
     for name in HELPER_NAMES:
         if not (own / name).is_file():
             raise ValueError("helper package does not match org.evergreen.carplay")

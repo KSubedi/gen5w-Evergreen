@@ -104,7 +104,7 @@ def build(stock, variant, output, helpers, calls=None, patches=None, lpatch=None
     module = patcher()
     helper_dir = Path(helpers) / "org/evergreen/carplay"
     if {p.name for p in Path(helpers).rglob("*.smali")} != module.HELPER_NAMES:
-        raise ValueError("build the four AR helper classes first")
+        raise ValueError("build the ten AR helper classes first")
     if plan is not None and (not isinstance(plan, dict) or plan.get("schema") != 1 or plan.get("variant") != variant
                              or plan.get("stock_sha256") != fingerprint):
         raise ValueError("inspection plan doesn't match these stock inputs")
@@ -143,7 +143,8 @@ def build(stock, variant, output, helpers, calls=None, patches=None, lpatch=None
             # Dalvik verification or the OEM service's actual behavior on a car.
             run("baksmali", "d", result, "-o", temp / (part + "-verify"))
             remaining = module.inspect(temp / (part + "-verify"))
-            if len(remaining) != 1 or remaining[0]["file"] != "org/evergreen/carplay/ArHudForwarder.smali":
+            if (len(remaining) != 3 or {s["file"] for s in remaining} != {
+                    "org/evergreen/carplay/ArHudForwarder.smali", "org/evergreen/carplay/ArHudRuntime.smali"}):
                 raise ValueError("unexpected direct cluster calls after injection")
             new_patch = variant + "/HKMC_DiPO." + part.split("_", 1)[1] + ".ar.lpd"
             run(sys.executable, ROOT / "tools/mkdelta.py", stock / "app/HKMC_DiPO.odex", result, staged / new_patch)

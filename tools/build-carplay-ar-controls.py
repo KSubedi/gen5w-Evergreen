@@ -7,7 +7,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 directory = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "dist"
 directory.mkdir(parents=True, exist_ok=True)
-for mode in ("enable", "disable", "status"):
+for mode in ("enable", "disable", "status", "basic", "advanced"):
     output = directory / ("Evergreen-AR-" + mode + ".zip")
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         for name in ("NEMESIS.data", "NEMESIS.sh"):

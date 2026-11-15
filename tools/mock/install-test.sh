@@ -142,9 +142,11 @@ adb_props() { echo "enable=$(cat "$X/prop_persist.service.adb.tcp.enable" 2>/dev
 cd "$X/pkg"; export LPATCH="$X/stub/lpatch_q"
 PRE_HOOK=$(sed -n 's/^preinstall=//p' NEMESIS.data)
 case "$PRE_HOOK" in scripts/pre.sh|scripts/ar-pre.sh) ;; *) echo "unsupported mock preinstall hook: $PRE_HOOK"; exit 2 ;; esac
+POST_HOOK=$(sed -n 's/^postinstall=//p' NEMESIS.data)
+case "$POST_HOOK" in scripts/post.sh|scripts/ar-post.sh) ;; *) echo "unsupported mock postinstall hook: $POST_HOOK"; exit 2 ;; esac
 ok=1
 if "$SH" "$PRE_HOOK" > "$X/pre.log" 2>&1; then
-    "$SH" scripts/post.sh > "$X/post.log" 2>&1 || true
+    "$SH" "$POST_HOOK" > "$X/post.log" 2>&1 || true
     if grep -q 'all parts installed' "$X/post.log"; then
         echo "INSTALL OK $(grep -o -E "(full|basic) mode[^)]*" "$X/post.log" | head -1)"
     else

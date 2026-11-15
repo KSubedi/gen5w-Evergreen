@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""Synthetic advanced-adapter and three-app build tests; no OEM code fixtures."""
+import copy
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest import mock
+import zipfile
+
+ROOT=Path(__file__).resolve().parents[1]
+
+
+def load(name):
+    spec=importlib.util.spec_from_file_location(name.replace('-','_'),ROOT/'tools'/(name+'.py'))
+    m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+
+
+advanced=load('build-carplay-ar-advanced');adapter=load('patch-carplay-ar-advanced')
+simple=load('patch-carplay-ar');base=load('build-carplay-ar');verify=load('check-carplay-ar-build')
+installer=load('build-carplay-ar-installer')
+HELPERS=ROOT/'src/carplay-ar/build/smali';LPATCH=ROOT/'tools/lpatch/lpatch-host'
+NC='Lcom/hkmc/cluster/NavigationCluster;'
+
+
+def write(path,text):
+    path.parent.mkdir(parents=True,exist_ok=True);path.write_text(text)
+
+
+def dipo(tree):
+    args='\n'.join('    const/4 v%d, 0x0'%i for i in range(10))
+    write(tree/adapter.U,'''.class public Lcom/daudio/app/dipo/e/u;
+.super Ljava/lang/Object;
+.field private Am:Ljava/util/LinkedHashMap;
+.method private a(Ljava/lang/Integer;Ljava/lang/Object;)V
+    .registers 15
+    check-cast p2, Lcom/daudio/app/dipo/e/c;
+'''+args+'''
+    invoke-virtual/range {v0 .. v9}, Lcom/hkmc/cluster/NavigationCluster;->updateTBTInfo(IIFFIIIII)V
+    return-void
+.end method
+.method private nT()V
+    .registers 1
+    return-void
+.end method
+.method public nS()V
+    .registers 1
+    return-void
+.end method
+''')
+    write(tree/adapter.C,'''.class public Lcom/daudio/app/dipo/e/c;
+.super Ljava/lang/Object;
+.field private aR:I
+.field private ba:I
+.field private bd:[I
+.method public a(ILjava/lang/Object;)V
+    .registers 4
+    const/4 v0, 0x0
+    iput v0, p0, Lcom/daudio/app/dipo/e/c;->ba:I
+    return-void
+.end method
+.method public ad()V
+    .registers 1
+    return-void
+.end method
+''')
+    write(tree/adapter.V,'.class public Lcom/daudio/app/dipo/e/v;\n.super Ljava/lang/Object;\n'+
+          ''.join('.field private '+x+':I\n' for x in ('DM','DR','DS','DU')))
+
+
+def navi(tree):
+    write(tree/'synthetic/Nav.smali','''.class public Lsynthetic/Nav;
+.super Ljava/lang/Object;
+.method public static modern(Lcom/hkmc/cluster/NavigationCluster;Lcom/hkmc/cluster/NavigationCluster$NaviTbtTrapInfo;)V
+    .registers 2
+    invoke-virtual {p0, p1}, Lcom/hkmc/cluster/NavigationCluster;->updateTBTTrapInfoNew(Lcom/hkmc/cluster/NavigationCluster$NaviTbtTrapInfo;)V
+    return-void
+.end method
+.method public static legacy(Lcom/hkmc/cluster/NavigationCluster;IIIIIIIIIIIIIIIII)V
+    .registers 18
+    invoke-virtual/range {p0 .. p17}, Lcom/hkmc/cluster/NavigationCluster;->updateTBTTrapInfo(IIIIIIIIIIIIIIIII)V
+    return-void
+.end method
+.method public static nativeTurn(Lcom/hkmc/cluster/NavigationCluster;IIFFIIIII)V
+    .registers 10
+    invoke-virtual/range {p0 .. p9}, Lcom/hkmc/cluster/NavigationCluster;->updateTBTInfo(IIFFIIIII)V
+    return-void
+.end method
+''')
+
+
+def framework(tree):
+    write(tree/'com/hkmc/cluster/NavigationCluster.smali','.class public '+NC+'\n.super Ljava/lang/Object;\n'+
+          '.method public updateTBTTrapInfo'+adapter.OLD_SIG+'\n    .registers 18\n'+
+          '    .param p12, "barGraphLevel"\n    .param p13, "speedLimit"\n    return-void\n.end method\n'+
+          '.method public updateTBTTrapInfoNew'+adapter.NEW_SIG+'\n    .registers 2\n    return-void\n.end method\n')
+    write(tree/'com/hkmc/cluster/NavigationCluster$NaviTbtTrapInfo.smali',
+          '.class public Lcom/hkmc/cluster/NavigationCluster$NaviTbtTrapInfo;\n.super Ljava/lang/Object;\n'+
+          ''.join('.field public '+f+':I\n' for f in adapter.TRAP_FIELDS)+
+          '.method public constructor <init>()V\n    .registers 1\n    invoke-direct {p0}, Ljava/lang/Object;-><init>()V\n    return-void\n.end method\n')
+
+
+class AdvancedTest(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name);self.dipo=self.root/'dipo';self.navi=self.root/'navi';self.fw=self.root/'fw'
+        dipo(self.dipo);navi(self.navi);framework(self.fw)
+
+    def test_adapter_hooks_assemble_and_reject_repeat(self):
+        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),5)
+        adapter.patch_dipo(self.dipo,plan)
+        simple.patch(self.dipo,HELPERS,1)
+        base.run('smali','a','-j','1','--api','18','-o',self.root/'patched.dex',self.dipo)
+        for name in ('prepare','reset','exact','forget','begin','finish'):
+            self.assertTrue(any('ArHudRuntime;->'+name+'(' in p.read_text() for p in self.dipo.rglob('*.smali')))
+        with self.assertRaises(ValueError):adapter.patch_dipo(self.dipo,plan)
+
+    def test_stale_or_unknown_metadata_fails_before_edits(self):
+        plan=adapter.inspect_dipo(self.dipo)
+        path=self.dipo/adapter.C;path.write_text(path.read_text().replace('.registers 4','.registers 5'))
+        before={str(p):p.read_bytes() for p in self.dipo.rglob('*.smali')}
+        with self.assertRaises(ValueError):adapter.patch_dipo(self.dipo,plan)
+        self.assertEqual(before,{str(p):p.read_bytes() for p in self.dipo.rglob('*.smali')})
+        path.write_text(path.read_text().replace('private ba:I','private ba:J'))
+        with self.assertRaises(ValueError):adapter.inspect_dipo(self.dipo)
+
+    def test_trap_overloads_rewrite_but_native_turns_do_not(self):
+        native=simple.inspect(self.navi);plan=adapter.inspect_navi(self.navi)
+        self.assertEqual(len(plan),2)
+        adapter.patch_navi(self.navi,HELPERS,plan)
+        self.assertEqual([s for s in simple.inspect(self.navi) if not s['file'].startswith('org/')],native)
+        self.assertTrue(all(s['file'].startswith('org/') for s in adapter.inspect_navi(self.navi)))
+        base.run('smali','a','-j','1','--api','18','-o',self.root/'navi.dex',self.navi)
+
+    def test_unknown_trap_registers_or_signature_rejected(self):
+        path=self.navi/'synthetic/Nav.smali'
+        path.write_text(path.read_text().replace('{p0 .. p17}','{p0 .. p16}'))
+        with self.assertRaises(ValueError):adapter.inspect_navi(self.navi)
+
+    def test_framework_requires_exact_bar_index_and_all_object_fields(self):
+        api=adapter.inspect_framework(self.fw);self.assertEqual(api['bar_index'],11)
+        path=self.fw/'com/hkmc/cluster/NavigationCluster.smali'
+        path.write_text(path.read_text().replace('.param p12, "barGraphLevel"','.param p11, "barGraphLevel"'))
+        with self.assertRaises(ValueError):adapter.inspect_framework(self.fw)
+        framework(self.fw)
+        path=self.fw/'com/hkmc/cluster/NavigationCluster$NaviTbtTrapInfo.smali'
+        path.write_text(path.read_text()+'.field public newWarning:I\n')
+        with self.assertRaises(ValueError):adapter.inspect_framework(self.fw)
+
+    def test_optional_ipc_permissions_do_not_block_projection_install(self):
+        work=self.root/'post-test';(work/'scripts').mkdir(parents=True)
+        write(work/'scripts/post.sh','echo delegated > post.ran\n')
+        stub=work/'bin';stub.mkdir()
+        write(stub/'chown','#!/bin/sh\nexit 1\n');(stub/'chown').chmod(0o755)
+        script=(ROOT/'kits/ar-installer/ar-post.sh').read_text()
+        script=script.replace('/data/',str(work)+'/data/').replace('exec /system/bin/sh','exec /bin/sh')
+        script='\n'.join('export PATH='+str(stub)+':/usr/bin:/bin' if line.startswith('export PATH=') else line for line in script.splitlines())+'\n'
+        write(work/'post.sh',script)
+        result=subprocess.run(['sh','post.sh'],cwd=work,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertTrue((work/'post.ran').exists())
+        self.assertIn(b'WARN: AR progress state unavailable',result.stdout)
+
+    def test_three_build_delta_roundtrips_and_enabled_installer(self):
+        stock=self.root/'stock';(stock/'app').mkdir(parents=True);(stock/'framework').mkdir()
+        for name in ('core.odex','automotive.jar','automotive.odex'):(stock/'framework'/name).write_bytes(b'our synthetic framework '+name.encode())
+        patches=self.root/'input-patches';shutil.copytree(ROOT/'patches',patches)
+        lines=[];wanted=[]
+        for name,tree in (('HKMC_DiPO',self.dipo),('HKMC_Navi_ExSL',self.navi)):
+            original=stock/'app'/(name+'.odex');original.write_bytes(('our synthetic original '+name).encode())
+            apk=stock/'app'/(name+'.apk')
+            with zipfile.ZipFile(apk,'w') as z:z.writestr('AndroidManifest.xml','our synthetic app manifest')
+            for path in (original,apk):wanted.append(path.name+' '+base.md5(path))
+            dex=self.root/(name+'.dex');base.run('smali','a','-j','1','--api','18','-o',dex,tree)
+            delta=patches/'ev6'/(name+'.synthetic.lpd')
+            base.run(sys.executable,ROOT/'tools/mkdelta.py',original,dex,delta)
+            result=self.root/(name+'-base.apk');base.run(LPATCH,'zipadd',apk,dex,result)
+            for part in (('2_tbt','3_bridge') if name=='HKMC_DiPO' else ('2_tbt',)):
+                lines.append(' '.join((part,'app',name,'ev6/'+delta.name,base.md5(result))))
+        (patches/'ev6/stock').write_text('\n'.join(wanted)+'\n');(patches/'ev6/manifest').write_text('\n'.join(lines)+'\n')
+        api=adapter.inspect_framework(self.fw)
+        with mock.patch.object(advanced,'framework',return_value=api):
+            plan=advanced.inspect(stock,patches,LPATCH)
+            stale=copy.deepcopy(plan);stale['framework_api']['bar_index']=8
+            with self.assertRaises(ValueError):advanced.build(stock,self.root/'stale',HELPERS,stale,patches,LPATCH)
+            self.assertFalse((self.root/'stale').exists())
+            output=self.root/'advanced';report=advanced.build(stock,output,HELPERS,plan,patches,LPATCH)
+        self.assertEqual(len(report['builds']),3);verify.validate(output/'patches',output/'ar-build.json')
+        self.assertFalse(list(output.rglob('*.apk')));self.assertFalse(list(output.rglob('*.dex')))
+        package=self.root/'advanced.zip';installer.build(output/'patches',package,True)
+        with zipfile.ZipFile(package) as outer:
+            with zipfile.ZipFile(io.BytesIO(outer.read('packages/wireless.carplay.aa.zip'))) as inner:
+                self.assertIn('postinstall=scripts/ar-post.sh',inner.read('NEMESIS.data').decode())
+                deployed=json.loads(inner.read('AR_BUILD.json'));self.assertTrue(deployed['features']['progress_adapter'])
+                self.assertIn(b'chown 1000',inner.read('scripts/ar-post.sh'))
+        bad=copy.deepcopy(report);bad['builds']=bad['builds'][:2]
+        (output/'bad.json').write_text(json.dumps(bad))
+        with self.assertRaises(ValueError):verify.validate(output/'patches',output/'bad.json')
+
+
+if __name__=='__main__':unittest.main()

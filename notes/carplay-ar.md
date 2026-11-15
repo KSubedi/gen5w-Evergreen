@@ -1,169 +1,156 @@
-# CarPlay AR HUD prototype
+# CarPlay AR HUD for the US EV6
 
-Target: the owner's **2022 Kia EV6 GT-Line, USA**, reported to be on the latest
-head-unit firmware, subsequently confirmed as **260507**. Evergreen's matching US EV6 patch set is `ev6`.
-Matching stock file hashes must be checked before
-building a car package. No car has tested this fork's implementation yet.
+Target: the owner's **2022 Kia EV6 GT-Line, USA, firmware 260507** (`ev6`).
+The owner confirmed **1.2.0.101 basic AR works really well**. Version **1.2.0.102**
+adds exact distance, bounded interpolation, metadata and progress; those additions
+need a separate car test. Normal Evergreen remains unchanged by default.
 
-## Implementation and limits
+## Implemented behavior
 
-This fork needs NEMESIS, not HMG-API. DiPO already sends phone turns through
-`NavigationCluster.updateTBTInfo(int,int,float,float,int,int,int,int,int)`.
-The build tool replaces its calls with a static forwarder taking the same
-receiver and arguments. It changes no register allocation or route parsing.
-Only DiPO is patched: native navigation, Android Auto, HUD lists and lanes keep
-their existing implementations. There are no new vehicle commands or raw CAN
-messages. The existing OEM cluster call carries different display values.
+The proven basic adapter maps supported projection icons to native turn types
+inside approximately 457 m: straight, slight/ordinary/sharp turns, U-turns,
+forks, exits and unambiguous roundabout exits. It sends the native angle and
+zero side-street bits through the existing `NavigationCluster.updateTBTInfo`
+call. Unknown/far/error/native messages pass through. It does not infer arrival
+from zero distance or add raw vehicle commands.
 
-With the experimental mode enabled, documented projection icons are converted
-to native turn types within 457 m: straight, left/right, slight/sharp turns,
-U-turns, left/right forks and exits, and unambiguous roundabout exit icons.
-The helper sends the native angle, zero side-street bits and a turn-frame bar.
-Unknown types, invalid distances/units/error flags, far-away turns, route clears
-and existing native messages pass through unchanged. It does not infer arrival
-from a rounded distance. Directions skipped by Evergreen's existing parser are
-still skipped: this prototype does not repair missing maneuver metadata.
+The advanced adapter:
 
-Distances come from the existing display distance, converted from the cluster's
-units (m/km/mi/ft/yd). They are rounded; the live adapter does not yet consume exact iAP2 distances. The separate trap frame is untouched, so this does not
-implement the cluster's filling distance bar or overwrite speed-limit data.
-The source also includes reusable, tested foundations for richer integration:
+- Captures exact meters only when DiPO actually parses iAP2 item 10. A default
+  zero field is never treated as a measurement. Raw receipts bind to the current
+  maneuver at packet completion, including when distance precedes the maneuver
+  list; a new maneuver cannot borrow the previous maneuver's distance.
+- Reads the inspected maneuver type, driving side, junction and exit angle from
+  the app's own state. Missing/unknown metadata falls back to basic AR. Native
+  arrival messages are preserved rather than synthesized from a rounded zero.
+- Estimates closing rate from consecutive exact-distance samples. This CarPlay
+  parser does **not** expose time to the next maneuver, so destination ETA is not
+  used as a substitute. Stationary/increasing distances, implausible rates,
+  new maneuvers/components/owners and long gaps reset velocity.
+- Sends changing near-turn distances every 250 ms, preserving the cluster's
+  original units (m/km/mi/ft/yd). Extrapolation stops after 1.5 s and holds; it
+  never runs below zero. Route stop, disconnect and source changes cancel it.
+  Five seconds without phone input removes the progress lease.
+- Adds a progress overlay inside the navigation app. It copies the latest OEM
+  trap frame and changes **only** the bar. The verified legacy argument is p12,
+  zero-based index 11; the newer object has 22 public int fields, all copied.
+  Speed limit, units, cameras, country and warning fields remain the OEM's.
+  Native navigation's original main-turn calls stay unchanged.
 
-- Raw maneuver metadata conversion, including driving side, junction and explicit arrival state.
-- Monotonic distance interpolation using time-to-turn, limited to 1.5 seconds of extrapolation.
-- A five-second progress lease and a merge helper that preserves all other 17 trap-frame arguments.
+The progress path wraps all five existing trap calls in `HKMC_Navi_ExSL`, both
+`updateTBTTrapInfo(17 ints)` and `updateTBTTrapInfoNew(NaviTbtTrapInfo)`. On a bar
+change it replays the navigation app's latest frame; it never guesses a limit
+or reads the cluster's delayed speed-limit echo. With no cached OEM frame, it
+waits for one (normally a map speed-limit update). Expiry or disabling advanced
+mode restores that frame's original bar once. Frame replacement and OEM updates
+serialize, so an old cached speed limit cannot race over a newer one.
 
-Those three foundations are **not connected to DiPO or the OEM trap sender yet**.
-Their hook locations and the progress argument index need the actual stock
-apps/framework. No guessed index or background sender is installed.
+DiPO and navigation exchange only a tiny bar lease under the package's own
+`ar-state/` directory. The installer owns that directory to system uid 1000,
+mode 0755; only DiPO writes, navigation reads a mode-0644 atomic file. DiPO's
+stock manifest declares `android.uid.system`; navigation is a separate app uid.
+The lease contains a boot nonce, monotonic times, active flag and bar, with no
+road names, coordinates or phone identifiers. It expires within five seconds,
+requires a heartbeat within three seconds, and is rejected across reboots.
+No filesystem sync is performed at navigation cadence: this is expiring runtime
+state, not an archive. Optional IPC permission failure logs a warning and retains
+the OEM bar while allowing the existing wireless install and smooth AR to run.
+The original apps' wireless/audio implementation remains.
 
-The helper's AR flag is **off by default**. The separate, explicitly selected
-`1.2.0.101` experimental installer includes the enable flag and restricts
-installation to US EV6 firmware 260507. Its deployment report records that opt-in;
-the normal Evergreen installer and private delta builder remain disabled by default.
-Generate optional USB controls with
-`python3 tools/build-carplay-ar-controls.py`: enable, disable and status archives
-run through NEMESIS. Enable/status require an installed generated AR build and
-US EV6 firmware 260507. Disable remains available without either prerequisite.
-They change only the package's flag, never `/system`, and do not restart CarPlay.
+Two daemon workers live in the existing app processes. They do not hold wake
+locks. The turn worker sends only changed, valid near-turn distances; the bar
+worker sends only a changed overlay or restoration, plus the OEM app's own
+normal updates. New helper failures use log tag `EvergreenAR` without route data.
 
-The following manual commands provide the same toggle. On a generated and mock-tested experimental
-build, enable it while parked using NEMESIS:
+## Controls and rollback
 
-```sh
-adb shell "nemesis root -c 'touch /data/nemesis/apps/wireless.carplay.aa/ar-hud.enabled'"
-```
+The helper is disabled without `ar-hud.enabled`. The explicitly selected
+experimental installer includes that file and restricts installation to
+`CVEV.USA.*.260507`. Normal Evergreen and private delta generation stay opt-in.
+Build USB controls with `python3 tools/build-carplay-ar-controls.py`:
 
-Disable it (subsequent turn updates use the original format):
+- `enable` / `disable`: change the overall AR flag; disable works even if the
+  prototype/target firmware is absent.
+- `basic`: sets `ar-advanced.disabled`, returning to the proven icon adapter and
+  restoring the OEM bar without removing wireless projection.
+- `advanced`: removes that file when schema-2 adapters are installed. If AR was
+  globally disabled, use the enable kit too.
+- `status`: reports overall state and whether basic mode is selected.
 
-```sh
-adb shell "nemesis root -c 'rm -f /data/nemesis/apps/wireless.carplay.aa/ar-hud.enabled'"
-```
-
-The file is inside the package's own directory, removed when NEMESIS removes
-the package. For testing the toggle, start a fresh navigation route so the HUD
-receives a fresh turn. Keep the car's HUD in AR mode.
+These controls change only package-owned files and do not reboot. Start a fresh
+navigation route after a switch. Keep the car HUD in AR mode. The prior
+`1.2.0.101` installer remains a full rollback to the owner-confirmed basic build;
+normal Evergreen remains another option. NEMESIS uninstall restores stock.
 
 ## Build and verify
 
-Host requirements: Python 3.9+, JDK 17, smali/baksmali 2.5.2, a host C compiler,
+Use Python 3.9+, JDK 17, smali/baksmali 2.5.2 with all dependencies, host lpatch,
 zip/unzip, and `pip install --require-hashes -r tools/requirements.txt`.
-The original mock head unit also needs qemu-arm-static and preferably mksh.
-The helper build uses R8/D8 8.3.37, available from Google's compiler releases:
+The head-unit mock needs qemu-arm-static and preferably mksh. R8/D8 8.3.37 is
+pinned in CI (SHA-256 `900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0190b8d61b1199`).
 
 ```sh
-curl -fL https://storage.googleapis.com/r8-releases/raw/8.3.37/r8.jar -o /private/tools/r8.jar
-echo '900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0190b8d61b1199  /private/tools/r8.jar' | sha256sum -c -
 cc -DHOST -O2 -o tools/lpatch/lpatch-host tools/lpatch/lpatch.c
 D8_JAR=/private/tools/r8.jar sh src/carplay-ar/build.sh
 sh tools/test-carplay-ar.sh
-```
-
-The tests use our own synthetic classes, never manufacturer files. They cover
-unit conversion, maneuver types, pass-through, call rewriting, actual DEX
-assembly/disassembly, both build variants and delta round trips. They cannot
-verify Dalvik's runtime checks or the HUD's physical behavior.
-
-For real patch generation, first collect the Leafia port kit's stock tree
-privately. The builder needs `app/HKMC_DiPO.apk` and `app/HKMC_DiPO.odex`;
-the full mock install needs the rest of the stock tree too. Do not upload keys,
-account data or other private kit output. The builder checks those two files
-against `patches/ev6/stock` before rebuilding anything.
-
-First export an inspection plan. Review the method locations, register shapes
-and call counts for **both** reconstructed variants. The build checks this
-plan's stock, base patch and DEX fingerprints again before changing anything.
-A changed input or unsupported call shape fails the build.
-
-```sh
-python3 tools/build-carplay-ar.py --variant ev6 \
-  --stock /private/LEAFIA/private/stock --inspect \
-  --out /private/ev6-call-sites.json
-# Review /private/ev6-call-sites.json before building.
-python3 tools/build-carplay-ar.py --variant ev6 \
-  --stock /private/LEAFIA/private/stock --out /private/evergreen-ar \
-  --plan /private/ev6-call-sites.json
-EVERGREEN_PATCHES_DIR=/private/evergreen-ar/patches \
-  sh tools/build-package.sh dist/Evergreen_CarPlay_AR-experimental.zip
-MOCK_SH=mksh MOCK_NEMESIS=1.15 sh tools/mock/install-test.sh \
-  dist/Evergreen_CarPlay_AR-experimental.zip \
-  CVEV.USA.0000.V015.012.260507 cvev_us /private/LEAFIA/private/stock
-```
-
-To build the labelled, enabled experimental installer after reviewing the plan
-and generating the real deltas:
-
-```sh
+python3 tools/build-carplay-ar-advanced.py \
+  --stock /private/EV6-AR-STOCK/stock --inspect --out /private/ev6-advanced-plan.json
+# Review method/API fingerprints, register shapes and all five navigation call sites.
+python3 tools/build-carplay-ar-advanced.py \
+  --stock /private/EV6-AR-STOCK/stock --plan /private/ev6-advanced-plan.json \
+  --out /private/evergreen-advanced-ar
 python3 tools/build-carplay-ar-installer.py \
-  --patches /private/evergreen-ar/patches --enable-ar
+  --patches /private/evergreen-advanced-ar/patches --enable-ar
+MOCK_SH=mksh MOCK_NEMESIS=1.15 sh tools/mock/install-test.sh \
+  dist/Evergreen_EV6_US_260507_AR_1.2.0.102.zip \
+  CVEV.USA.0000.V015.012.260507 cvev_us /private/mock-stock
 ```
 
-This retains the package id `wireless.carplay.aa` for a NEMESIS update, sets the
-package version to `1.2.0.101`, preserves existing services, narrows the package's
-OS descriptor, and adds an early firmware guard before the original preinstall.
-It includes instructions and uses the same stock gates/backups/uninstall. It is
-a NEMESIS application package, not a firmware flash. The generated package holds
-only deltas and our source-derived helper payload; no complete OEM apps.
+The builder verifies all stock inputs, reconstructs and hash-checks the original
+Evergreen APKs, deodexes against the full ordered framework (Dalvik API **18**),
+and verifies field/API layouts. It modifies both DiPO variants and one navigation
+build, assembles each twice, disassembles again, then verifies delta round trips
+and final APK hashes. No platform/OEM compile stub is included in the DEX.
+Only deltas, fingerprints and reports leave temporary private storage. The
+committed stock patches and compatibility data stay unchanged.
 
-Generation reconstructs the existing DiPO variants and verifies their manifest
-APK hashes before modifying them. New builds are assembled twice and compared,
-disassembled again, and round-trip checked through lpatch. Only deltas and a
-build report and call-site plan leave the temporary working directory. The report
-records input/helper/output SHA-256 fingerprints and which adapters are wired.
-Packaging verifies both AR deltas against that report and includes it as
-`AR_BUILD.json` for the USB controls. The committed patch sets
-stay unchanged; unrelated variants and the universal build are not updated.
-The generated manifest records the new APK hashes for the normal installer.
-The compatibility website will still describe the committed builds until the
-new deltas are promoted and `tools/compat-built.py` is run.
+Schema-2 build/deployment reports record all three deltas and framework hashes.
+The labelled installer preserves existing services, adds an early firmware gate,
+creates only its dedicated IPC directory, and delegates to Evergreen's existing
+checksum-gated install/uninstall. Every final descriptor is validated **after**
+all overrides. NEMESIS accepts numeric versions: the first `1.2.0-ar.1` package
+was rejected before install; a regression check prevents that error recurring.
 
-## Validation status and next steps
+For a basic-only private delta build, `tools/build-carplay-ar.py --variant ev6`
+retains the schema-1 inspection-plan workflow. It does not wire advanced hooks.
 
-- Helper compilation, 509 Java checks and 19 synthetic integration tests pass locally.
-- The owner's collection supplied all 12 known app/library files with matching
-  US EV6 260507 stock hashes, plus the framework JAR/ODEX files. They stay private.
-- The framework confirms `NavigationCluster.updateTBTInfo(IIFFIIIII)V`. Each
-  reconstructed DiPO variant has one inspected receiver-plus-nine-argument call
-  in `com/daudio/app/dipo/e/u.a(Integer,Object)`. The existing app passes zero
-  distance/bar error flags and already maps display units into cluster units.
-- Both real DiPO delta builds assemble deterministically, disassemble, and
-  round-trip to their expected DEX/APK hashes.
-- Mock full-mode install/uninstall passes using mksh and the actual ARM lpatch
-  under qemu. Uninstall restores the tested `/system` tree byte for byte. The
-  apps/libraries/framework are real; missing build.prop/Wi-Fi configuration and
-  codec-presence checks use clearly marked synthetic fixtures. The mock's
-  dexopt is a stub, so this does not verify Dalvik or codec runtime behavior.
-- The first `1.2.0-ar.1` package was refused immediately on the car. NEMESIS's
-  metadata parser rejects non-numeric package versions; the earlier mock tested
-  hooks without parsing that field. The replacement uses `1.2.0.101` and the
-  builder validates the final narrowed descriptor after all overrides. A
-  regression check rejects the old version before publishing any installer.
-- An enabled EV6-only `1.2.0.101` installer is built for the next car test.
-- On-car verification is pending: ordinary turns, forks, highway exits,
-  roundabouts, rerouting, app/source changes, route ending, AR disabled,
-  speed limits and a car without HUD where practical.
-- Keep this on the development branch; no stable version bump or release tag
-  until the generated builds and rollback have been verified.
+## Validation and remaining car checks
+
+The owner's collection supplied all 12 known app/library files with matching
+US EV6 260507 hashes plus the full framework. They remain private. The API
+inspection confirms the nine-argument main turn call, legacy bar index 11,
+all 22 trap-object fields, five DiPO adapter methods and five navigation trap
+sites. Original native-navigation main-turn calls are preserved.
+
+Synthetic tests (1,010 Java checks and 27 Python integration cases) cover
+distance units/rate bounds, missing or partial metadata,
+packet ordering, resets, stale/out-of-order data, source/owner/maneuver changes,
+boot-bound IPC, every trap field, restoration of the OEM bar, API/register
+mismatch rejection, three real DEX/delta round trips from synthetic inputs,
+package modes, firmware gates, final numeric metadata and stale build plans.
+They contain no manufacturer implementation.
+
+Real-input mock full-mode install/uninstall uses mksh and the actual ARM lpatch
+under qemu. The apps/libraries/framework are real; uncollected build.prop/Wi-Fi
+configuration and codec-presence checks use marked synthetic fixtures. Uninstall
+restores that tested system tree byte for byte. The mock dexopt is a stub: it
+cannot verify Dalvik runtime behavior or the physical HUD.
+
+On-car acceptance for 1.2.0.102 is still pending: stationary arrows, smooth normal
+turns, forks/exits/roundabouts, rerouting, consecutive maneuvers, navigation app
+switches, route ending/disconnect, basic/disable controls, and speed-limit/camera
+changes while the bar is active. Do not infer advanced success from the confirmed
+basic build. Keep development on this branch until those checks pass.
 
 ## Obtaining stock files
 

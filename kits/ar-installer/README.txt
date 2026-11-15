@@ -1,17 +1,25 @@
-EVERGREEN 1.2.0.101 -- EXPERIMENTAL CARPLAY AR HUD (TEST 2)
+EVERGREEN 1.2.0.102 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
-This replaces the rejected 1.2.0-ar.1 package. NEMESIS requires a numeric
-package-version; the first package was refused before installation.
+The owner confirmed basic AR in 1.2.0.101 works on this car. This new advanced
+build still needs its own car test. NEMESIS package versions remain numeric.
 
-WHAT THIS FIRST BUILD DOES
+WHAT THIS BUILD DOES
 Keeps Evergreen's wireless CarPlay/Android Auto and audio implementation.
-Converts supported CarPlay turn icons to native AR turn type/angle within
-approximately 457 m (1,500 ft). AR is enabled by this explicit experimental
-installer. Unknown/far turns pass through. The car must have HUD AR mode selected.
-This first build uses the phone's rounded display distance; exact-distance
-interpolation and the separate filling progress bar are not wired yet.
-No AR hardware or real-car test has been completed for this build.
+Converts supported turns to native AR format within about 457 m (1,500 ft).
+The advanced build uses the phone's exact maneuver distance and raw turn
+metadata. It estimates the closing rate from consecutive exact distances and
+updates at 250 ms intervals for at most 1.5 seconds after a sample, then holds.
+It does not guess time-to-turn or extrapolate through stale route changes.
+Invalid/missing metadata falls back to the working icon-based AR behavior.
+
+The progress overlay changes only the bar in the navigation app's latest OEM
+trap frame. Speed limits, units, camera and warning fields remain the OEM's.
+It waits for that app's first real trap frame (often a map speed-limit update);
+it never constructs a speed limit from phone data or the cluster's delayed echo.
+The lease expires on stale data, across boots, or when guidance/AR is disabled.
+Both AR and advanced features are enabled by this selected experimental installer.
+Unknown/far/native turns pass through. The HUD must have AR mode selected.
 
 INSTALL
 1. Save the working Evergreen installer so you can reinstall it if needed.
@@ -29,6 +37,13 @@ INSTALL
    first; a passenger should observe/report behavior during a normal drive.
 
 TURN AR OFF / ROLLBACK
+For a quick return to BASIC AR while keeping the new package installed, use
+Evergreen-AR-basic.zip on a separate USB. It disables the new interpolation,
+metadata and progress overlay, while retaining the confirmed icon-based AR.
+Start a fresh route after switching. Evergreen-AR-advanced.zip restores advanced
+mode when the new adapters are installed. If AR was globally disabled, use the
+enable kit too. The previous 1.2.0.101 installer remains a full rollback option.
+
 Use the separately supplied Evergreen-AR-disable.zip kit on an otherwise empty
 USB. It removes only the AR flag and keeps wireless projection installed. Start
 a fresh navigation route after toggling. Evergreen-AR-enable.zip re-enables it.
@@ -45,3 +60,5 @@ Report the navigation app, maneuver and approximate distance, whether the HUD
 was in AR mode, and whether AR-disable returns the expected original behavior.
 NEMESIS Manager's Logs > Copy to USB includes the package install logs. Avoid
 publishing full stock firmware or private phone/route logs.
+New helper failures are logged with tag EvergreenAR, without road names,
+coordinates or phone identifiers.

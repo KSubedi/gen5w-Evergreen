@@ -17,6 +17,14 @@ public final class ArHudForwarder {
         } catch (RuntimeException unavailable) {
             // A missing/unreadable opt-in must retain the original turn.
         }
+        try {
+            ArHudSample sample = ArHudRoute.take();
+            if (enabled && ArHudRuntime.update(cluster, type, sideStreet, direction, distance,
+                    distanceError, combiSideStreet, unit, bar, barError, sample,
+                    android.os.SystemClock.elapsedRealtime(), ArHudIpc.advanced())) return;
+        } catch (RuntimeException unavailable) {
+            ArHudRuntime.reset();
+        }
         forward(enabled, cluster, type, sideStreet, direction, distance, distanceError,
                 combiSideStreet, unit, bar, barError);
     }
