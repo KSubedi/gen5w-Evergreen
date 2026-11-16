@@ -11,6 +11,15 @@ Wireless **CarPlay** and **Android Auto** for Hyundai, Kia and Genesis **Gen5W**
 
 **Compatibility checker:** https://zpoon.github.io/gen5w-Evergreen/
 
+## EV6 CarPlay AR fork
+
+This fork includes experimental CarPlay AR HUD support for **Kia EV6 GT-Line USA,
+firmware 260507**. Download the installer, controls and installation instructions
+from the [AR prerelease](https://github.com/KSubedi/gen5w-Evergreen/releases/tag/v1.2.0.103-beta.1).
+The normal package builder still builds standard Evergreen; the AR installer is
+explicitly selected and gated to that EV6 firmware. Highway-exit AR remains under
+investigation. See [development and replay notes](notes/carplay-ar.md).
+
 ## How it works
 
 Firmware differs between models, regions and versions, so whole-file checksums rarely match across cars. Evergreen checks **only the bytes it changes**:
