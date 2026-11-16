@@ -373,6 +373,19 @@ class ControlTest(unittest.TestCase):
         self.assertNotEqual(self.control('advanced').returncode,0)
         self.assertTrue(disabled.is_file())
 
+    def test_diagnostics_reads_only_our_tag_and_preserves_flags(self):
+        (self.package/'AR_BUILD.json').write_text('{"variant": "ev6"}\n')
+        self.marker.touch()
+        logcat=self.root/'bin/logcat'
+        logcat.write_text('#!/bin/sh\n[ "$*" = "-d -v brief -s EvergreenAR:W *:S" ] || exit 2\necho "EvergreenAR: turn icon=81 result=native output=17"\n')
+        logcat.chmod(0o755)
+        result=self.control('diagnostics')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('icon=81',(self.usb/'AR-DIAGNOSTICS.txt').read_text())
+        self.assertTrue(self.marker.is_file())
+        logcat.write_text('#!/bin/sh\nexit 1\n')
+        self.assertNotEqual(self.control('diagnostics').returncode,0)
+
     def test_enable_status_disable_changes_only_marker(self):
         report = self.package / "AR_BUILD.json"
         report.write_text('{"variant": "ev6"}\n')

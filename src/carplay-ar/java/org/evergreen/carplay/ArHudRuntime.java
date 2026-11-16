@@ -17,12 +17,20 @@ public final class ArHudRuntime implements Runnable {
     private static long receivedAt, acceptedExactAt = -1;
     private static float sentMeters = -1f;
     private static boolean running, active;
+    private static String traceKey;
+    private static long traceAt = -1;
     static boolean background = true; // Host tests drive tick() deterministically.
 
     private ArHudRuntime() {}
 
     public static void exact(Object route, int meters) {
         ArHudRoute.exact(route, meters, SystemClock.elapsedRealtime());
+    }
+
+    /** Called only after the stock maneuver-details parser has returned normally. */
+    public static void details(Object owner) {
+        try { if (ArHudIpc.advanced()) ArHudRoute.refreshDetails(owner); }
+        catch (RuntimeException unavailable) { /* Original callback must still complete. */ }
     }
 
     public static void forget(Object route) { ArHudRoute.forget(route); }
@@ -36,7 +44,7 @@ public final class ArHudRuntime implements Runnable {
 
     public static synchronized void reset() {
         active = false; sample = null; cluster = null; motion.reset();
-        acceptedExactAt = -1; sentMeters = -1f;
+        acceptedExactAt = -1; sentMeters = -1f; traceKey = null; traceAt = -1;
         ArHudRoute.clear();
         long now = SystemClock.elapsedRealtime();
         ArHudIpc.publish(false, 0, now, now);
@@ -84,6 +92,7 @@ public final class ArHudRuntime implements Runnable {
         int[] turn = exact >= 0f ? ArHudTurns.maneuver(sample.type, sample.drivingSide, sample.junction,
                 sample.angle, sample.angle != 0, icon, exact, 1) : null;
         if (turn == null) turn = ArHudTurns.convert(icon, exact >= 0f ? exact : rounded, 0, exact >= 0f ? 0 : unit, 0);
+        if (force) trace(now, exact, meters, turn);
         int bar = turn == null ? 0 : turn[2];
         ArHudIpc.publish(true, bar, receivedAt, now);
         if (!force && (turn == null || exact < 0f || Math.abs(meters - sentMeters) < 0.05f)) return;
@@ -95,6 +104,19 @@ public final class ArHudRuntime implements Runnable {
             cluster.updateTBTInfo(turn[0], 0, turn[1], distance, 0, combi, unit, bar, 0);
         }
         sentMeters = meters;
+    }
+
+    /** Small diagnostic record on changed conversion state, at most once/second.
+     * No road names, route coordinates, phone IDs or maneuver identifiers.
+     */
+    private static void trace(long now, float exact, float meters, int[] turn) {
+        String state = turn != null ? "native" : meters > ArHudTurns.GUIDE_METERS ? "far" : "unmapped";
+        String key = icon+":"+sample.type+":"+sample.drivingSide+":"+sample.junction+":"+sample.angle+":"+state+":"+(exact>=0);
+        if (key.equals(traceKey) || (traceAt >= 0 && now >= traceAt && now-traceAt < 1000)) return;
+        traceKey=key;traceAt=now;
+        android.util.Log.w("EvergreenAR", "turn icon="+icon+" raw="+sample.type+" traffic="+sample.drivingSide+
+                " junction="+sample.junction+" angle="+sample.angle+" exact="+(exact>=0)+" meters="+(int)meters+
+                " result="+state+" output="+(turn==null?icon:turn[0]), null);
     }
 
     static synchronized void tick(long now, boolean advanced) {

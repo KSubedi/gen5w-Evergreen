@@ -1,0 +1,7 @@
+# milliseconds,event,args (synthetic values; no route names or coordinates)
+1000,route,7
+1010,distance,300
+1020,details,7,2,90,67
+2000,distance,280
+2250,tick
+2300,stop

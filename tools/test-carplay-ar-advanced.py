@@ -38,11 +38,16 @@ def dipo(tree):
     write(tree/adapter.U,'''.class public Lcom/daudio/app/dipo/e/u;
 .super Ljava/lang/Object;
 .field private Am:Ljava/util/LinkedHashMap;
+.field private Al:Ljava/util/LinkedHashMap;
 .method private a(Ljava/lang/Integer;Ljava/lang/Object;)V
     .registers 15
     check-cast p2, Lcom/daudio/app/dipo/e/c;
 '''+args+'''
     invoke-virtual/range {v0 .. v9}, Lcom/hkmc/cluster/NavigationCluster;->updateTBTInfo(IIFFIIIII)V
+    return-void
+.end method
+.method public d(Ljava/lang/Object;)V
+    .registers 2
     return-void
 .end method
 .method private nT()V
@@ -113,11 +118,11 @@ class AdvancedTest(unittest.TestCase):
         dipo(self.dipo);navi(self.navi);framework(self.fw)
 
     def test_adapter_hooks_assemble_and_reject_repeat(self):
-        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),5)
+        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),6)
         adapter.patch_dipo(self.dipo,plan)
         simple.patch(self.dipo,HELPERS,1)
         base.run('smali','a','-j','1','--api','18','-o',self.root/'patched.dex',self.dipo)
-        for name in ('prepare','reset','exact','forget','begin','finish'):
+        for name in ('prepare','reset','exact','forget','begin','finish','details'):
             self.assertTrue(any('ArHudRuntime;->'+name+'(' in p.read_text() for p in self.dipo.rglob('*.smali')))
         with self.assertRaises(ValueError):adapter.patch_dipo(self.dipo,plan)
 

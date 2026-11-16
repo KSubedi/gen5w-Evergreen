@@ -17,7 +17,7 @@ C = "com/daudio/app/dipo/e/c.smali"
 V = "com/daudio/app/dipo/e/v.smali"
 CT = "Lcom/daudio/app/dipo/e/c;"
 FIELDS = {
-    U: {"Am": "Ljava/util/LinkedHashMap;"},
+    U: {"Am": "Ljava/util/LinkedHashMap;", "Al": "Ljava/util/LinkedHashMap;"},
     C: {"aR": "I", "ba": "I", "bd": "[I"},
     V: {"DM": "I", "DR": "I", "DS": "I", "DU": "I"},
 }
@@ -55,17 +55,19 @@ def inspect_dipo(tree):
             if len(re.findall(r"(?m)^\.field [^\n]*\b"+re.escape(name+":"+type)+r"$", text)) != 1:
                 raise ValueError("unexpected field layout: " + path + ":" + name)
     for path, signature in ((U,"a(Ljava/lang/Integer;Ljava/lang/Object;)V"), (U,"nT()V"),
-                             (U,"nS()V"), (C,"a(ILjava/lang/Object;)V"), (C,"ad()V")):
+                             (U,"nS()V"), (U,"d(Ljava/lang/Object;)V"), (C,"a(ILjava/lang/Object;)V"), (C,"ad()V")):
         text = method((tree/path).read_text(), signature)[0]
         if RUNTIME in text:
             raise ValueError("advanced adapter already present")
         registers = int(re.search(r"\.registers (\d+)", text)[1])
-        args = 3 if signature.startswith("a(") else 1
+        args = 3 if signature.startswith("a(") else 2 if signature.startswith("d(") else 1
         if registers < args or registers > 16:
             raise ValueError("adapter requires inspected low-register method: " + signature)
         if path == U and signature.startswith("a("):
             if text.count("check-cast p2, " + CT) != 1:
                 raise ValueError("missing guidance-object cast")
+        if signature == "d(Ljava/lang/Object;)V" and text.count("    return-void") != 1:
+            raise ValueError("expected shared maneuver-details return")
         if path == C and signature.startswith("a("):
             if len(re.findall(r"iput (v\d+), p0, "+re.escape(CT+"->ba:I"), text)) != 1:
                 raise ValueError("missing unique exact-distance write")
@@ -79,6 +81,9 @@ def patch_dipo(tree, plan):
         raise ValueError("advanced DiPO plan is stale")
     replace_method(tree/U, "a(Ljava/lang/Integer;Ljava/lang/Object;)V", lambda t: t.replace(
         "check-cast p2, "+CT, "check-cast p2, "+CT+"\n\n    invoke-static {p0, p1, p2}, "+RUNTIME+"->prepare(Ljava/lang/Object;Ljava/lang/Integer;Ljava/lang/Object;)V"))
+    replace_method(tree/U, "d(Ljava/lang/Object;)V", lambda t: t.replace(
+        "    return-void", "    if-eqz p1, :evergreen_details_done\n\n    invoke-static {p0}, "+RUNTIME+
+        "->details(Ljava/lang/Object;)V\n\n    :evergreen_details_done\n    return-void"))
     for signature in ("nT()V", "nS()V"):
         replace_method(tree/U, signature, lambda t: insert_entry(t,"invoke-static {}, "+RUNTIME+"->reset()V"))
     replace_method(tree/C, "a(ILjava/lang/Object;)V", lambda t: re.sub(

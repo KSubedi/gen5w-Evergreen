@@ -2,8 +2,13 @@
 
 Target: the owner's **2022 Kia EV6 GT-Line, USA, firmware 260507** (`ev6`).
 The owner confirmed **1.2.0.101 basic AR works really well**. Version **1.2.0.102**
-adds exact distance, bounded interpolation, metadata and progress; those additions
-need a separate car test. Normal Evergreen remains unchanged by default.
+adds exact distance, bounded interpolation, metadata and progress. The owner
+reported an all-day test including three hours of driving: generally worked well,
+with highway-exit arrows missing, occasional blank initial guidance until the next
+turn, and occasional late small-arrow rotation. CarPlay also froze a couple of
+times and recovered by leaving and reopening projection; the owner had observed
+that before AR. These reports do not yet establish the individual causes. Normal
+Evergreen remains unchanged by default.
 
 ## Implemented behavior
 
@@ -102,7 +107,7 @@ python3 tools/build-carplay-ar-advanced.py \
 python3 tools/build-carplay-ar-installer.py \
   --patches /private/evergreen-advanced-ar/patches --enable-ar
 MOCK_SH=mksh MOCK_NEMESIS=1.15 sh tools/mock/install-test.sh \
-  dist/Evergreen_EV6_US_260507_AR_1.2.0.102.zip \
+  dist/Evergreen_EV6_US_260507_AR_1.2.0.103.zip \
   CVEV.USA.0000.V015.012.260507 cvev_us /private/mock-stock
 ```
 
@@ -129,10 +134,10 @@ retains the schema-1 inspection-plan workflow. It does not wire advanced hooks.
 The owner's collection supplied all 12 known app/library files with matching
 US EV6 260507 hashes plus the full framework. They remain private. The API
 inspection confirms the nine-argument main turn call, legacy bar index 11,
-all 22 trap-object fields, five DiPO adapter methods and five navigation trap
+all 22 trap-object fields, six DiPO adapter methods and five navigation trap
 sites. Original native-navigation main-turn calls are preserved.
 
-Synthetic tests (1,010 Java checks and 27 Python integration cases) cover
+Synthetic tests (1,036 Java checks and 28 Python integration cases) cover
 distance units/rate bounds, missing or partial metadata,
 packet ordering, resets, stale/out-of-order data, source/owner/maneuver changes,
 boot-bound IPC, every trap field, restoration of the OEM bar, API/register
@@ -146,7 +151,8 @@ configuration and codec-presence checks use marked synthetic fixtures. Uninstall
 restores that tested system tree byte for byte. The mock dexopt is a stub: it
 cannot verify Dalvik runtime behavior or the physical HUD.
 
-On-car acceptance for 1.2.0.102 is still pending: stationary arrows, smooth normal
+The owner reported a generally successful three-hour drive with 1.2.0.102.
+Detailed acceptance for 1.2.0.103 remains pending: stationary arrows, smooth normal
 turns, forks/exits/roundabouts, rerouting, consecutive maneuvers, navigation app
 switches, route ending/disconnect, basic/disable controls, and speed-limit/camera
 changes while the bar is active. Do not infer advanced success from the confirmed
@@ -193,3 +199,56 @@ Protocol facts and the implementation approach were informed by:
 
 This fork contains a new GPL-3.0-only implementation of that documented protocol;
 it imports neither project's HMG-API hook runtime or Java source files.
+
+## Follow-up from the 1.2.0.102 road test
+
+Code inspection identified investigation targets, not verified fixes:
+
+- AR conversion is capped at 457 m for every maneuver. Only exit icons 81/82
+  have direct exit conversion; the broader projection exit/ramp family needs
+  individually verified semantics before adding mappings. Existing raw metadata
+  conversion also recognizes maneuver types 22/23. Missing highway AR is not
+  yet attributable to one of these paths without the actual input values.
+- The adapter wraps the final main-turn call. DiPO can return before that call
+  when route/current-maneuver/display-distance state is incomplete. A startup
+  fix must handle partial packet ordering without borrowing a previous route's
+  state or guessing a maneuver.
+- DiPO sends the small HUD arrow via sendHud after the wrapped main-turn call.
+  The 250 ms worker updates main-turn distance only; it does not replay the
+  separate HUD turn-list path. Determine which state changes trigger sendHud
+  before changing its cadence.
+- Projection freezes predate AR per the owner. Recovery by reopening projection
+  alone does not distinguish a rendering/session stall from a callback block.
+  Keep diagnosis separate and check that AR adds no blocking cycle.
+
+Navigation app and whether initial blank means all guidance versus large AR only
+are awaiting clarification. The initial investigation preceded the 1.2.0.103
+refresh fix described below.
+
+Host callback-order replay and its limitations are documented in
+[`src/carplay-ar/replay/README.md`](../src/carplay-ar/replay/README.md).
+The comparison mode now executes the production refresh routine through a
+synthetic private sender callback; it does not execute the OEM sender itself.
+
+## 1.2.0.103: refresh after maneuver details
+
+The builder now fingerprints DiPO's `Al` route map and sixth method,
+`u.d(Object)`, and inserts a normal-return callback. With advanced AR enabled,
+it finds active routes whose current maneuver is present and re-enters the
+verified private `a(Integer,Object)` sender. That sender retains all original
+readiness checks and sends both the main turn and the small HUD list. No phone
+restart/request, new vehicle command, distance mutation or freshness reset is
+added. The adapter holds no metadata monitor while invoking the OEM sender.
+Layouts above 16 components are skipped, and reflection failures leave the
+normal route-update path available. Basic mode disables the extra refresh.
+
+The highway investigation remains open. Inspection of this firmware's raw
+22/23 maneuver branches shows icons 82/81, already supported. Some broader
+exit/ramp icons are not mapped, but those alone do not establish this failure.
+There is no verified reason yet to widen the 457 m activation window or turn
+an exit into an ordinary street turn. The new rate-limited EvergreenAR trace
+records conversion state (numeric metadata and distance only). The separate
+`Evergreen-AR-diagnostics.zip` kit exports only that log tag to USB; it does not
+collect stock apps, general logs, phone IDs, names or coordinates. Native exit
+output 17/18 in the log proves the software sent that representation, not that
+the physical HUD rendered it. Kernel/logcat buffer retention remains limited.

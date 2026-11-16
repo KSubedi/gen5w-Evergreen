@@ -5,7 +5,7 @@ if [ -z "$SOURCE" ]; then
     export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 fi
 read -r MODE < AR_MODE || exit 1
-case "$MODE" in enable|disable|status|basic|advanced) ;; *) echo "Unknown AR control mode"; exit 1 ;; esac
+case "$MODE" in enable|disable|status|basic|advanced|diagnostics) ;; *) echo "Unknown AR control mode"; exit 1 ;; esac
 PKG=$SOURCE/data/nemesis/apps/wireless.carplay.aa
 MARKER=$PKG/ar-hud.enabled
 if [ "$MODE" = disable ]; then
@@ -18,7 +18,17 @@ if [ ! -f "$PKG/AR_BUILD.json" ] || ! grep -q '"variant": "ev6"' "$PKG/AR_BUILD.
     echo "The generated EV6 CarPlay AR prototype is not installed."
     exit 1
 fi
-if [ "$MODE" = basic ]; then
+if [ "$MODE" = diagnostics ]; then
+    # Only our own privacy-limited tag, not general phone/route/application logs.
+    if logcat -d -v brief -s EvergreenAR:W '*:S' > AR-DIAGNOSTICS.txt 2>&1; then
+        sync
+        echo "Saved AR-DIAGNOSTICS.txt to USB. Logs cover only this boot's remaining log buffer."
+        exit 0
+    fi
+    sync
+    echo "AR diagnostic log unavailable; see AR-DIAGNOSTICS.txt."
+    exit 1
+elif [ "$MODE" = basic ]; then
     : > "$PKG/ar-advanced.disabled" || exit 1
     chmod 644 "$PKG/ar-advanced.disabled" || exit 1
     echo "Basic AR selected: interpolation and progress overlay disabled. Start a fresh route."

@@ -2,6 +2,7 @@
 package org.evergreen.carplay;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -91,6 +92,37 @@ public final class ArHudRoute {
         } catch (Exception unavailable) {
             if (!warned) { warned=true; android.util.Log.w("EvergreenAR","Metadata unavailable; retaining basic AR",unavailable); }
             return null;
+        }
+    }
+
+    /** Re-enter the verified OEM sender after a maneuver-details packet completes.
+     * No route fields or receipt times are changed here. Calls happen without our
+     * metadata lock held; OEM a(Integer,Object) retains its own synchronization.
+     * Al is bounded to 16 components before copying to avoid unbounded work.
+     */
+    public static void refreshDetails(Object owner) {
+        if (owner == null) return;
+        try {
+            Object routes = field(owner, "Al");
+            if (!(routes instanceof Map)) return;
+            Map<?, ?> map = (Map<?, ?>) routes;
+            if (map.size() > 16) return;
+            Object[] entries = map.entrySet().toArray();
+            Method sender = owner.getClass().getDeclaredMethod("a", Integer.class, Object.class);
+            sender.setAccessible(true);
+            for (Object value : entries) {
+                Map.Entry<?, ?> entry = (Map.Entry<?, ?>) value;
+                if (!(entry.getKey() instanceof Integer) || ((Integer)entry.getKey()).intValue() < 0) continue;
+                Object route = entry.getValue();
+                if (route == null || ((Integer)field(route,"aR")).intValue() == 0) continue;
+                int[] current = (int[])field(route,"bd");
+                if (current == null || current.length == 0) continue;
+                Object details = ((Map<?, ?>)field(owner,"Am")).get(entry.getKey());
+                if (!(details instanceof Map) || !((Map<?, ?>)details).containsKey(Integer.valueOf(current[0]))) continue;
+                sender.invoke(owner, entry.getKey(), route);
+            }
+        } catch (Exception unavailable) {
+            if (!warned) { warned=true; android.util.Log.w("EvergreenAR","Details refresh unavailable; retaining route-update path",unavailable); }
         }
     }
 

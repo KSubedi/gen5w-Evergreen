@@ -1,10 +1,14 @@
-EVERGREEN 1.2.0.102 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.2.0.103 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
-The owner confirmed basic AR in 1.2.0.101 works on this car. This new advanced
-build still needs its own car test. NEMESIS package versions remain numeric.
+The owner tested 1.2.0.102 for three hours of driving with generally good results.
+This build adds the maneuver-details refresh fix and needs its own car test.
+NEMESIS package versions remain numeric.
 
 WHAT THIS BUILD DOES
+Refreshes the existing main-turn and small-HUD paths after maneuver details
+arrive, without waiting for the next distance/route-state update. Missing
+current-maneuver data and stopped routes do not produce a synthetic turn.
 Keeps Evergreen's wireless CarPlay/Android Auto and audio implementation.
 Converts supported turns to native AR format within about 457 m (1,500 ft).
 The advanced build uses the phone's exact maneuver distance and raw turn
@@ -62,3 +66,13 @@ NEMESIS Manager's Logs > Copy to USB includes the package install logs. Avoid
 publishing full stock firmware or private phone/route logs.
 New helper failures are logged with tag EvergreenAR, without road names,
 coordinates or phone identifiers.
+
+HIGHWAY DIAGNOSTICS
+Highway AR remains under investigation. Exit mappings and the 457 m activation
+window are unchanged; this build does not claim to fix missing exit AR.
+After encountering the issue, park and run Evergreen-AR-diagnostics.zip from
+a separate USB, before restarting the head unit. Send AR-DIAGNOSTICS.txt. It
+contains only our EvergreenAR log tag and may be empty if the log buffer rotated.
+The conversion trace records numeric maneuver fields, distance and result;
+it contains no phone identifiers, road names or coordinates.
+The diagnostics kit does not collect general CarPlay crash logs.

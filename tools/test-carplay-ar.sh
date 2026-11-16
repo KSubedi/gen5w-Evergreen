@@ -12,5 +12,6 @@ javac --release 7 -Xlint:-options -d "$tmp" \
 java -cp "$tmp" org.evergreen.carplay.ArHudTest
 java -cp "$tmp" org.evergreen.carplay.ArHudAdvancedTest
 java -cp "$tmp" org.evergreen.carplay.ArHudRuntimeTest
+java -cp "$tmp" org.evergreen.carplay.ArHudReplayTest
 python3 "$ROOT/tools/test-carplay-ar.py"
 python3 "$ROOT/tools/test-carplay-ar-advanced.py"
