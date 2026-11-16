@@ -1,0 +1,59 @@
+name: Mirror release demo video
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'releases/carplay-ar/1.2.0.103/video.json'
+      - '.github/workflows/release-media.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ar-release-media
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.repository == 'KSubedi/gen5w-Evergreen'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify the owner-provided video
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib,urllib.request
+          c=json.loads(pathlib.Path('releases/carplay-ar/1.2.0.103/video.json').read_text())
+          assert c['tag']=='v1.2.0.103-beta.1' and c['asset']=='EV6-CarPlay-AR-demo.mov'
+          assert c['source'].startswith('https://cdn.discordapp.com/attachments/')
+          req=urllib.request.Request(c['source'],headers={'User-Agent':'Mozilla/5.0'})
+          with urllib.request.urlopen(req,timeout=60) as r:
+              data=r.read(c['bytes']+1)
+          assert len(data)==c['bytes'] and hashlib.sha256(data).hexdigest()==c['sha256'], 'video checksum mismatch'
+          pathlib.Path(c['asset']).write_bytes(data)
+          pathlib.Path('VIDEO-SHA256SUMS.txt').write_text(c['sha256']+'  '+c['asset']+'\n')
+          PY
+      - name: Attach video and update the existing release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v1.2.0.103-beta.1 EV6-CarPlay-AR-demo.mov VIDEO-SHA256SUMS.txt --clobber
+          gh release view v1.2.0.103-beta.1 --json body --jq .body > current-notes.md
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          source=Path('releases/carplay-ar/1.2.0.103/NOTES.md').read_text()
+          pattern=r'<!-- ar-demo:start -->.*?<!-- ar-demo:end -->'
+          block=re.search(pattern,source,re.S)[0]
+          current=Path('current-notes.md').read_text()
+          if re.search(pattern,current,re.S):
+              current=re.sub(pattern,lambda _:block,current,flags=re.S)
+          elif '## Download' in current:
+              current=current.replace('## Download',block+'\n\n## Download',1)
+          else:
+              current+='\n\n'+block+'\n'
+          Path('updated-notes.md').write_text(current)
+          PY
+          gh release edit v1.2.0.103-beta.1 --notes-file updated-notes.md

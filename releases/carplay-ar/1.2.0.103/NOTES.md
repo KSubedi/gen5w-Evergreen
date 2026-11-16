@@ -1,5 +1,11 @@
 Experimental CarPlay AR HUD for **Kia EV6 GT-Line, USA, Gen5W firmware 260507**, with the factory AR HUD. This is a NEMESIS application update, not a firmware flash. Other models, regions and firmware are not supported by this installer.
 
+<!-- ar-demo:start -->
+## Demo video
+
+[Watch or download the EV6 CarPlay AR video](https://github.com/KSubedi/gen5w-Evergreen/releases/download/v1.2.0.103-beta.1/EV6-CarPlay-AR-demo.mov). Mirrored as a release asset so it remains available independently of the Discord link.
+<!-- ar-demo:end -->
+
 ## Download
 
 Install **Evergreen_EV6_US_260507_AR_1.2.0.103.zip** from the assets below. The other ZIPs are optional controls, not the installer. This prerelease keeps the existing `wireless.carplay.aa` package identity and enables AR and advanced features.
