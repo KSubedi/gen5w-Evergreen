@@ -44,3 +44,10 @@ fixed. Add a trace and regression assertion before changing production hooks.
 Not simulated: iAP2 wire decoding, actual DiPO/Dalvik execution, Binder timing,
 Wi-Fi, CarPlay video freezes, cluster firmware or visual AR animation. These
 require additional integration work and car testing. No OEM files are included.
+
+`straight-to-rejected-exit.csv` characterizes the later Apple Maps road report.
+The explicit zero icon models a verified early-return gate, not a captured phone
+message or an implementation of the OEM icon switch. It shows why the old main
+and small HUD instruction can remain despite a new route, and contrasts that
+with a recognized exit. Run with `--refresh-details` to include the 1.2.0.103
+refresh policy. This trace is not evidence of the real incident's input values.

@@ -252,3 +252,35 @@ records conversion state (numeric metadata and distance only). The separate
 collect stock apps, general logs, phone IDs, names or coordinates. Native exit
 output 17/18 in the log proves the software sent that representation, not that
 the physical HUD rendered it. Kernel/logcat buffer retention remains limited.
+
+## Apple Maps follow-up after 1.2.0.103
+
+The owner reports improvement, but an instruction can remain at straight/10 ft
+while Apple Maps advances to an exit one mile away; highway exits can be absent
+entirely. Large ordinary-turn AR appears before intervening side streets. No new
+diagnostic trace has been supplied for these incidents.
+
+Inspection finds another gate before our final-call adapter: the stock sender
+returns for icon zero. Its raw 22/23 exit branches require traffic side, junction
+and optional exit angle all zero; a nonzero exit angle goes to the unmapped
+result. Raw keep-left/right 13/14 are also absent from the original switch, even
+though our metadata converter understands them. The details-refresh fix alone
+cannot repair a maneuver rejected inside the re-entered sender. This is a
+verified code limitation, not confirmation of the actual phone packet.
+
+The synthetic straight-to-rejected-exit replay demonstrates old main/HUD state
+remaining when the new maneuver has icon zero. Timer expiry removes the progress
+lease and stops sending but does not clear that separate HUD list. A recognized
+far exit replaces the old instruction in the model, and a recognized near exit
+produces native type 17. Physical HUD rendering is still outside this model.
+
+A subsequent fix should recover supported raw metadata before the zero-icon
+gate, invalidate old smoothing and displayed state on maneuver replacement, and
+keep ordinary small guidance active before large street-turn AR. A shorter
+street-turn activation distance (approximately 60-90 m / 200-300 ft) is a policy
+option, not an ability to detect passed side streets. Parsed junction-element
+angles describe the target junction; this feed has no verified catalogue of all
+intervening intersections or road geometry. Highway preparation cues should not
+be delayed merely because ordinary street-turn AR needs a shorter window.
+
+No production changes or new installer are included in this investigation commit.

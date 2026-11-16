@@ -47,7 +47,8 @@ public final class ArHudReplay {
     void refresh() {
         // Deliberately model readiness gates, not the entire stock icon selection.
         if(route.aR==0||route.bd==null||display<0)return;
-        Maneuver m=maneuvers.get(route.bd[0]);if(m==null)return;
+        Maneuver m=maneuvers.get(route.bd[0]);if(m==null||m.icon==0)return;
+        // DiPO skips the final sender for icon zero, before our adapter can run.
         ArHudRoute.prepare(owner,1,route);
         ArHudSample s=ArHudRoute.take();
         boolean handled=ArHudRuntime.update(cluster,m.icon,0,0,display,0,0,0,0,0,s,now,true);

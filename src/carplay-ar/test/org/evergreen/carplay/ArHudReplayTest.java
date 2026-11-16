@@ -42,6 +42,28 @@ public final class ArHudReplayTest {
         check(r.cluster.calls==sent,"details after stop cannot resurrect guidance");
         ArHudRoute.refreshDetails(new Object());
         check(r.cluster.calls==sent,"unknown layouts fail back without output");
+        // Road report: straight reaches 10 feet, then an exit is 1 mile away.
+        // Explicit icon zero models the inspected stock rejection of, e.g.,
+        // raw exit 23 with a non-zero optional angle. It is not a captured packet.
+        r=new ArHudReplay(true);
+        r.event("1000,details,7,3,0,65");r.event("1010,route,7");r.event("1020,distance,61");
+        r.event("2000,distance,3");
+        check(r.cluster.type==13&&r.cluster.distance==3,"previous straight reaches ten-foot equivalent");
+        r.event("2100,route,8");r.event("2200,distance,1609");
+        r.event("2300,details,8,23,30,0");r.event("3000,distance,1500");
+        check(r.cluster.type==13&&r.cluster.distance==3&&r.hudIcon==65,
+                "zero-icon early return strands old main and small HUD instructions");
+        int stuckCalls=r.cluster.calls;r.event("8000,tick");
+        check(r.cluster.calls==stuckCalls&&r.hudIcon==65,
+                "runtime expiry stops work but cannot clear a skipped OEM HUD path");
+        r.event("8100,details,8,23,0,81");
+        check(r.cluster.type==81&&r.hudIcon==81&&r.cluster.distance==1500,
+                "recognized far exit does replace the old direction in the replay");
+        r.event("9000,distance,300");
+        check(r.cluster.type==17&&r.hudIcon==81,
+                "recognized near exit sends native exit; physical rendering remains outside replay");
+        check(ArHudTurns.convert(67,300,0,0,0)[0]==13,
+                "current 457-meter policy activates ordinary-turn AR at 300 meters");
         ArHudRuntime.reset();System.out.println("ArHudReplayTest: "+checks+" assertions passed");
     }
 }

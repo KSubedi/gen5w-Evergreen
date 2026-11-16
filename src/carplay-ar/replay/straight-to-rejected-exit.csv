@@ -1,0 +1,14 @@
+# Synthetic reproduction, not a captured trace. Explicit icon 0 models a stock
+# rejection before the final sender (e.g. raw exit 23 with an optional 30deg angle).
+1000,details,7,3,0,65
+1010,route,7
+1020,distance,61
+2000,distance,3
+2100,route,8
+2200,distance,1609
+2300,details,8,23,30,0
+3000,distance,1500
+8000,tick
+# Correcting to a recognized icon demonstrates that a far exit CAN replace it.
+8100,details,8,23,0,81
+9000,distance,300
