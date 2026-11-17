@@ -89,6 +89,8 @@ public final class ArHudTurns {
     public static int recoverIcon(int raw,int traffic,int junction) {
         if(traffic<0||traffic>1||junction!=0)return 0;
         switch(raw) {
+            // Direction-unspecified off-ramp: projection's generic exit, no invented side.
+            case 8:return 86;
             case 1: case 20:return 70;
             case 2: case 21:return 67;
             case 3:return 65;

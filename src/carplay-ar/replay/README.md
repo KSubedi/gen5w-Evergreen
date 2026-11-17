@@ -59,6 +59,8 @@ sh tools/replay-carplay-ar.sh src/carplay-ar/replay/observed-code8-gap.csv --liv
 ```
 
 This sanitizes the first diagnostic drive into a regression case: supported raw
-13 recovers to icon 174, but raw 8 is still unmapped with valid distance updates
+13 recovers to icon 174; in the 104 trace raw 8 stayed unmapped despite valid distance updates
 from 1,100 m down to 2 m. Times and IDs are synthetic; no raw logs or locations
-are included. The default mode retains the earlier callback-policy comparison.
+are included. In 105 the live replay asserts generic exit icon 86 for that same
+sequence, reaching both HUD paths through the final distance update. The default
+mode retains the earlier callback-policy comparison.

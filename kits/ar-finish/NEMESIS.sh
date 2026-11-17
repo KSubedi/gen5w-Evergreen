@@ -25,13 +25,17 @@ copy_verified() {
     echo "$_copy  $2" >> "$OUT/VERIFIED.txt"
 }
 case "$(getprop ro.build.product)" in CVEV.USA.*.260507) ;; *) fail "Unsupported firmware" ;; esac
-[ -f "$PKG/AR_INSTALL.json" ] && grep -q '"version": "1.2.0.104"' "$PKG/AR_INSTALL.json" || fail "This finish kit requires AR 1.2.0.104"
+[ -f "$PKG/AR_INSTALL.json" ] && grep -q '"version": "1.2.0.10[45]"' "$PKG/AR_INSTALL.json" || fail "This finish kit requires AR 1.2.0.104 or 1.2.0.105"
 mkdir -p "$OUT" || fail "Cannot create USB export folder"
 : > "$OUT/VERIFIED.txt" || fail "USB not writable"
-read -r ORIGINAL < original-md5.txt || fail "Missing recorder fingerprint"
+[ -f original-md5.txt ] || fail "Missing recorder fingerprints"
 INSTALLED=$(ar_digest "$PKG/svc/ar-debug.sh") || fail "Cannot checksum installed recorder"
 STOPPED=$(ar_digest stopped-recorder.sh) || fail "Cannot checksum idle recorder"
-[ "$INSTALLED" = "$ORIGINAL" ] || [ "$INSTALLED" = "$STOPPED" ] || fail "Recorder differs from the tested version"
+KNOWN=0
+while read -r ORIGINAL; do
+    [ "$INSTALLED" = "$ORIGINAL" ] && KNOWN=1
+done < original-md5.txt
+[ "$KNOWN" = 1 ] || [ "$INSTALLED" = "$STOPPED" ] || fail "Recorder differs from the tested version"
 copy_verified "$PKG/svc/ar-debug.sh" "$OUT/RECORDER-BEFORE.sh" || fail "Cannot back up recorder on USB"
 # Only our own service script is changed; this prevents log capture returning at reboot.
 cp stopped-recorder.sh "$PKG/svc/ar-debug.sh.new" && chmod 755 "$PKG/svc/ar-debug.sh.new" || fail "Cannot stage idle recorder"

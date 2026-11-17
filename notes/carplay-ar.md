@@ -356,3 +356,29 @@ rotation limits need confirmation, so the 64 MiB configuration is an upper-bound
 estimate rather than observed retention. The trace label 'unmapped' also includes
 ordinary turns deliberately deferred between 75 m and 457 m; these are not
 unknown maneuver types. These are investigation notes, not a new installer.
+
+## 1.2.0.105 test build
+
+Street-turn native AR begins at 125 m (about 410 ft), an intermediate setting
+between the original 457 m and the 104 build's 75 m. Small cues remain visible
+earlier. The captured raw-8 gap now recovers to generic exit icon 86, a
+projection exit representation already used for direction-unspecified off-ramps
+in the documented cluster protocol. Distance continues updating; no left/right
+AR direction is synthesized from traffic side or absent geometry. Explicit
+directional exit/fork recovery and maneuver-replacement invalidation remain.
+
+The captured code-8 replay now asserts delivery to both main and small HUD
+paths down to 2 m. The boundary test checks deferred street AR at 126 m and
+native AR at 125 m. Logs distinguish deferred street AR from unmapped turns;
+important transitions get a separate bounded 100-event/sec budget in addition
+to routine 50/sec tracing. Recorder rotation explicitly requests 1 MiB files
+and 31 backups (32 MiB total), matching the size observed in the private export.
+AOSP KitKat's logcat accepts a configurable integer backup count; this vendor
+unit's behavior with 31 backups still needs confirmation.
+
+The finish kit now checks the installed version and known 104/105 recorder
+fingerprints, retaining copy verification and cleanup failure guards. Use the
+new finish kit after the test drive, since the old kit only recognized 104.
+These changes are host-tested test candidates; physical generic-exit rendering
+and the timing preference need the owner's drive feedback. No freeze fix is
+claimed from the navigation-only trace.

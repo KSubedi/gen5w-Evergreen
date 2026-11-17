@@ -21,7 +21,7 @@ public final class ArHudReplayTest {
             r.event("2400,details,8,1,270,70");r.event("2500,tick");
             check(r.cluster.calls==calls,"source change prevents old route replay");
             r.event("2600,route,8");check(r.cluster.calls==calls,"new route cannot inherit old display distance");
-            r.event("2700,distance,100");
+            r.event("2700,distance,200");
             check(r.cluster.type==70&&r.hudIcon==70,"far left turn keeps small cue");
             r.event("2800,stop");calls=r.cluster.calls;r.event("3000,tick");
             check(r.cluster.calls==calls,"stop cancels smoothing");
@@ -75,18 +75,20 @@ public final class ArHudReplayTest {
         check(r.cluster.type==0&&r.hudIcon==-1,"new maneuver cannot borrow previous rounded distance");
         r.event("4020,distance,300");
         check(r.cluster.type==67&&r.hudIcon==67,"street-turn small cue remains at 300 meters");
-        r.event("5000,distance,75");check(r.cluster.type==13,"street AR begins at 75 meters");
+        r.event("5000,distance,126");check(r.cluster.type==67,"street AR remains deferred just outside 125 meters");
+        r.event("6000,distance,125");check(r.cluster.type==13,"street AR begins at 125 meters");
         check(ArHudTurns.recoverIcon(13,0,0)==174&&ArHudTurns.recoverIcon(14,0,0)==173,"keep left/right recovery");
         check(ArHudTurns.recoverIcon(999,0,0)==0&&ArHudTurns.recoverIcon(23,0,1)==0,"unknown/roundabout do not invent exits");
-        // Sanitized reproduction from the 104 drive: raw 8 never reaches HUD.
+        // Regression from the 104 drive: raw 8 previously never reached HUD.
         r=new ArHudReplay(true);r.livePipeline=true;
         r.event("1000,details,7,13,0,0");r.event("1010,route,7");r.event("1020,distance,441");
         check(r.cluster.type==25&&r.hudIcon==174,"observed raw13 recovery reaches main and HUD");
         r.event("2000,details,8,8,0,0");r.event("2010,route,8");r.event("2020,distance,1100");
-        int rejectedCalls=r.cluster.calls;
+        check(r.cluster.type==86&&r.hudIcon==86&&r.cluster.distance==1100,
+                "observed raw8 now reaches main and small HUD as generic exit");
         r.event("3000,distance,716");r.event("4000,distance,2");
-        check(r.cluster.calls==rejectedCalls&&r.cluster.type==0&&r.hudIcon==-1,
-                "known 104 gap: observed raw8 stays blank through valid distance updates");
+        check(r.cluster.type==86&&r.hudIcon==86&&r.cluster.distance==2,
+                "generic exit stays current through final distance without guessing direction");
         ArHudRuntime.reset();System.out.println("ArHudReplayTest: "+checks+" assertions passed");
     }
 }

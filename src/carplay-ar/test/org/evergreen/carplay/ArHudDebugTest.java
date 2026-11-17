@@ -15,8 +15,13 @@ public final class ArHudDebugTest {
         check(Log.last.contains("hud_list_sent"),"API return recorded");
         boolean leaked=false;for(String message:Log.messages)if(message.contains("SECRET"))leaked=true;
         check(!leaked,"no road-name content logged in any record");
+        int normalBefore=Log.calls;
         for(int i=0;i<1000;i++)ArHudDebug.event("flood");
-        check(Log.calls<=50,"bounded event rate prevents runaway logger volume");
+        check(Log.calls-normalBefore<=50,"bounded event rate prevents runaway logger volume");
+        int priorityBefore=Log.calls;ArHudDebug.event("icon_gate critical fixture");
+        check(Log.calls==priorityBefore+1,"critical transition survives normal budget exhaustion");
+        for(int i=0;i<1000;i++)ArHudDebug.event("icon_gate flood");
+        check(Log.calls-priorityBefore<=100,"critical traffic also stays bounded");
         ArHudDebug.enabled=false;int before=Log.calls;ArHudDebug.event("disabled");
         check(Log.calls==before,"logger disable gate");
         System.out.println("AR debug: "+checks+" checks passed");

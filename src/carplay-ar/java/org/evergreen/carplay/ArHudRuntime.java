@@ -17,7 +17,7 @@ public final class ArHudRuntime implements Runnable {
     private static long receivedAt, acceptedExactAt = -1;
     private static float sentMeters = -1f;
     private static boolean running, active;
-    public static final float STREET_AR_METERS = 75f;
+    public static final float STREET_AR_METERS = 125f;
     private static Object seenOwner;
     private static int seenComponent=-1, seenManeuver=-1;
     private static String traceKey;
@@ -170,7 +170,10 @@ public final class ArHudRuntime implements Runnable {
      * No road names, route coordinates, phone IDs or maneuver identifiers.
      */
     private static void trace(long now, float exact, float meters, int[] turn) {
-        String state = turn != null ? "native" : meters > ArHudTurns.GUIDE_METERS ? "far" : "unmapped";
+        int[] candidate=ArHudTurns.convert(icon,meters,0,0,0);
+        boolean deferred=candidate!=null && candidate[0]==13 && meters>STREET_AR_METERS;
+        String state = turn != null ? "native" : icon==86 ? "generic_exit" : deferred ? "street_ar_deferred" :
+                meters > ArHudTurns.GUIDE_METERS ? "far" : "unmapped";
         String key = icon+":"+sample.type+":"+sample.drivingSide+":"+sample.junction+":"+sample.angle+":"+state+":"+(exact>=0);
         if (key.equals(traceKey) || (traceAt >= 0 && now >= traceAt && now-traceAt < 1000)) return;
         traceKey=key;traceAt=now;

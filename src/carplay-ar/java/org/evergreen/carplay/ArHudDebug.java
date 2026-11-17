@@ -9,15 +9,18 @@ import com.hkmc.cluster.NavigationCluster;
  */
 public final class ArHudDebug {
     private static long window=-1, sequence;
-    private static int count, dropped;
+    private static int count, criticalCount, dropped, criticalDropped;
     static boolean enabled=true;
     private ArHudDebug() {}
     public static synchronized void event(String message) {
         if(!enabled)return;
         long now=SystemClock.elapsedRealtime();
-        if(window<0||now-window>=1000){window=now;count=0;}
-        if(count++>=50){dropped++;return;}
-        Log.w("EvergreenAR","v104 t="+now+" seq="+(++sequence)+" dropped="+dropped+" "+message,null);
+        if(window<0||now-window>=1000){window=now;count=0;criticalCount=0;}
+        boolean critical=message.startsWith("icon_gate") || message.startsWith("maneuver_replaced") ||
+                message.startsWith("hud_") || message.startsWith("reset") || message.startsWith("sender_prepare");
+        if(critical ? criticalCount++>=100 : count++>=50){dropped++;if(critical)criticalDropped++;return;}
+        Log.w("EvergreenAR","v105 t="+now+" seq="+(++sequence)+" dropped="+dropped+" "+message+
+                " critical_dropped="+criticalDropped,null);
     }
     public static void hud(NavigationCluster c,byte[] data) {
         // Never print the trailing road-name bytes.

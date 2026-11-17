@@ -37,6 +37,11 @@ class FinishTest(unittest.TestCase):
         self.assertEqual(other.read_text(),'leave alone');self.assertTrue((self.pkg/'ar-hud.enabled').exists())
         self.assertIn('sleep 3600',(self.pkg/'svc/ar-debug.sh').read_text())
         self.assertEqual(self.runkit().returncode,0)
+    def test_105_export_and_cleanup(self):
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.105'}))
+        result=self.runkit();self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertTrue((self.usb/'AR-DEBUG-FINISHED/FINISHED.txt').exists())
+        self.assertFalse(self.logs.exists())
     def test_corrupt_usb_copy_preserves_all_original_logs(self):
         self.env['AR_CORRUPT']='1';r=self.runkit()
         self.assertNotEqual(r.returncode,0)

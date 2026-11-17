@@ -212,9 +212,9 @@ class AdvancedTest(unittest.TestCase):
         result=subprocess.run(['sh',str(script)],timeout=5,capture_output=True)
         self.assertEqual(result.returncode,-15)
         args=(work/'args').read_text()
-        self.assertIn('-r 8192 -n 7 -s EvergreenAR:W *:S',args)
+        self.assertIn('-r 1024 -n 31 -s EvergreenAR:W *:S',args)
         self.assertEqual((work/'logs').stat().st_mode & 0o777,0o700)
-        self.assertIn('bounded 8x8MiB',(work/'logs/STATUS.txt').read_text())
+        self.assertIn('bounded 32x1MiB',(work/'logs/STATUS.txt').read_text())
 
     def test_three_build_delta_roundtrips_and_enabled_installer(self):
         stock=self.root/'stock';(stock/'app').mkdir(parents=True);(stock/'framework').mkdir()
