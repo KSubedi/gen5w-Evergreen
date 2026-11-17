@@ -8,6 +8,7 @@ public class NavigationCluster {
                 speedLimitType,speedLimitUnit,speedInfoType,warningZone2,warningZone3,warningZone4,
                 displayCountry,cameraSafetyAlert;
     }
+    public void updateTPTurnListNew(byte[] data) {}
     public void updateTBTTrapInfoNew(NaviTbtTrapInfo value) {}
     public void updateTBTTrapInfo(int a0,int a1,int a2,int a3,int a4,int a5,int a6,int a7,int a8,
             int a9,int a10,int a11,int a12,int a13,int a14,int a15,int a16) {}

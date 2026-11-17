@@ -43,11 +43,37 @@ def dipo(tree):
     .registers 15
     check-cast p2, Lcom/daudio/app/dipo/e/c;
 '''+args+'''
+    if-eqz v0, :cond_e
+
+    if-eqz v1, :cond_e
     invoke-virtual/range {v0 .. v9}, Lcom/hkmc/cluster/NavigationCluster;->updateTBTInfo(IIFFIIIII)V
+    :cond_e
+    return-void
+.end method
+.method private sendHudBlank()V
+    .registers 3
+    const/4 v0, 0x0
+    const/4 v1, 0x0
+    invoke-virtual {v0, v1}, Lcom/hkmc/cluster/NavigationCluster;->updateTPTurnListNew([B)V
+    return-void
+.end method
+.method private sendHud(ILjava/lang/Integer;Lcom/daudio/app/dipo/e/c;)V
+    .registers 6
+    const/4 v0, 0x0
+    const/4 v1, 0x0
+    invoke-virtual {v0, v1}, Lcom/hkmc/cluster/NavigationCluster;->updateTPTurnListNew([B)V
+    return-void
+.end method
+.method private sendHudDist(FI)V
+    .registers 3
+    return-void
+.end method
+.method public c(Ljava/lang/Object;)V
+    .registers 3
     return-void
 .end method
 .method public d(Ljava/lang/Object;)V
-    .registers 2
+    .registers 3
     return-void
 .end method
 .method private nT()V
@@ -64,10 +90,12 @@ def dipo(tree):
 .field private aR:I
 .field private ba:I
 .field private bd:[I
+.field private bb:Ljava/lang/String;
 .method public a(ILjava/lang/Object;)V
     .registers 4
     const/4 v0, 0x0
     iput v0, p0, Lcom/daudio/app/dipo/e/c;->ba:I
+    iput-object v0, p0, Lcom/daudio/app/dipo/e/c;->bb:Ljava/lang/String;
     return-void
 .end method
 .method public ad()V
@@ -118,11 +146,11 @@ class AdvancedTest(unittest.TestCase):
         dipo(self.dipo);navi(self.navi);framework(self.fw)
 
     def test_adapter_hooks_assemble_and_reject_repeat(self):
-        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),6)
+        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),10)
         adapter.patch_dipo(self.dipo,plan)
         simple.patch(self.dipo,HELPERS,1)
         base.run('smali','a','-j','1','--api','18','-o',self.root/'patched.dex',self.dipo)
-        for name in ('prepare','reset','exact','forget','begin','finish','details'):
+        for name in ('prepare','reset','exact','forget','begin','finish','details','resolveIcon','end'):
             self.assertTrue(any('ArHudRuntime;->'+name+'(' in p.read_text() for p in self.dipo.rglob('*.smali')))
         with self.assertRaises(ValueError):adapter.patch_dipo(self.dipo,plan)
 
@@ -171,6 +199,22 @@ class AdvancedTest(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertTrue((work/'post.ran').exists())
         self.assertIn(b'WARN: AR progress state unavailable',result.stdout)
+
+    def test_debug_service_uses_bounded_own_tag_rotation(self):
+        work=self.root/'service';work.mkdir();stub=work/'bin';stub.mkdir()
+        logcat=stub/'logcat'
+        logcat.write_text('#!/bin/sh\necho "$*" > "'+str(work/'args')+'"\nkill -TERM "$PPID"\n')
+        logcat.chmod(0o755)
+        source=(ROOT/'kits/ar-installer/ar-debug.sh').read_text()
+        source=source.replace('/data/nemesis/wireless.carplay.aa-ar-debug',str(work/'logs'))
+        source='\n'.join('export PATH='+str(stub)+':/usr/bin:/bin' if x.startswith('export PATH=') else x for x in source.splitlines())+'\n'
+        script=work/'service.sh';script.write_text(source)
+        result=subprocess.run(['sh',str(script)],timeout=5,capture_output=True)
+        self.assertEqual(result.returncode,-15)
+        args=(work/'args').read_text()
+        self.assertIn('-r 8192 -n 7 -s EvergreenAR:W *:S',args)
+        self.assertEqual((work/'logs').stat().st_mode & 0o777,0o700)
+        self.assertIn('bounded 8x8MiB',(work/'logs/STATUS.txt').read_text())
 
     def test_three_build_delta_roundtrips_and_enabled_installer(self):
         stock=self.root/'stock';(stock/'app').mkdir(parents=True);(stock/'framework').mkdir()

@@ -12,13 +12,15 @@ import shutil
 NC = "Lcom/hkmc/cluster/NavigationCluster;"
 RUNTIME = "Lorg/evergreen/carplay/ArHudRuntime;"
 TRAP = "Lorg/evergreen/carplay/ArHudTrap;"
+DEBUG = "Lorg/evergreen/carplay/ArHudDebug;"
+ZERO_GATE = re.compile(r"(?m)^    if-eqz v0, (:[A-Za-z0-9_]+)\n\n    if-eqz v1, \1$")
 U = "com/daudio/app/dipo/e/u.smali"
 C = "com/daudio/app/dipo/e/c.smali"
 V = "com/daudio/app/dipo/e/v.smali"
 CT = "Lcom/daudio/app/dipo/e/c;"
 FIELDS = {
     U: {"Am": "Ljava/util/LinkedHashMap;", "Al": "Ljava/util/LinkedHashMap;"},
-    C: {"aR": "I", "ba": "I", "bd": "[I"},
+    C: {"aR": "I", "ba": "I", "bd": "[I", "bb":"Ljava/lang/String;"},
     V: {"DM": "I", "DR": "I", "DS": "I", "DU": "I"},
 }
 TRAP_FIELDS = ("fixedSpeed mobileSpeed overSpeedAlarm redlineSpeed nonSpeed warningZone curveWarning "
@@ -55,7 +57,9 @@ def inspect_dipo(tree):
             if len(re.findall(r"(?m)^\.field [^\n]*\b"+re.escape(name+":"+type)+r"$", text)) != 1:
                 raise ValueError("unexpected field layout: " + path + ":" + name)
     for path, signature in ((U,"a(Ljava/lang/Integer;Ljava/lang/Object;)V"), (U,"nT()V"),
-                             (U,"nS()V"), (U,"d(Ljava/lang/Object;)V"), (C,"a(ILjava/lang/Object;)V"), (C,"ad()V")):
+                             (U,"nS()V"), (U,"d(Ljava/lang/Object;)V"), (U,"c(Ljava/lang/Object;)V"), (U,"sendHudBlank()V"),
+                             (U,"sendHud(ILjava/lang/Integer;Lcom/daudio/app/dipo/e/c;)V"),
+                             (U,"sendHudDist(FI)V"), (C,"a(ILjava/lang/Object;)V"), (C,"ad()V")):
         text = method((tree/path).read_text(), signature)[0]
         if RUNTIME in text:
             raise ValueError("advanced adapter already present")
@@ -66,11 +70,15 @@ def inspect_dipo(tree):
         if path == U and signature.startswith("a("):
             if text.count("check-cast p2, " + CT) != 1:
                 raise ValueError("missing guidance-object cast")
+            if len(list(ZERO_GATE.finditer(text)))!=1:
+                raise ValueError("missing unique zero-icon gate")
         if signature == "d(Ljava/lang/Object;)V" and text.count("    return-void") != 1:
             raise ValueError("expected shared maneuver-details return")
         if path == C and signature.startswith("a("):
             if len(re.findall(r"iput (v\d+), p0, "+re.escape(CT+"->ba:I"), text)) != 1:
                 raise ValueError("missing unique exact-distance write")
+            if len(re.findall(r"iput-object v\d+, p0, "+re.escape(CT+"->bb:Ljava/lang/String;"),text))!=1:
+                raise ValueError("missing unique display-distance write")
         sites.append({"file":path,"method":signature,"sha256":hashlib.sha256(text.encode()).hexdigest(),"registers":registers})
     return sites
 
@@ -81,13 +89,29 @@ def patch_dipo(tree, plan):
         raise ValueError("advanced DiPO plan is stale")
     replace_method(tree/U, "a(Ljava/lang/Integer;Ljava/lang/Object;)V", lambda t: t.replace(
         "check-cast p2, "+CT, "check-cast p2, "+CT+"\n\n    invoke-static {p0, p1, p2}, "+RUNTIME+"->prepare(Ljava/lang/Object;Ljava/lang/Integer;Ljava/lang/Object;)V"))
+    replace_method(tree/U, "a(Ljava/lang/Integer;Ljava/lang/Object;)V", lambda t: ZERO_GATE.sub(
+        lambda m: "    if-eqz v0, "+m[1]+"\n\n    invoke-static {v1}, "+RUNTIME+
+        "->resolveIcon(I)I\n\n    move-result v1\n\n    if-eqz v1, "+m[1],t).replace(
+        "    return-void", "    invoke-static {}, "+RUNTIME+"->end()V\n\n    return-void"))
+    for signature in ("sendHudBlank()V", "sendHud(ILjava/lang/Integer;Lcom/daudio/app/dipo/e/c;)V"):
+        replace_method(tree/U,signature,lambda t:re.sub(
+            r"invoke-virtual (\{[^}]+\}), "+re.escape(NC)+r"->updateTPTurnListNew\(\[B\)V",
+            lambda m:"invoke-static "+m[1]+", "+DEBUG+"->hud("+NC+"[B)V",t))
     replace_method(tree/U, "d(Ljava/lang/Object;)V", lambda t: t.replace(
         "    return-void", "    if-eqz p1, :evergreen_details_done\n\n    invoke-static {p0}, "+RUNTIME+
         "->details(Ljava/lang/Object;)V\n\n    :evergreen_details_done\n    return-void"))
+    replace_method(tree/U,"sendHudDist(FI)V",lambda t:insert_entry(t,
+        'const-string v0, "hud_distance"\n\n    invoke-static {v0, p1, p2}, '+RUNTIME+'->distanceEvent(Ljava/lang/String;FI)V'))
+    for signature,label in (("c(Ljava/lang/Object;)V","route_callback"),("d(Ljava/lang/Object;)V","maneuver_callback")):
+        replace_method(tree/U,signature,lambda t,label=label:insert_entry(t,
+            'const-string v0, "'+label+'"\n\n    invoke-static {v0}, '+RUNTIME+'->event(Ljava/lang/String;)V'))
     for signature in ("nT()V", "nS()V"):
         replace_method(tree/U, signature, lambda t: insert_entry(t,"invoke-static {}, "+RUNTIME+"->reset()V"))
     replace_method(tree/C, "a(ILjava/lang/Object;)V", lambda t: re.sub(
         r"(iput (v\d+), p0, "+re.escape(CT+"->ba:I")+r")", lambda m: m[1]+"\n\n    invoke-static {p0, "+m[2]+"}, "+RUNTIME+"->exact(Ljava/lang/Object;I)V", t))
+    replace_method(tree/C,"a(ILjava/lang/Object;)V",lambda t:re.sub(
+        r"(iput-object v\d+, p0, "+re.escape(CT+"->bb:Ljava/lang/String;")+r")",
+        lambda m:m[1]+"\n\n    invoke-static {p0}, "+RUNTIME+"->display(Ljava/lang/Object;)V",t))
     replace_method(tree/C, "a(ILjava/lang/Object;)V",lambda t:insert_entry(t,
         "invoke-static {p0}, "+RUNTIME+"->begin(Ljava/lang/Object;)V").replace(
         "    return-void","    invoke-static {p0}, "+RUNTIME+"->finish(Ljava/lang/Object;)V\n\n    return-void"))

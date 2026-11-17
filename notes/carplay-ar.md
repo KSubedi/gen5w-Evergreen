@@ -284,3 +284,29 @@ intervening intersections or road geometry. Highway preparation cues should not
 be delayed merely because ordinary street-turn AR needs a shorter window.
 
 No production changes or new installer are included in this investigation commit.
+
+## 1.2.0.104 diagnostic drive build
+
+Recovers supported raw maneuver types before the stock zero-icon gate. It
+fingerprints ten DiPO methods and the display-distance field in addition to the
+existing exact receipt. Display/exact receipts bind to the current maneuver at
+packet completion, so a replacement cannot borrow the old rounded distance.
+The callback clears previous main/small HUD state and motion on replacement,
+using the existing OEM clear path, without sending raw vehicle frames. Large
+ordinary-turn AR is delayed to 75 m; far small cues and highway conversion
+windows remain available. Unknown metadata stays unmapped rather than guessing.
+
+ArHudDebug (eleventh helper) records the navigation flow with monotonic times,
+sequence and dropped-event counts, at most 50 events/sec. A NEMESIS root service
+streams only EvergreenAR warning records to eight rotating 8 MiB files in
+`/data/nemesis/wireless.carplay.aa-ar-debug`. Route/maneuver callback boundaries,
+parser receipts, selection, outgoing main/HUD calls, progress IPC/overlay, reset
+and heartbeat records are included; no phone identities, road names, geometry,
+raw messages, general crash logs or video are collected. API return does not
+confirm cluster/HUD rendering. The export kit copies logs plus build metadata
+to AR-DEBUG on USB, then syncs. These logs are bounded, not permanent retention.
+This is a car-test candidate; the unchanged prior release remains the rollback.
+
+Host validation: 1,055 Java assertions and 29 Python integration cases, including
+logger rate limit/payload preservation, rotation-service invocation, persistent
+log export, zero-gate recovery and exact/display replacement handling.

@@ -14,6 +14,8 @@ import java.util.WeakHashMap;
  */
 public final class ArHudRoute {
     private static final Map<Object, long[]> exact = new WeakHashMap<Object, long[]>();
+    private static final Map<Object,long[]> displays=new WeakHashMap<Object,long[]>();
+    private static final Map<Object,Boolean> displayPackets=new WeakHashMap<Object,Boolean>();
     private static final Map<Object, Boolean> packets = new WeakHashMap<Object, Boolean>();
     private static final Map<String, Field> fields = new HashMap<String, Field>();
     private static final ThreadLocal<Object[]> prepared = new ThreadLocal<Object[]>();
@@ -31,6 +33,7 @@ public final class ArHudRoute {
 
     public static synchronized void exact(Object route, int meters, long now) {
         if (route == null) return;
+        ArHudDebug.event("exact meters="+meters+" at="+now);
         if (meters < 0 || now < 0) exact.remove(route);
         else {
             int maneuver=-1;
@@ -43,16 +46,35 @@ public final class ArHudRoute {
         }
     }
 
-    public static synchronized void begin(Object route) { packets.put(route,Boolean.FALSE); }
+    public static synchronized void begin(Object route) { packets.put(route,Boolean.FALSE); displayPackets.put(route,Boolean.FALSE); ArHudDebug.event("parser_begin"); }
 
     public static synchronized void finish(Object route) {
         Boolean touched=packets.remove(route);long[] receipt=exact.get(route);
+        ArHudDebug.event("parser_finish state="+state(route)+" current="+identity(route)+" exact_touched="+touched+" receipt="+(receipt!=null));
+        Boolean displayTouched=displayPackets.remove(route);long[] display=displays.get(route);
+        int id=identity(route);
+        if(display!=null) {
+            if(id<0 || (!Boolean.TRUE.equals(displayTouched)&&display[1]!=id))displays.remove(route);
+            else display[1]=id;
+        }
         if(receipt==null)return;
         try {
             int[] ids=(int[])field(route,"bd");int maneuver=ids!=null&&ids.length>0?ids[0]:-1;
             if(maneuver<0 || (!Boolean.TRUE.equals(touched) && receipt[2]!=maneuver))exact.remove(route);
             else receipt[2]=maneuver;
         } catch(Exception unavailable){exact.remove(route);}
+    }
+
+    public static synchronized void display(Object route) {
+        if(route==null)return;
+        displayPackets.put(route,Boolean.TRUE);
+        displays.put(route,new long[]{android.os.SystemClock.elapsedRealtime(),identity(route)});
+        ArHudDebug.event("display_distance_received");
+    }
+    public static boolean distanceReady() {
+        Object[] p=prepared.get();if(p==null||p[2]==null)return false;
+        ArHudSample sample=peek();if(sample!=null&&sample.exactAt>=0)return true;
+        synchronized(ArHudRoute.class){long[] d=displays.get(p[2]);return d!=null&&d[1]==identity(p[2]);}
     }
 
     public static void prepare(Object owner, Integer component, Object route) {
@@ -70,6 +92,10 @@ public final class ArHudRoute {
 
     public static ArHudSample take() {
         Object[] p = prepared.get(); prepared.remove();
+        return snapshot(p);
+    }
+    public static ArHudSample peek() { return snapshot(prepared.get()); }
+    private static ArHudSample snapshot(Object[] p) {
         if (p == null || p[0] == null || p[1] == null || p[2] == null) return null;
         synchronized (ArHudRoute.class) { if (((Long)p[3]).longValue() != generation) return null; }
         try {
@@ -93,6 +119,21 @@ public final class ArHudRoute {
             if (!warned) { warned=true; android.util.Log.w("EvergreenAR","Metadata unavailable; retaining basic AR",unavailable); }
             return null;
         }
+    }
+
+    public static int identity(Object route) {
+        try { int[] ids=(int[])field(route,"bd");return ids!=null&&ids.length>0?ids[0]:-1; }
+        catch(Exception unavailable){return -1;}
+    }
+    public static int state(Object route) {
+        try {return ((Integer)field(route,"aR")).intValue();}
+        catch(Exception unavailable){return -1;}
+    }
+    public static void blank(Object owner) {
+        try {
+            Method method=owner.getClass().getDeclaredMethod("sendHudBlank");method.setAccessible(true);method.invoke(owner);
+            ArHudDebug.event("hud_blank_sent");
+        } catch(Exception unavailable){ArHudDebug.event("hud_blank_failed");}
     }
 
     /** Re-enter the verified OEM sender after a maneuver-details packet completes.
@@ -119,6 +160,7 @@ public final class ArHudRoute {
                 if (current == null || current.length == 0) continue;
                 Object details = ((Map<?, ?>)field(owner,"Am")).get(entry.getKey());
                 if (!(details instanceof Map) || !((Map<?, ?>)details).containsKey(Integer.valueOf(current[0]))) continue;
+                ArHudDebug.event("details_refresh component="+entry.getKey()+" current="+current[0]);
                 sender.invoke(owner, entry.getKey(), route);
             }
         } catch (Exception unavailable) {
@@ -126,6 +168,6 @@ public final class ArHudRoute {
         }
     }
 
-    public static synchronized void clear() { generation++; exact.clear(); packets.clear(); prepared.remove(); }
-    public static synchronized void forget(Object route) { exact.remove(route); packets.remove(route); }
+    public static synchronized void clear() { generation++; exact.clear(); displays.clear();displayPackets.clear();packets.clear(); prepared.remove(); }
+    public static synchronized void forget(Object route) { exact.remove(route);displays.remove(route);displayPackets.remove(route);packets.remove(route); }
 }

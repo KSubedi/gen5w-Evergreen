@@ -21,6 +21,7 @@ public final class ArHudIpc {
     private static long publishedAt = -1;
     private static boolean wasActive;
     private static boolean warned;
+    private static int readBar=-2;
 
     private ArHudIpc() {}
 
@@ -40,6 +41,7 @@ public final class ArHudIpc {
         if (!active && !wasActive) return;
         if (active && wasActive && bar == publishedBar && now - publishedAt < 2000) return;
         if (writeLease(new File(ROOT+"/ar-state"),boot,active,bar,sampleAt,now)) {
+            ArHudDebug.event("ipc_written active="+active+" bar="+bar+" sample="+sampleAt+" published="+now);
             wasActive = active; publishedBar = bar; publishedAt = now;
         }
     }
@@ -68,7 +70,9 @@ public final class ArHudIpc {
 
     public static int read(long now) {
         if (!advanced() || boot.length() == 0) return -1;
-        return readLease(new File(ROOT+"/ar-state/progress"),boot,now);
+        int value=readLease(new File(ROOT+"/ar-state/progress"),boot,now);
+        if(value!=readBar){ArHudDebug.event("ipc_read bar="+value);readBar=value;}
+        return value;
     }
 
     static int readLease(File target, String boot, long now) {

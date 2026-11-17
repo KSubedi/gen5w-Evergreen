@@ -376,15 +376,20 @@ class ControlTest(unittest.TestCase):
     def test_diagnostics_reads_only_our_tag_and_preserves_flags(self):
         (self.package/'AR_BUILD.json').write_text('{"variant": "ev6"}\n')
         self.marker.touch()
+        debug=self.root/'car/data/nemesis/wireless.carplay.aa-ar-debug'
+        debug.mkdir(parents=True)
+        (debug/'flow.log.1').write_text('numeric persistent trace')
         logcat=self.root/'bin/logcat'
         logcat.write_text('#!/bin/sh\n[ "$*" = "-d -v brief -s EvergreenAR:W *:S" ] || exit 2\necho "EvergreenAR: turn icon=81 result=native output=17"\n')
         logcat.chmod(0o755)
         result=self.control('diagnostics')
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('icon=81',(self.usb/'AR-DIAGNOSTICS.txt').read_text())
+        self.assertEqual((self.usb/'AR-DEBUG/flow.log.1').read_text(),'numeric persistent trace')
         self.assertTrue(self.marker.is_file())
         logcat.write_text('#!/bin/sh\nexit 1\n')
-        self.assertNotEqual(self.control('diagnostics').returncode,0)
+        self.assertEqual(self.control('diagnostics').returncode,0)
+        self.assertIn('unavailable',(self.usb/'AR-DEBUG/EXPORT.txt').read_text())
 
     def test_enable_status_disable_changes_only_marker(self):
         report = self.package / "AR_BUILD.json"

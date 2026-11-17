@@ -85,6 +85,26 @@ public final class ArHudTurns {
         return new int[] {type, angle, bar(exactMeters)};
     }
 
+    /** Recover only supported unambiguous raw maneuvers rejected by the stock icon table. */
+    public static int recoverIcon(int raw,int traffic,int junction) {
+        if(traffic<0||traffic>1||junction!=0)return 0;
+        switch(raw) {
+            case 1: case 20:return 70;
+            case 2: case 21:return 67;
+            case 3:return 65;
+            case 4: case 26:return traffic==1?73:72;
+            case 13: case 52:return 174;
+            case 14: case 53:return 173;
+            case 22:return 82;
+            case 23:return 81;
+            case 47:return 69;
+            case 48:return 68;
+            case 49:return 71;
+            case 50:return 66;
+            default:return 0;
+        }
+    }
+
     private static int turnAngle(int exit, boolean present, boolean right) {
         int plain = right ? 90 : 270;
         if (!present) return plain;

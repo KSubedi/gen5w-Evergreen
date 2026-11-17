@@ -81,7 +81,7 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
     patches=Path(patches or ROOT/'patches').resolve();lpatch=Path(lpatch or ROOT/'tools/lpatch/lpatch-host').resolve()
     if output.exists() or output.is_relative_to(stock) or (output.is_relative_to(ROOT) and not output.is_relative_to(ROOT/'dist')):
         raise ValueError('choose a NEW private output directory or ignored dist directory')
-    if {p.name for p in helpers.rglob('*.smali')}!=simple.HELPER_NAMES:raise ValueError('build the ten helpers first')
+    if {p.name for p in helpers.rglob('*.smali')}!=simple.HELPER_NAMES:raise ValueError('build the eleven helpers first')
     lines,entries,fingerprint,fw=inputs(stock,patches)
     if not isinstance(plan,dict) or plan.get('schema')!=2 or plan.get('mode')!='advanced' or plan.get('variant')!='ev6':
         raise ValueError('an advanced EV6 inspection plan is required')

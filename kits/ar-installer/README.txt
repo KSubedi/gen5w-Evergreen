@@ -1,8 +1,9 @@
-EVERGREEN 1.2.0.103 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.2.0.104 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
-This build adds the maneuver-details refresh fix and needs its own car test.
+This diagnostic build adds exit recovery, maneuver replacement clearing and
+closer street-turn AR. These changes need their own car test.
 NEMESIS package versions remain numeric.
 
 WHAT THIS BUILD DOES
@@ -10,7 +11,9 @@ Refreshes the existing main-turn and small-HUD paths after maneuver details
 arrive, without waiting for the next distance/route-state update. Missing
 current-maneuver data and stopped routes do not produce a synthetic turn.
 Keeps Evergreen's wireless CarPlay/Android Auto and audio implementation.
-Converts supported turns to native AR format within about 457 m (1,500 ft).
+Large ordinary street-turn AR begins within 75 m (about 250 ft). Small
+direction cues remain available earlier. Highway/fork/roundabout native
+conversion retains its 457 m (1,500 ft) window; far exit cues use projection icons.
 The advanced build uses the phone's exact maneuver distance and raw turn
 metadata. It estimates the closing rate from consecutive exact distances and
 updates at 250 ms intervals for at most 1.5 seconds after a sample, then holds.
@@ -67,12 +70,32 @@ publishing full stock firmware or private phone/route logs.
 New helper failures are logged with tag EvergreenAR, without road names,
 coordinates or phone identifiers.
 
-HIGHWAY DIAGNOSTICS
-Highway AR remains under investigation. Exit mappings and the 457 m activation
-window are unchanged; this build does not claim to fix missing exit AR.
-After encountering the issue, park and run Evergreen-AR-diagnostics.zip from
-a separate USB, before restarting the head unit. Send AR-DIAGNOSTICS.txt. It
-contains only our EvergreenAR log tag and may be empty if the log buffer rotated.
-The conversion trace records numeric maneuver fields, distance and result;
-it contains no phone identifiers, road names or coordinates.
-The diagnostics kit does not collect general CarPlay crash logs.
+DIAGNOSTIC DRIVE -- NO USB NEEDED WHILE DRIVING
+Logging starts automatically after installation and the head-unit restart.
+A root NEMESIS service captures only our numeric EvergreenAR navigation tag,
+with up to eight 8 MiB files (about 64 MiB total). Log writes are streamed by
+logcat, not buffered in Java memory. Events are capped at 50/second; dropped
+counts are recorded. Detailed logging is enabled for this diagnostic build.
+
+It covers route/maneuver callbacks, parsed exact/display distance receipts,
+current maneuver/state, missing metadata and icon recovery, replacement clears,
+main cluster calls, small HUD calls/distance, progress IPC and OEM bar overlay,
+resets and worker heartbeat. API return is not physical HUD acknowledgement.
+It does not capture raw CarPlay video, arbitrary phone packets, Wi-Fi passwords,
+road names, coordinates, phone identifiers or general app logs.
+
+AFTER THE DRIVE
+1. Park in READY. Extract Evergreen-AR-diagnostics.zip onto a separate empty USB.
+2. Insert it and let NEMESIS run the export. Wait for "Export complete" before
+   removing USB. The kit flushes writes before showing completion.
+3. Zip the AR-DEBUG folder and send it privately, using an upload link if it is
+   too large for chat. Keep AR-DIAGNOSTICS.txt too. EXPORT.txt and STATUS.txt
+   show whether persistent recording was available. Old files rotate; export
+   soon after the issue. Logs normally survive restart, but recent logcat may not.
+4. Tell us the approximate time, what Apple Maps showed versus HUD, left/right
+   exit and whether switching out of CarPlay and back changed it. No interaction
+   with diagnostics or observation tasks are needed from the driver in motion.
+
+The kit copies existing logs; it does not clear them or change AR settings.
+Persistent capture and these behavioral changes are host-tested, not yet
+verified on this car. Missing files are themselves diagnostic evidence.

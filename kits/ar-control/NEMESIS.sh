@@ -19,15 +19,26 @@ if [ ! -f "$PKG/AR_BUILD.json" ] || ! grep -q '"variant": "ev6"' "$PKG/AR_BUILD.
     exit 1
 fi
 if [ "$MODE" = diagnostics ]; then
-    # Only our own privacy-limited tag, not general phone/route/application logs.
+    OUT=AR-DEBUG
+    mkdir -p "$OUT" || exit 1
+    DEBUG=$SOURCE/data/nemesis/wireless.carplay.aa-ar-debug
+    echo "AR export $(date)" > "$OUT/EXPORT.txt"
+    for FILE in "$DEBUG"/flow.log* "$DEBUG/STATUS.txt"; do
+        [ -f "$FILE" ] && cp "$FILE" "$OUT/"
+    done
+    for NAME in BUILD AR_BUILD.json AR_INSTALL.json; do
+        [ -f "$PKG/$NAME" ] && cp "$PKG/$NAME" "$OUT/"
+    done
+    getprop ro.build.product >> "$OUT/EXPORT.txt"
     if logcat -d -v brief -s EvergreenAR:W '*:S' > AR-DIAGNOSTICS.txt 2>&1; then
-        sync
-        echo "Saved AR-DIAGNOSTICS.txt to USB. Logs cover only this boot's remaining log buffer."
-        exit 0
+        cp AR-DIAGNOSTICS.txt "$OUT/recent-logcat.txt"
+        echo "Recent logcat exported" >> "$OUT/EXPORT.txt"
+    else
+        echo "Recent logcat unavailable; persistent logs may still be present" >> "$OUT/EXPORT.txt"
     fi
     sync
-    echo "AR diagnostic log unavailable; see AR-DIAGNOSTICS.txt."
-    exit 1
+    echo "Saved AR-DEBUG folder and AR-DIAGNOSTICS.txt to USB. Export complete."
+    exit 0
 elif [ "$MODE" = basic ]; then
     : > "$PKG/ar-advanced.disabled" || exit 1
     chmod 644 "$PKG/ar-advanced.disabled" || exit 1

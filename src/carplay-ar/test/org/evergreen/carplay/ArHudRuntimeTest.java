@@ -77,19 +77,19 @@ public final class ArHudRuntimeTest {
 
     private static void runtime() {
         ArHudRuntime.background=false;ArHudRuntime.reset();Object owner=new Object();Cluster c=new Cluster();
-        check(ArHudRuntime.update(c,67,0,0,1000,0,3,3,0,0,sample(owner,7,300,1000),1000,true),"advanced handled");
+        check(ArHudRuntime.update(c,67,0,0,1000,0,3,3,0,0,sample(owner,7,60,1000),1000,true),"advanced handled");
         check(c.calls==1&&c.type==13&&c.scale==3&&c.combi==3,"native turn preserves original units/combi");
-        close(c.distance*0.3048f,300,"first exact distance sent");
+        close(c.distance*0.3048f,60,"first exact distance sent");
         ArHudRuntime.tick(1250,true);check(c.calls==1,"first sample creates no fake motion");
-        ArHudRuntime.update(c,67,0,0,900,0,3,3,0,0,sample(owner,7,280,2000),2000,true);
-        ArHudRuntime.tick(2250,true);close(c.distance*0.3048f,275,"scheduled smooth arrow");
-        ArHudRuntime.tick(3500,true);close(c.distance*0.3048f,250,"bounded scheduled arrow");int sent=c.calls;
+        ArHudRuntime.update(c,67,0,0,900,0,3,3,0,0,sample(owner,7,40,2000),2000,true);
+        ArHudRuntime.tick(2250,true);close(c.distance*0.3048f,35,"scheduled smooth arrow");
+        ArHudRuntime.tick(3500,true);close(c.distance*0.3048f,10,"bounded scheduled arrow");int sent=c.calls;
         ArHudRuntime.tick(4500,true);check(c.calls==sent,"no repeated held frames");
         ArHudRuntime.tick(7501,true);check(c.calls==sent,"stale phone cannot keep moving");
-        ArHudRuntime.update(c,67,0,0,300,0,0,0,0,0,sample(owner,8,100,8000),8000,true);
-        ArHudRuntime.tick(8250,true);close(c.distance,100,"new maneuver resets velocity");
-        ArHudRuntime.update(c,67,0,0,100,0,0,0,0,0,sample(new Object(),8,80,9000),9000,true);
-        ArHudRuntime.tick(9250,true);close(c.distance,80,"new owner resets velocity");
+        ArHudRuntime.update(c,67,0,0,300,0,0,0,0,0,sample(owner,8,50,8000),8000,true);
+        ArHudRuntime.tick(8250,true);close(c.distance,50,"new maneuver resets velocity");
+        ArHudRuntime.update(c,67,0,0,100,0,0,0,0,0,sample(new Object(),8,40,9000),9000,true);
+        ArHudRuntime.tick(9250,true);close(c.distance,40,"new owner resets velocity");
         check(!ArHudRuntime.update(c,3,0,0,0,0,0,0,0,0,sample(owner,8,0,10000),10000,true),"explicit native arrival passes through");
         check(!ArHudRuntime.update(c,67,0,0,100,0,0,0,0,0,sample(owner,8,80,10000),10000,false),"basic switch uses proven adapter");
         check(!ArHudRuntime.update(c,67,0,0,100,-1,0,0,0,0,sample(owner,8,80,10000),10000,true),"error flags pass through");

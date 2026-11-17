@@ -24,6 +24,7 @@ public final class ArHudReplay {
         private final Map<Integer,Object> Al=new HashMap<Integer,Object>();
         ArHudReplay replay;
         private void a(Integer component,Object route) { replay.refresh(); }
+        private void sendHudBlank() { replay.hudIcon=-1;replay.hudCalls++; }
     }
     static final class Cluster extends NavigationCluster {
         int calls,type; float angle,distance;
@@ -36,6 +37,7 @@ public final class ArHudReplay {
     final Map<Integer,Maneuver> maneuvers=new HashMap<Integer,Maneuver>();
     final Cluster cluster=new Cluster();
     final boolean refreshDetails;
+    boolean livePipeline;
     long now;
     int hudIcon=-1,hudCalls;
     float display=-1;
@@ -47,14 +49,17 @@ public final class ArHudReplay {
     void refresh() {
         // Deliberately model readiness gates, not the entire stock icon selection.
         if(route.aR==0||route.bd==null||display<0)return;
-        Maneuver m=maneuvers.get(route.bd[0]);if(m==null||m.icon==0)return;
+        if(livePipeline)ArHudRuntime.prepare(owner,1,route,true);
+        Maneuver m=maneuvers.get(route.bd[0]);if(m==null)return;
+        int selected=livePipeline?(!ArHudRoute.distanceReady()?0:ArHudRuntime.resolveIcon(m.icon,ArHudRoute.peek(),true)):m.icon;
+        if(selected==0)return;
         // DiPO skips the final sender for icon zero, before our adapter can run.
         ArHudRoute.prepare(owner,1,route);
         ArHudSample s=ArHudRoute.take();
-        boolean handled=ArHudRuntime.update(cluster,m.icon,0,0,display,0,0,0,0,0,s,now,true);
-        if(!handled)ArHudForwarder.forward(true,cluster,m.icon,0,0,display,0,0,0,0,0);
+        boolean handled=ArHudRuntime.update(cluster,selected,0,0,display,0,0,0,0,0,s,now,true);
+        if(!handled)ArHudForwarder.forward(true,cluster,selected,0,0,display,0,0,0,0,0);
         // Host model of the separate turn-list output. Runtime ticks do not call it.
-        if(hudIcon!=m.icon){hudIcon=m.icon;hudCalls++;}
+        if(hudIcon!=selected){hudIcon=selected;hudCalls++;}
     }
     void event(String line) {
         String[] p=line.split(",");now=Long.parseLong(p[0].trim());String op=p[1].trim();

@@ -13,22 +13,22 @@ public final class ArHudReplayTest {
             r.event("1020,details,7,2,90,67");
             check(r.cluster.calls==(candidate?1:0),"late details expose current skipped refresh");
             r.event("2000,distance,280");
-            check(r.cluster.type==13&&r.hudIcon==67,"next route update restores both paths");
+            check(r.cluster.type==67&&r.hudIcon==67,"far street turn keeps small cue without early AR");
             int hud=r.hudCalls;r.event("2250,tick");
             check(r.hudCalls==hud,"smooth ticks do not refresh turn list");
-            check(Math.abs(r.cluster.distance-(candidate?274.95f:280f))<0.1,"late refresh also controls when motion receives its first sample");
+            check(r.cluster.type==67,"far street turn does not become large AR during timer tick");
             r.event("2300,source");int calls=r.cluster.calls;
             r.event("2400,details,8,1,270,70");r.event("2500,tick");
             check(r.cluster.calls==calls,"source change prevents old route replay");
             r.event("2600,route,8");check(r.cluster.calls==calls,"new route cannot inherit old display distance");
             r.event("2700,distance,100");
-            check(r.cluster.angle==270&&r.hudIcon==70,"new route uses fresh left maneuver");
+            check(r.cluster.type==70&&r.hudIcon==70,"far left turn keeps small cue");
             r.event("2800,stop");calls=r.cluster.calls;r.event("3000,tick");
             check(r.cluster.calls==calls,"stop cancels smoothing");
         }
         ArHudReplay r=new ArHudReplay(false);
         r.event("1000,details,7,2,90,67");r.event("1010,route,7");r.event("1020,distance,300");
-        check(r.cluster.type==13,"details-first ordering works today");
+        check(r.cluster.type==67,"details-first ordering keeps far street cue");
         check(ArHudTurns.convert(81,200,0,0,0)[0]==17,"known right exit maps");
         check(ArHudTurns.convert(86,200,0,0,0)==null,"unmapped exit remains an explicit coverage gap");
         check(ArHudTurns.convert(81,600,0,0,0)==null,"far exit remains outside activation window");
@@ -37,7 +37,7 @@ public final class ArHudReplayTest {
         r.event("1020,details,8,1,270,70");
         check(r.cluster.calls==0,"unrelated details cannot invent the missing current maneuver");
         r.event("1030,details,7,2,90,67");
-        check(r.cluster.calls==1&&r.cluster.angle==90,"real details adapter refreshes current turn");
+        check(r.cluster.calls==1&&r.cluster.type==67,"real details adapter refreshes far current turn");
         r.event("1100,stop");int sent=r.cluster.calls;r.event("1200,details,7,1,270,70");
         check(r.cluster.calls==sent,"details after stop cannot resurrect guidance");
         ArHudRoute.refreshDetails(new Object());
@@ -64,6 +64,20 @@ public final class ArHudReplayTest {
                 "recognized near exit sends native exit; physical rendering remains outside replay");
         check(ArHudTurns.convert(67,300,0,0,0)[0]==13,
                 "current 457-meter policy activates ordinary-turn AR at 300 meters");
+        r=new ArHudReplay(true);r.livePipeline=true;
+        r.event("1000,details,7,3,0,65");r.event("1010,route,7");r.event("1020,distance,61");
+        r.event("2000,distance,3");r.event("2100,route,8");
+        check(r.cluster.type==0&&r.hudIcon==-1,"replacement with missing details clears previous guidance");
+        r.event("2200,distance,1609");r.event("2300,details,8,23,30,0");
+        check(r.cluster.type==81&&r.cluster.distance==1609&&r.hudIcon==81,"angled exit recovered before zero-icon gate");
+        r.event("3000,distance,300");check(r.cluster.type==17,"near angled exit uses native exit type");
+        r.event("4000,details,9,2,90,67");r.event("4010,route,9");
+        check(r.cluster.type==0&&r.hudIcon==-1,"new maneuver cannot borrow previous rounded distance");
+        r.event("4020,distance,300");
+        check(r.cluster.type==67&&r.hudIcon==67,"street-turn small cue remains at 300 meters");
+        r.event("5000,distance,75");check(r.cluster.type==13,"street AR begins at 75 meters");
+        check(ArHudTurns.recoverIcon(13,0,0)==174&&ArHudTurns.recoverIcon(14,0,0)==173,"keep left/right recovery");
+        check(ArHudTurns.recoverIcon(999,0,0)==0&&ArHudTurns.recoverIcon(23,0,1)==0,"unknown/roundabout do not invent exits");
         ArHudRuntime.reset();System.out.println("ArHudReplayTest: "+checks+" assertions passed");
     }
 }

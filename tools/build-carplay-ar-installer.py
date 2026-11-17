@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.2.0.103"
+VERSION = "1.2.0.104"
 
 
 def verifier():
@@ -75,6 +75,8 @@ def build(patches, output, enable_ar):
         if data['schema']==2:
             original=field(original,'postinstall','scripts/ar-post.sh')
             original=field(original,'short-desc','"Experimental smooth CarPlay AR; EV6 USA 260507 only"')
+        if data['schema']==2:
+            original += "\n[service.2]\nname=ar-debug\nkind=sh\npath=svc/ar-debug.sh\nuid=root\nmode=restart\n"
         # Validate the FINAL descriptor, after all experimental overrides.
         # NEMESIS permits dotted numbers only, not SemVer prerelease suffixes.
         checked_descriptor = Path(temp) / "NEMESIS.data"
@@ -89,6 +91,8 @@ def build(patches, output, enable_ar):
         if data['schema']==2:
             files['scripts/ar-post.sh']=(ROOT/'kits/ar-installer/ar-post.sh').read_bytes()
             modes['scripts/ar-post.sh']=0o755
+            files['svc/ar-debug.sh']=(ROOT/'kits/ar-installer/ar-debug.sh').read_bytes()
+            modes['svc/ar-debug.sh']=0o755
         files["ar-hud.enabled"] = b"Explicit opt-in by the experimental AR installer.\n"
         data = json.loads(files["AR_BUILD.json"])
         data["enabled_by_default"] = True

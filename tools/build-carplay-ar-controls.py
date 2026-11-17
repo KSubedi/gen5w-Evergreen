@@ -14,8 +14,8 @@ for mode in ("enable", "disable", "status", "basic", "advanced", "diagnostics"):
             archive.write(ROOT / "kits/ar-control" / name, name)
         archive.writestr("AR_MODE", mode + "\n")
         archive.writestr("README.txt", "Unzip to an empty USB drive and run through NEMESIS while parked.\n"
-                         "Controls change AR flags only. Diagnostics saves only the EvergreenAR log tag to AR-DIAGNOSTICS.txt.\n"
-                         "No /system writes, no reboot. Run diagnostics after an issue, before restarting the head unit.\n"
+                         "Controls change AR flags only. Diagnostics exports bounded EvergreenAR logs and build metadata to AR-DEBUG/.\n"
+                         "No /system writes, no reboot. Run diagnostics parked after a drive. Wait for Export complete, then zip AR-DEBUG/ and share privately.\n"
                          "Enable/status require a generated US EV6 260507 AR build; disable works even without one.\n"
                          "The normal Evergreen package has no AR prototype to enable.\n")
     print(output)

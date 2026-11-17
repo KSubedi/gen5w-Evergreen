@@ -39,7 +39,9 @@ public final class ArHudForwarder {
             direction = turn[1];
             bar = turn[2];
         }
+        ArHudDebug.event("fallback_send enabled="+enabled+" type="+type+" distance="+distance+" unit="+unit);
         cluster.updateTBTInfo(type, sideStreet, direction, distance, distanceError,
                 combiSideStreet, unit, bar, barError);
+        ArHudDebug.event("fallback_sent");
     }
 }
