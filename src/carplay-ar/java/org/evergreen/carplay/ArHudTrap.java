@@ -42,14 +42,14 @@ public final class ArHudTrap implements Runnable {
 
     public static synchronized void updateNew(NavigationCluster receiver, NaviTbtTrapInfo original) {
         if (original == null) { receiver.updateTBTTrapInfoNew(null); return; }
-        ArHudDebug.event("trap_input modern limit="+original.speedLimit+" unit="+original.speedLimitUnit+" bar="+original.barGraphLevel);
+        if (ArHudDebug.on()) ArHudDebug.event("trap_input modern limit="+original.speedLimit+" unit="+original.speedLimitUnit+" bar="+original.barGraphLevel);
         cluster=receiver; originalNew=copy(original); originalInts=null;
         emit(ArHudIpc.read(SystemClock.elapsedRealtime())); start();
     }
 
     public static synchronized void update(NavigationCluster receiver, int a0,int a1,int a2,int a3,
             int a4,int a5,int a6,int a7,int a8,int a9,int a10,int a11,int a12,int a13,int a14,int a15,int a16) {
-        ArHudDebug.event("trap_input legacy limit="+a12+" unit="+a15+" bar="+a11);
+        if (ArHudDebug.on()) ArHudDebug.event("trap_input legacy limit="+a12+" unit="+a15+" bar="+a11);
         cluster=receiver; originalNew=null;
         originalInts=new int[] {a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15,a16};
         emit(ArHudIpc.read(SystemClock.elapsedRealtime())); start();
@@ -64,7 +64,7 @@ public final class ArHudTrap implements Runnable {
             int[] a=originalInts.clone(); if(bar>=0)a[BAR_INDEX]=bar;
             cluster.updateTBTTrapInfo(a[0],a[1],a[2],a[3],a[4],a[5],a[6],a[7],a[8],a[9],a[10],a[11],a[12],a[13],a[14],a[15],a[16]);
         }
-        ArHudDebug.event("trap_sent overlay="+bar+" modern="+(originalNew!=null));
+        if (ArHudDebug.on()) ArHudDebug.event("trap_sent overlay="+bar+" modern="+(originalNew!=null));
         applied=bar;
     }
 

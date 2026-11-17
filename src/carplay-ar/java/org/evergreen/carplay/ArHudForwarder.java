@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package org.evergreen.carplay;
 
-import java.io.File;
 import com.hkmc.cluster.NavigationCluster;
 
 /** Replaces only DiPO's updateTBTInfo call; the OEM service remains the sender. */
@@ -13,7 +12,7 @@ public final class ArHudForwarder {
             int unit, int bar, int barError) {
         boolean enabled = false;
         try {
-            enabled = new File("/data/nemesis/apps/wireless.carplay.aa/ar-hud.enabled").isFile();
+            enabled = ArHudIpc.enabled();
         } catch (RuntimeException unavailable) {
             // A missing/unreadable opt-in must retain the original turn.
         }
@@ -27,6 +26,7 @@ public final class ArHudForwarder {
         }
         forward(enabled, cluster, type, sideStreet, direction, distance, distanceError,
                 combiSideStreet, unit, bar, barError);
+        ArHudRuntime.mainSent();
     }
 
     static void forward(boolean enabled, NavigationCluster cluster, int type, int sideStreet,
@@ -39,7 +39,7 @@ public final class ArHudForwarder {
             direction = turn[1];
             bar = turn[2];
         }
-        ArHudDebug.event("fallback_send enabled="+enabled+" type="+type+" distance="+distance+" unit="+unit);
+        if (ArHudDebug.on()) ArHudDebug.event("fallback_send enabled="+enabled+" type="+type+" distance="+distance+" unit="+unit);
         cluster.updateTBTInfo(type, sideStreet, direction, distance, distanceError,
                 combiSideStreet, unit, bar, barError);
         ArHudDebug.event("fallback_sent");

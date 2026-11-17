@@ -10,6 +10,7 @@ on:
       - 'kits/ar-finish/**'
       - 'tools/*ar-finish*'
       - 'tools/*carplay-ar*'
+      - 'tools/*ar-log*'
       - 'tools/build-package.sh'
       - '.github/workflows/carplay-ar.yml'
   pull_request:
@@ -21,6 +22,7 @@ on:
       - 'kits/ar-finish/**'
       - 'tools/*ar-finish*'
       - 'tools/*carplay-ar*'
+      - 'tools/*ar-log*'
       - 'tools/build-package.sh'
       - '.github/workflows/carplay-ar.yml'
 

@@ -18,7 +18,8 @@ class FinishTest(unittest.TestCase):
         scripts={
             'md5':'md5sum "$@"',
             'getprop':'echo CVEV.USA.0000.V015.012.260507',
-            'nemesis':'[ "$AR_FAIL_STOP" = 1 ] && exit 1\necho "wireless.carplay.aa/ar-debug|restart|stopped|0"',
+            'nemesis':'[ "$AR_FAIL_STOP" = 1 ] && exit 1\n[ "$AR_BAD_STATUS" = 1 ] && { [ "$2" = status ] && echo "no such service"; exit 0; }\n'
+                'echo "wireless.carplay.aa/ar-debug|restart|stopped|0"',
             'logcat':'echo "EvergreenAR own-tag snapshot"',
             'sync':'[ "$AR_FAIL_SYNC" = 1 ] && exit 1\nexit 0',
             'cp':'/bin/cp "$@" || exit 1\ncase "$1" in */flow.log) [ "$AR_CORRUPT" = 1 ] && echo corrupt >> "$2" ;; esac\nexit 0',
@@ -42,11 +43,48 @@ class FinishTest(unittest.TestCase):
         result=self.runkit();self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertTrue((self.usb/'AR-DEBUG-FINISHED/FINISHED.txt').exists())
         self.assertFalse(self.logs.exists())
+    def test_106_exports_and_removes_the_cluster_baseline_too(self):
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.106'}))
+        (self.logs/'cluster-baseline.log').write_text('stock frames');(self.pkg/'ar-tuning').write_text('gain=0.7\n')
+        result=self.runkit();self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        out=self.usb/'AR-DEBUG-FINISHED'
+        self.assertEqual((out/'cluster-baseline.log').read_text(),'stock frames');self.assertEqual((out/'ar-tuning').read_text(),'gain=0.7\n')
+        self.assertFalse(self.logs.exists());self.assertTrue((self.pkg/'ar-tuning').exists())
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.107'}))
+        self.assertEqual(self.runkit().returncode,0)
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.108'}))
+        self.assertEqual(self.runkit().returncode,0)
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.109'}))
+        self.assertEqual(self.runkit().returncode,0)
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.110'}))
+        self.assertEqual(self.runkit().returncode,0)
+        self.assertFalse((self.usb/'AR-EXPORT-ERROR.txt').exists());self.assertFalse((self.usb/'AR-DEBUG-SNAPSHOT').exists())
+    def test_unsupported_version_leaves_the_reason_and_a_plain_copy_on_the_usb(self):
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.111'}))
+        self.assertNotEqual(self.runkit().returncode,0)
+        self.assertIn('requires AR 1.2.0.104 to 1.2.0.110',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
+        self.assertIn('AR-DEBUG-SNAPSHOT',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
+        for n in ('flow.log','flow.log.1','STATUS.txt'):
+            self.assertEqual((self.usb/'AR-DEBUG-SNAPSHOT'/n).read_text(),'trace '+n)
+            self.assertEqual((self.logs/n).read_text(),'trace '+n)
+        self.assertIn('ar-debug.sh',[x.name for x in (self.pkg/'svc').iterdir()])
+        self.assertNotIn('sleep 3600',(self.pkg/'svc/ar-debug.sh').read_text())
+        # A later good run removes the stale reason and the plain copy.
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.108'}))
+        self.assertEqual(self.runkit().returncode,0)
+        self.assertFalse((self.usb/'AR-EXPORT-ERROR.txt').exists());self.assertFalse((self.usb/'AR-DEBUG-SNAPSHOT').exists())
+        self.assertEqual((self.usb/'AR-DEBUG-FINISHED/flow.log').read_text(),'trace flow.log')
+    def test_unreadable_service_status_still_exports(self):
+        self.env['AR_BAD_STATUS']='1';r=self.runkit();self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.assertIn('PID unknown',(self.usb/'AR-DEBUG-FINISHED/SERVICE-BEFORE.txt').read_text())
+        self.assertTrue((self.usb/'AR-DEBUG-FINISHED/FINISHED.txt').is_file());self.assertFalse(self.logs.exists())
+
     def test_corrupt_usb_copy_preserves_all_original_logs(self):
         self.env['AR_CORRUPT']='1';r=self.runkit()
         self.assertNotEqual(r.returncode,0)
         for n in ('flow.log','flow.log.1','STATUS.txt'):self.assertEqual((self.logs/n).read_text(),'trace '+n)
         self.assertFalse((self.usb/'AR-DEBUG-FINISHED/FINISHED.txt').exists())
+        self.assertIn('verification failed',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
     def test_unknown_recorder_is_not_replaced_or_deleted(self):
         p=self.pkg/'svc/ar-debug.sh';p.write_text('unknown future service')
         self.assertNotEqual(self.runkit().returncode,0)

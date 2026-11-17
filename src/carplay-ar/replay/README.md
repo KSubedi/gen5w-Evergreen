@@ -8,7 +8,7 @@ sh tools/replay-carplay-ar.sh src/carplay-ar/replay/startup-late-details.csv --r
 ```
 
 Output is CSV: simulated time, event, cumulative main-turn calls, last main
-turn type/angle/distance in meters, last small-HUD icon and cumulative HUD calls.
+turn type/angle/distance in meters and bar, last small-HUD icon and cumulative HUD calls.
 Rows with unchanged call counts mean no new output. Last values can remain visible
 in the trace after stop; this records history, not the physical HUD's blanking.
 
@@ -21,7 +21,8 @@ Events use ordered nonnegative millisecond times:
 
 | Event | Arguments | Meaning |
 |---|---|---|
-| route | maneuver ID | Start/update current maneuver |
+| route | maneuver ID [, route state [, maneuver state]] | Start/update current maneuver; state 1 (guiding) unless given |
+| packet | maneuver ID, integer meters [, route state] | One update carrying the maneuver list and distance together, as on the road |
 | details | ID, raw type, angle, projection icon | Insert/update maneuver metadata |
 | distance | integer meters | Exact and display distance update |
 | tick | none | Advance the real smoothing runtime at this timestamp |
@@ -62,5 +63,25 @@ This sanitizes the first diagnostic drive into a regression case: supported raw
 13 recovers to icon 174; in the 104 trace raw 8 stayed unmapped despite valid distance updates
 from 1,100 m down to 2 m. Times and IDs are synthetic; no raw logs or locations
 are included. In 105 the live replay asserts generic exit icon 86 for that same
-sequence, reaching both HUD paths through the final distance update. The default
+sequence, reaching both HUD paths through the final distance update; from 109
+it is the slight-right icon 66 far; within 457 m 109 sent native `TURN` at 45 degrees and
+110 sends the native right exit sign (`exit_style=sign`, the default again). The default
 mode retains the earlier callback-policy comparison.
+
+Two further sanitized cases from the same drive, both run with `--live`:
+
+- `observed-route-start.csv`: the phone's first instruction is raw 11 (start
+  route) in route state 6 (proceed to route). The stock icon table has no icon
+  for it, so 104/105 left the HUD blank for 16-26 s at every route start. In 106
+  it recovers to the small straight cue (65) and never becomes a large AR arrow;
+  the first real turn then converts as before, with the bar on the stock 457 m
+  scale (108; 106/107 scaled it over the street-turn window).
+- `stationary-then-reroute.csv`: forty silent seconds at a light keep the lease
+  and the arrow (the 104 trace had 17 such expiries, all with the car standing
+  still); route state 5 (rerouting) passes the OEM icon through unchanged.
+
+The replay cannot set the tuning file; `ArHudRuntimeTest` covers it.
+
+`tools/analyze-ar-log.py <export> --replay DIR` writes such traces from a real
+diagnostic export, one per DiPO process, with maneuver numbers, raw types,
+icons, states and meters only.

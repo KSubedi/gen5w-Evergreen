@@ -58,6 +58,18 @@ public final class ArHudTurns {
      */
     public static int[] maneuver(int maneuver, int drivingSide, int junction,
             int exitAngle, boolean hasAngle, int icon, float exactMeters, int state) {
+        return maneuver(maneuver, drivingSide, junction, exitAngle, hasAngle, icon, exactMeters, state, 0);
+    }
+
+    /** exitSide is the side chosen for a direction-unspecified exit (raw 8): 1 right, -1 left, 0 none. */
+    public static int[] maneuver(int maneuver, int drivingSide, int junction,
+            int exitAngle, boolean hasAngle, int icon, float exactMeters, int state, int exitSide) {
+        return maneuver(maneuver, drivingSide, junction, exitAngle, hasAngle, icon, exactMeters, state, exitSide, false);
+    }
+
+    /** exitSign draws an exit as the native exit sign (EXIT_RIGHT/EXIT_LEFT) instead of a slight-turn arrow. */
+    public static int[] maneuver(int maneuver, int drivingSide, int junction,
+            int exitAngle, boolean hasAngle, int icon, float exactMeters, int state, int exitSide, boolean exitSign) {
         if (state < 1 || drivingSide < 0 || drivingSide > 1 || junction < 0 || junction > 1) return null;
         // An explicit phone arrival state is reliable; rounded zero meters isn't.
         if (state == 2) return new int[] {3, 0, 0};
@@ -78,17 +90,58 @@ public final class ArHudTurns {
             case 4: case 26: type = 31; angle = drivingSide == 1 ? 90 : 270; break;
             case 13: case 52: type = 25; angle = 270; break;
             case 14: case 53: type = 25; angle = 90; break;
-            case 22: type = 18; angle = 270; break;
-            case 23: type = 17; angle = 90; break;
+            case 8: case 22: case 23:
+                // 22/23 carry their side; 8 uses the chosen one.
+                int exit = maneuver == 22 ? -1 : maneuver == 23 ? 1 : exitSide;
+                if (exit == 0) return null;
+                if (exitSign) { type = exit > 0 ? 17 : 18; angle = exit > 0 ? 90 : 270; }
+                else { type = 13; angle = exit > 0 ? 45 : 315; }
+                break;
             default: return null;
         }
         return new int[] {type, angle, bar(exactMeters)};
     }
 
+    /** Side of the phone's direction-unspecified exit (raw 8): 1 right, -1 left, 0 generic.
+     * The stock US app maps CarPlay's sided exits (22/23) to the sided icons and then
+     * refuses to send them, so no exit ever reached the cluster; the US car's own
+     * exits are on the right unless the phone's exit angle says otherwise.
+     * mode is ArHudTuning.EXIT_AUTO/RIGHT/LEFT/GENERIC.
+     */
+    public static int exitSide(int raw, int drivingSide, int exitAngle, int mode) {
+        if (raw != 8) return 0;
+        switch (mode) {
+            case ArHudTuning.EXIT_RIGHT: return 1;
+            case ArHudTuning.EXIT_LEFT: return -1;
+            case ArHudTuning.EXIT_GENERIC: return 0;
+            default: break;
+        }
+        int normalized = (exitAngle % 360 + 360) % 360;
+        if (normalized >= 5 && normalized <= 175) return 1;
+        if (normalized >= 185 && normalized <= 355) return -1;
+        return drivingSide == 1 ? -1 : 1;
+    }
+
+    /** The phone's exit maneuvers: direction-unspecified (8), left (22) and right (23). */
+    public static boolean exit(int raw) { return raw == 8 || raw == 22 || raw == 23; }
+
+    /** Raw maneuvers that only get the small straight cue, never a large AR arrow.
+     * 11 is the phone's "start route" instruction at the beginning of guidance.
+     */
+    public static boolean cueOnly(int raw) { return raw == 11; }
+
     /** Recover only supported unambiguous raw maneuvers rejected by the stock icon table. */
-    public static int recoverIcon(int raw,int traffic,int junction) {
+    public static int recoverIcon(int raw,int traffic,int junction) { return recoverIcon(raw,traffic,junction,0); }
+
+    /** exitSide from exitSide(): the slight-turn icons 66/71, or the generic 86 (drawn as "continue" on the US EV6).
+     * Never the sided exit icons 81/82: the stock US app refuses to send those to the cluster,
+     * so what the cluster does with them is unknown (1.2.0.108 sent 81 in the small-HUD list; its effect was not observed).
+     */
+    public static int recoverIcon(int raw,int traffic,int junction,int exitSide) {
         // A generic exit needs no traffic-side or junction geometry to choose a side.
-        if(raw==8)return 86;
+        if(raw==8)return exitSide>0?66:exitSide<0?71:86;
+        // Start of route: the straight cue keeps the HUD from staying blank until the first turn.
+        if(cueOnly(raw))return 65;
         if(traffic<0||traffic>1||junction!=0)return 0;
         switch(raw) {
             case 1: case 20:return 70;
@@ -97,8 +150,8 @@ public final class ArHudTurns {
             case 4: case 26:return traffic==1?73:72;
             case 13: case 52:return 174;
             case 14: case 53:return 173;
-            case 22:return 82;
-            case 23:return 81;
+            case 22:return 71;
+            case 23:return 66;
             case 47:return 69;
             case 48:return 68;
             case 49:return 71;
@@ -151,8 +204,11 @@ public final class ArHudTurns {
         return new int[] {type, angle, bar(meters)};
     }
 
-    public static int bar(float meters) {
-        if (meters(meters, 0) < 0f || meters > GUIDE_METERS) return 0;
-        return Math.max(1, Math.min(9, (int) (meters * 10f / GUIDE_METERS))) * 10;
+    public static int bar(float meters) { return bar(meters, GUIDE_METERS); }
+
+    /** The cluster's 90..10 bar over the window in which this maneuver's AR is shown. */
+    public static int bar(float meters, float window) {
+        if (meters(meters, 0) < 0f || !(window > 0f) || meters > window) return 0;
+        return Math.max(1, Math.min(9, (int) (meters * 10f / window))) * 10;
     }
 }

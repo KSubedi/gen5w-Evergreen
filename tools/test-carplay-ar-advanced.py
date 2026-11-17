@@ -88,6 +88,7 @@ def dipo(tree):
     write(tree/adapter.C,'''.class public Lcom/daudio/app/dipo/e/c;
 .super Ljava/lang/Object;
 .field private aR:I
+.field private aS:I
 .field private ba:I
 .field private bd:[I
 .field private bb:Ljava/lang/String;
@@ -104,7 +105,7 @@ def dipo(tree):
 .end method
 ''')
     write(tree/adapter.V,'.class public Lcom/daudio/app/dipo/e/v;\n.super Ljava/lang/Object;\n'+
-          ''.join('.field private '+x+':I\n' for x in ('DM','DR','DS','DU')))
+          ''.join('.field private '+x+':I\n' for x in ('DM','DR','DS','DU','DV'))+'.field private DT:[I\n')
 
 
 def navi(tree):
@@ -150,9 +151,11 @@ class AdvancedTest(unittest.TestCase):
         adapter.patch_dipo(self.dipo,plan)
         simple.patch(self.dipo,HELPERS,1)
         base.run('smali','a','-j','1','--api','18','-o',self.root/'patched.dex',self.dipo)
-        for name in ('prepare','reset','exact','forget','begin','finish','details','resolveIcon','end'):
+        for name in ('prepare','reset','exact','forget','begin','finish','details','resolveIcon','end','hudDistance'):
             self.assertTrue(any('ArHudRuntime;->'+name+'(' in p.read_text() for p in self.dipo.rglob('*.smali')))
         with self.assertRaises(ValueError):adapter.patch_dipo(self.dipo,plan)
+        hud=adapter.method((self.dipo/adapter.U).read_text(),'sendHudDist(FI)V')[0]
+        self.assertIn('->hudDistance(FI)F\n\n    move-result p1',hud)
 
     def test_stale_or_unknown_metadata_fails_before_edits(self):
         plan=adapter.inspect_dipo(self.dipo)
@@ -216,6 +219,26 @@ class AdvancedTest(unittest.TestCase):
         self.assertEqual((work/'logs').stat().st_mode & 0o777,0o700)
         self.assertIn('bounded 32x1MiB',(work/'logs/STATUS.txt').read_text())
 
+    def test_baseline_service_waits_for_a_request_and_keeps_only_frame_lines(self):
+        work=self.root/'baseline';(work/'pkg').mkdir(parents=True);stub=work/'bin';stub.mkdir()
+        write(stub/'dumpsys','#!/bin/sh\n[ "$1" = com.hkmc.micom.cluster ] || exit 1\n'
+              'echo "  NaviTbtInfo: type=TURN direction=90 distance=120"\necho "  dest name: Secret Street"\necho "  barGraphLevel=40 speedLimit=35"\n')
+        write(stub/'sleep','#!/bin/sh\n[ "$1" = 10 ] && [ -f "'+str(work/'pkg/done')+'" ] && kill -TERM "$PPID"\n[ "$1" = 10 ] && : > "'+str(work/'pkg/done')+'"\nexit 0\n')
+        for s in ('dumpsys','sleep'):(stub/s).chmod(0o755)
+        source=(ROOT/'kits/ar-installer/ar-baseline.sh').read_text()
+        source=source.replace('/data/nemesis/wireless.carplay.aa-ar-debug',str(work/'logs')).replace('/data/nemesis/apps/wireless.carplay.aa',str(work/'pkg'))
+        source='\n'.join('export PATH='+str(stub)+':/usr/bin:/bin' if x.startswith('export PATH=') else x for x in source.splitlines())+'\n'
+        script=work/'service.sh';script.write_text(source)
+        write(work/'pkg/ar-baseline.requested','1\n')
+        result=subprocess.run(['sh',str(script)],timeout=20,capture_output=True)
+        self.assertEqual(result.returncode,-15,result.stderr)
+        self.assertFalse((work/'pkg/ar-baseline.requested').exists())
+        log=(work/'logs/cluster-baseline.log').read_text()
+        self.assertIn('minutes=1',log);self.assertEqual(log.count('--- sample'),60)
+        self.assertIn('type=TURN direction=90 distance=120',log);self.assertIn('barGraphLevel=40',log)
+        self.assertNotIn('Secret Street',log);self.assertIn('cluster baseline end',log)
+        self.assertEqual((work/'logs').stat().st_mode & 0o777,0o700)
+
     def test_three_build_delta_roundtrips_and_enabled_installer(self):
         stock=self.root/'stock';(stock/'app').mkdir(parents=True);(stock/'framework').mkdir()
         for name in ('core.odex','automotive.jar','automotive.odex'):(stock/'framework'/name).write_bytes(b'our synthetic framework '+name.encode())
@@ -246,8 +269,15 @@ class AdvancedTest(unittest.TestCase):
         with zipfile.ZipFile(package) as outer:
             with zipfile.ZipFile(io.BytesIO(outer.read('packages/wireless.carplay.aa.zip'))) as inner:
                 self.assertIn('postinstall=scripts/ar-post.sh',inner.read('NEMESIS.data').decode())
+                self.assertIn('name=ar-baseline',inner.read('NEMESIS.data').decode())
                 deployed=json.loads(inner.read('AR_BUILD.json'));self.assertTrue(deployed['features']['progress_adapter'])
+                self.assertTrue(deployed['trace_enabled']);self.assertIn('ar-trace.enabled',inner.namelist())
+                self.assertTrue((inner.getinfo('svc/ar-baseline.sh').external_attr>>16)&0o111)
                 self.assertIn(b'chown 1000',inner.read('scripts/ar-post.sh'))
+        quiet=self.root/'quiet.zip';installer.build(output/'patches',quiet,True,False)
+        with zipfile.ZipFile(quiet) as outer:
+            with zipfile.ZipFile(io.BytesIO(outer.read('packages/wireless.carplay.aa.zip'))) as inner:
+                self.assertNotIn('ar-trace.enabled',inner.namelist());self.assertFalse(json.loads(inner.read('AR_BUILD.json'))['trace_enabled'])
         bad=copy.deepcopy(report);bad['builds']=bad['builds'][:2]
         (output/'bad.json').write_text(json.dumps(bad))
         with self.assertRaises(ValueError):verify.validate(output/'patches',output/'bad.json')

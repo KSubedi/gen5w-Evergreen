@@ -5,7 +5,7 @@ umask 077
 DIR=/data/nemesis/wireless.carplay.aa-ar-debug
 mkdir -p "$DIR" || exit 1
 chmod 700 "$DIR" || exit 1
-echo "AR debug v105 starting $(date); bounded 32x1MiB; own EvergreenAR tag only" > "$DIR/STATUS.txt"
+echo "AR debug v110 starting $(date); bounded 32x1MiB; own EvergreenAR tag only" > "$DIR/STATUS.txt"
 sync
 while :; do
     logcat -v threadtime -f "$DIR/flow.log" -r 1024 -n 31 -s EvergreenAR:W '*:S' 2>> "$DIR/STATUS.txt"

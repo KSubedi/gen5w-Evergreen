@@ -382,3 +382,258 @@ new finish kit after the test drive, since the old kit only recognized 104.
 These changes are host-tested test candidates; physical generic-exit rendering
 and the timing preference need the owner's drive feedback. No freeze fix is
 claimed from the navigation-only trace.
+
+## 1.2.0.106 test build
+
+Read from the 104 drive export (two head-unit epochs, 15,158 own-tag records,
+1,129 exact-distance receipts at a steady 1 Hz) rather than from new hypotheses:
+
+- **Blank start of every route.** The first maneuver of both routes was raw type
+  11 (CarPlay's start-route instruction) in route state 6 (proceed to route),
+  rejected by the zero-icon gate 45 times over 16-26 s. `recoverIcon` now maps 11
+  to the straight cue 65; `cueOnly(11)` keeps it out of large AR conversion.
+- **All 17 five-second expiries were a standing car.** Distances before and
+  after each gap were equal (e.g. 12 m, silent for 31 s); eight were inside the
+  street window, i.e. waiting at the light to turn. The phone sends nothing
+  while stationary. The lease now follows the route: maneuver change, route
+  stop, source change and disconnect end it as before; `ArHudIpc.HOLD_MS`
+  (300 s) only catches a stuck sender. The 3 s publish heartbeat still covers a
+  dead DiPO.
+- **Bar scale.** All 675 street-turn sends in 104 carried bar 10 because `bar()`
+  divided by 457 m while street AR started at 75 m (125 m in 105). Street turns
+  now fill the bar over their own window (`bar(meters, street)`), 90 down to 10
+  as the stock navigation does; exits/forks/roundabouts keep the 457 m scale.
+- **Backward steps between phone samples.** 36 % of phone samples that followed
+  an extrapolated tick moved the distance back up, median 1.3-2.2 m, up to 10 m,
+  because a car approaching a turn is slowing. Replaying the captured samples
+  offline: full-rate projection mean error 2.4 m with 53 % back-steps; 0.8x
+  projection 2.7 m with 28 %. `ArHudMotion` now projects with gain 0.8, and
+  `send()` holds the sent distance when a sample is above it by at most 15 m
+  (`backstep_meters`); larger increases (reroute, backing up) go through.
+- **Rerouting.** DiPO parses iAP2 item 1 of RouteGuidanceUpdate into route
+  state (`aR`): 1 guiding, 2 arrived, 3 loading, 5 rerouting, 6 proceed to
+  route in this log. During state 5 the runtime now passes the OEM frame through
+  unchanged with no smoothing, instead of animating a maneuver that may be gone.
+  Both observed reroutes lasted under a second.
+- **Diagnostics for the next decisions.** DiPO also stores item 2, the phone's
+  maneuver state (`aS`, logged `mstate=`, never used by the stock app) and the
+  junction element angles (`DT`, logged as a count `angles=`). If `mstate` is
+  the expected continue/initial/prepare/execute signal it can replace the
+  hand-tuned street window later; the angle count shows whether generic exits
+  (raw 8) carry geometry that could give them a side. Logged only.
+- **Tuning without reinstalling.** `ArHudTuning` reads `ar-tuning` next to the
+  flags (key=value: `street_ar_meters` 30-457, `gain` 0.5-1, `backstep_meters`
+  0-50; anything else keeps the default). `tools/build-carplay-ar-controls.py
+  --street-ar-meters 90 --gain 0.7` builds `Evergreen-AR-tune.zip`; `tune-reset`
+  removes the file. Values take effect within two seconds.
+- **Trace gate.** Navigation-cadence tracing runs only while `ar-trace.enabled`
+  exists. The diagnostic installer creates it (`--no-trace` omits it); the
+  `trace-on`/`trace-off` kits switch it. The once-per-second `turn` records and
+  warnings stay on.
+- **Stock-navigation baseline.** A new idle NEMESIS service (`svc/ar-baseline.sh`)
+  waits for `ar-baseline.requested` from the `baseline` kit, then records the
+  cluster service's last turn/trap frame lines from `dumpsys com.hkmc.micom.cluster`
+  once a second for the requested minutes (max 60, 4 MiB) into the debug
+  directory, dropping turn-list road-name lines. Drive the same route with the
+  car's own navigation and export with the diagnostics or finish kit to get the
+  stock exit types, start distances and bar cadence for comparison.
+
+Host validation: 1,102 Java checks and 41 Python cases, including the two new
+sanitized replays (`observed-route-start.csv`, `stationary-then-reroute.csv`),
+tuning parse/range/file tests, the trace gate, the baseline service with a
+stub `dumpsys`, control-kit validation of tuning input, and the finish kit on
+104/105/106 recorders. In the 104 log the patched sender returned within 12 ms
+at the 99th percentile (one 290 ms outlier), so AR is not blocking the CarPlay
+callback thread; the freeze question stays open. Physical HUD rendering, the
+`mstate` meaning and the preferred timing need the owner's drive feedback.
+
+## 1.2.0.107 test build
+
+Polish and overhead items found while reading the 104 export, plus the tooling
+to read the next one:
+
+- **HUD distance glides with the arrow.** DiPO's `sendHudDist(float, int)` only
+  uses the cluster reference and its arguments (integer part plus tenths for
+  km/mi, then `updateTBTSubInfo2C`), and the log shows it carries the same
+  value and unit enum as the main turn (0 mismatches in 611 pairs). Its entry,
+  which we already hook, now passes through `ArHudRuntime.hudDistance`, so the
+  OEM's own call carries the exact distance while a maneuver is active; the
+  4 Hz worker re-enters the method reflectively when the displayed number
+  (whole feet/meters, tenths of a mile) would change. Unavailable layouts log
+  once and keep the OEM cadence. Cue-only maneuvers keep the OEM value.
+- **No blank between consecutive maneuvers.** The zero main frame and HUD blank
+  on replacement are deferred to the end of the sender callback and skipped
+  when the new maneuver's main frame or HUD list was sent in that callback
+  (13 of 14 replacements in the log followed within 5-10 ms). When nothing is
+  sent, the clear happens as before (`clear_previous_main`/`clear_previous_hud`
+  vs `clear_skipped`).
+- **Overhead.** `ArHudIpc.enabled()/advanced()` cache the two flag files for one
+  second instead of stat-ing them on every 250 ms tick in both processes; the
+  forwarder uses the same cache. Trace text at hot call sites is built only
+  when `ArHudDebug.on()`; `ipc_*`, `worker_alive` and `hud_distance` records
+  have their own 20/s budget so they cannot crowd out transitions.
+- **`tools/analyze-ar-log.py`** reads an AR-DEBUG(-FINISHED) export (rotated
+  files and recent logcat, de-duplicated) and prints per-process cadence, gate
+  counts, send latency, expiries with their silent context, back-steps,
+  replacement timing, tuning in effect, maneuver segments with the phone's
+  maneuver states, and the once-per-second turn records; `--json` for the full
+  report, `--replay DIR` for sanitized replay traces (`details`/`packet`/`route`/
+  `tick`/`stop`, numbers only) that run through `tools/replay-carplay-ar.sh
+  --live`. The 104 export replays end to end that way.
+- The replay harness gained a `packet` event (maneuver list and distance in one
+  update, as DiPO receives it) and records the HUD distance.
+
+Host validation: 1,127 Java checks and 44 Python cases. Roundabouts from raw
+exit angles and directional generic exits remain deferred until a 106/107 log
+shows the angle data; use the analyser's `mstate` and `angles` output.
+
+## 1.2.0.108 test build
+
+Read from the 107 drive export (25 minutes, 12,539 records, 770 exact receipts
+at 1 Hz, no expiries, 13 of 14 replacements with the clear skipped, send latency
+p99 1 ms). The owner reported two things: highway exits showed a "continue on
+this road" icon, and the large AR arrow rotated further than the real distance.
+
+- **Exits.** Both exits of the drive were CarPlay type 8 (direction-unspecified
+  off-ramp) with exit angle 0; the junction angle array had one element on one
+  of them and was absent on the other. The stock sender's switch maps CarPlay's
+  sided exits (22/23) to icons 82/81 and forks (52/53) to 174/173, and its
+  US-region filter then refuses those codes ("not send by navi": 73, 76, 81,
+  82, 84, 85, 87, 88, 90, 91, 161, 162, 172-174, 177, 183, 184 and the
+  clockwise roundabouts), so no exit ever reached the cluster on this firmware;
+  type 8 is not in the switch at all. The generic icon 86 we recovered to in
+  106/107 passes the filter but is drawn as "continue on the road". 108 gives
+  type 8 a side (`ArHudTurns.exitSide`): the exit angle's sign when it is
+  non-zero, else the traffic side (right in right-hand traffic). Far: icon 81/82
+  in the main frame and the HUD list; within 457 m: native `EXIT_RIGHT`/`EXIT_LEFT`
+  with the 457 m bar. `exit_side=auto|right|left|generic` overrides it. 81 and
+  82 are the codes HMG-API's mod sends on US Ioniq 5s; this is their first use
+  on the EV6.
+- **Arrow rotation.** The distance we send is the phone's exact distance,
+  0-3 m behind it between samples (0.8x projection, one back-step in 152
+  samples), so the number is not ahead of reality. What changed since the 104
+  drive, which had no such report: the bar (constant 10 within 75 m then; 90 to
+  10 over the 125 m street window in 106/107) and the start of the large arrow
+  (75 m then, 125 m now). The cluster service packs the bar into the turn frame
+  (one nibble, `round(bar/10)`, next to the distance's tenths digit), so the AR
+  unit does receive it. 108 puts the bar back on the stock scale, 90 to 10 over
+  457 m (`bar_meters`, default 457), which is what every stock approach sends,
+  and adds `turn_offset_meters` (0-60, default 0) that moves only the large
+  arrow's distance so the owner can test the placement hypothesis in one drive
+  with the ready-made tune kits (offset 15/30, bar 125, street 75). The HUD
+  number and the lease keep the phone's distance. A stock-navigation baseline
+  capture on the same roads (the baseline kit; its `dumpsys` filter matches
+  the service's "TBT Info" / "Distance" / "BarGraph Level" labels) would settle
+  which input the AR unit animates from.
+- Turn records add `angle_values=` (the phone's junction element angles, at
+  most eight), `extra=` (its item 12), `exit_side=` and `offset=`; the icon
+  gate record adds `exit_side=`. The analyser keeps the side and angle values in
+  its turn-record summary. `DV` joins the verified field list.
+
+Host validation: 1,156 Java checks and 44 Python cases; the 107 export replays
+through the analyser unchanged.
+
+## 1.2.0.109 test build
+
+The 108 road test failed and its export did too, so this build was made
+without logs. The owner's report: on the first route neither the AR turn nor
+the small HUD started, and CarPlay did not reconnect after toggling the phone's
+Wi-Fi and Bluetooth; after a head-unit restart the exit arrow and sign appeared
+(the exit was close), and that picture then stayed until navigation was
+stopped, while speed and speed limit kept updating. The export "failed" with
+no reason visible; the 108 kit's version pattern and recorder checksum were
+right, so the likely causes are the 107 kit (which rejects 108) or the nested
+controls zip.
+
+What is known and what is not:
+
+- 108 was the first build to hand this cluster icon 81 (far main frame and the
+  small HUD list, including while the native sign was up) and native
+  `EXIT_RIGHT`. Icon 81 is on the stock US app's refused list. A cluster that
+  ignores the frame explains both observations: nothing at the start of a route
+  whose first maneuver is a far exit, and, because the deferred clear is
+  skipped when the next maneuver's frame was *sent*, the previous picture
+  staying when the next maneuver is again a far exit. That is a hypothesis.
+- The other candidates are the AR unit holding the native exit until a blank,
+  and the phone callback stalling. The helper has no lock-order inversion with
+  the sender's monitor, and the cluster service's `updateTBTInfo` only packs
+  bytes and posts a message. The 108 logs on the head unit (PIDs, `seq`
+  restarts, `worker_alive input_age`, `main_sent` types) decide between them.
+
+Changes:
+
+- `recoverIcon` never returns 81/82: raw 8 (and 22/23 when the stock table
+  gives icon 0) become 66/71, or 86 with `exit_side=generic`. A test walks all
+  raw values and sides.
+- `exit_style=slight|sign` (default `slight`). Slight: native `TURN` at 45/315
+  degrees inside the full 457 m window (the street window does not apply to
+  exits), bar on the 457 m scale. Sign: native `EXIT_RIGHT`/`EXIT_LEFT` inside
+  457 m with icon 66/71 far and in the HUD list, so the sign can be tested
+  without the refused icons; a replaced exit sign is cleared in `prepare()`
+  before the next maneuver's frame instead of through the deferred clear.
+- Lease expiry (`HOLD_MS`) now sends the type-0 main clear and the stock
+  `sendHudBlank` once, outside the runtime lock.
+- `ArHudDebug` is the process's default uncaught-exception handler in front of
+  the existing one (class and method names only, no messages), installed at
+  the first `prepare()`. The worker logs the sender thread's state and top
+  frames once when active input has been quiet for 15 s. No new class: the
+  helper count stays twelve.
+- Finish kit: versions 104-109, the 108 recorder checksum, an early plain copy
+  to `AR-DEBUG-SNAPSHOT` (removed again after a verified export), the failure
+  reason in `AR-EXPORT-ERROR.txt`, and a service status that cannot be read no
+  longer aborts the run (the service is still stopped by name; a recorder that
+  keeps writing fails the checksum comparison and nothing is deleted).
+- The analyser reports the crash and quiet-input records and the exit style.
+
+Not proven on the car before this build: icons 66/71 and `TURN` at 45/315
+degrees (both stock-sendable), and the expiry clear.
+
+## 1.2.0.110 test build
+
+The 108 export arrived after 109 was handed over. It replaces the guesswork in
+the 109 section above. All times are head-unit uptime; nothing was dropped
+from the trace and there is no crash record.
+
+- First route (first boot): the projection app's sender received no route or
+  maneuver callback at all for eight minutes. The only helper activity is a
+  `reset` with the stock HUD blank at three moments that match the owner
+  switching the phone's Wi-Fi/Bluetooth. The navigation process kept seeing
+  speed limits, so the car was driving. The helper had nothing to convert.
+- Second route (after the head-unit restart): 28 s after boot raw 8 arrived
+  with exact distances 447, 443, 424 and 410 m inside 1.7 s. The gate
+  recovered icon 81, the worker sent native `EXIT_RIGHT` sixteen times down
+  to an interpolated 384 m and the HUD list got icon 81 once. The owner saw
+  the arrow and the proper exit sign, so the native exit type renders on
+  this car. Then no phone input for 540.7 s, while speed limits show the car
+  driving for another three minutes. The sender's callback had returned
+  normally and the worker stayed alive; the 300 s lease expired, but 108 sent
+  no clear on expiry, so the sign stayed. The next phone input was a new
+  guidance start (state 6, raw 11) while parked; stopping navigation then
+  blanked the HUD.
+- So the frozen picture was lost phone input with nothing to clear it, not
+  the cluster ignoring icon 81. Why the phone's guidance stopped arriving
+  (twice on that drive, never on the 107 drive two hours earlier) is not in
+  the logs: 108 had no record of the sender thread's state. 109 and later log
+  it after 15 quiet seconds (`input_quiet`).
+
+Changes:
+
+- `ArHudMotion.passedAt()`: when the last two exact samples gave a closing
+  rate of at least 12 m/s (both the smoothed speed and the last interval),
+  the maneuver counts as passed at the last sample plus twice the remaining
+  time plus 10 s, at least 20 s. `tick()` then runs the normal expiry: lease
+  off, type-0 main clear, stock HUD blank, once. On the 108 sequence that is
+  48 s after the last sample. In the 104 and 107 drives every one of the 31
+  silences longer than 10 s followed samples at 1.7 m/s or less, so the rule
+  would not have fired on any recorded stop; a hard stop from speed inside
+  one phone interval would be cleared and comes back with the next sample.
+- `exit_style` defaults to `sign` again; `slight` stays available. Icons
+  81/82 stay unused (far and HUD list are 66/71), which is the one part of
+  the 108 picture that 110 does not reproduce: 108's list entry was icon 81.
+- `timer_expired` records carry `passed=` and are critical records, so the
+  rate limiter cannot drop them. The crash handler prints the stack trace
+  when there is no previous handler (host tests only).
+- Finish kit and recorder checksum list: 104-110.
+
+Not proven on the car: the moving-loss clear, and the sign together with the
+66/71 list icon.

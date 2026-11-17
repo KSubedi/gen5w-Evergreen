@@ -1,0 +1,13 @@
+# Sanitized start of a 104 drive route. Times and IDs are synthetic; no route data.
+# The phone's first instruction is raw 11 (start route) while the route state is 6
+# (proceed to route). The stock icon table has no icon for it, so the HUD stayed
+# blank until the first real turn. Columns: time,route,<maneuver>,<route state>.
+1000,route,0,6
+1010,details,0,11,0,0
+1020,distance,61
+2000,distance,58
+# First real maneuver: a right turn 44 m ahead, state 1 (guiding).
+3000,details,2,2,0,67
+3010,route,2,1
+3020,distance,44
+4000,distance,20

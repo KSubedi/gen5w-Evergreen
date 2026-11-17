@@ -382,10 +382,14 @@ class ControlTest(unittest.TestCase):
         logcat=self.root/'bin/logcat'
         logcat.write_text('#!/bin/sh\n[ "$*" = "-d -v brief -s EvergreenAR:W *:S" ] || exit 2\necho "EvergreenAR: turn icon=81 result=native output=17"\n')
         logcat.chmod(0o755)
+        (debug/'cluster-baseline.log').write_text('stock navigation frames')
+        (self.package/'ar-tuning').write_text('gain=0.7\n')
         result=self.control('diagnostics')
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('icon=81',(self.usb/'AR-DIAGNOSTICS.txt').read_text())
         self.assertEqual((self.usb/'AR-DEBUG/flow.log.1').read_text(),'numeric persistent trace')
+        self.assertEqual((self.usb/'AR-DEBUG/cluster-baseline.log').read_text(),'stock navigation frames')
+        self.assertEqual((self.usb/'AR-DEBUG/ar-tuning').read_text(),'gain=0.7\n')
         self.assertTrue(self.marker.is_file())
         logcat.write_text('#!/bin/sh\nexit 1\n')
         self.assertEqual(self.control('diagnostics').returncode,0)
@@ -401,6 +405,61 @@ class ControlTest(unittest.TestCase):
         self.assertFalse(self.marker.exists())
         self.assertIn(b"is disabled", self.control("status").stdout)
         self.assertEqual(report.read_text(), '{"variant": "ev6"}\n')
+
+    def test_trace_and_tuning_controls_change_only_their_files(self):
+        (self.package/'AR_BUILD.json').write_text('{"variant": "ev6", "schema": 2}\n');self.marker.touch()
+        self.assertEqual(self.control('trace-on').returncode,0)
+        trace=self.package/'ar-trace.enabled';self.assertTrue(trace.is_file());self.assertEqual(trace.stat().st_mode&0o777,0o644)
+        self.assertIn(b'tracing is enabled',self.control('status').stdout)
+        self.assertEqual(self.control('trace-off').returncode,0);self.assertFalse(trace.exists())
+        (self.usb/'AR_TUNING').write_text('street_ar_meters=90\ngain=0.7\n')
+        self.assertEqual(self.control('tune').returncode,0)
+        tuning=self.package/'ar-tuning';self.assertEqual(tuning.read_text(),'street_ar_meters=90\ngain=0.7\n')
+        self.assertEqual(tuning.stat().st_mode&0o777,0o644)
+        self.assertIn(b'street_ar_meters=90',self.control('status').stdout)
+        (self.usb/'AR_TUNING').write_text('bar_meters=125\nturn_offset_meters=20\nexit_side=left\nexit_style=sign\n')
+        self.assertEqual(self.control('tune').returncode,0)
+        self.assertEqual(tuning.read_text(),'bar_meters=125\nturn_offset_meters=20\nexit_side=left\nexit_style=sign\n')
+        (self.usb/'AR_TUNING').write_text('street_ar_meters=90\ngain=0.7\n');self.assertEqual(self.control('tune').returncode,0)
+        for bad in ('street_ar_meters=90\nrm -rf /=1\n','gain=abc\n','gain=0.7;reboot\n','speed=1\n','exit_side=up\n','exit_side=left;reboot\n','bar_meters=left\n','exit_style=generic\n','exit_style=sign;reboot\n','exit_style=1\n'):
+            (self.usb/'AR_TUNING').write_text(bad)
+            self.assertNotEqual(self.control('tune').returncode,0,bad)
+            self.assertEqual(tuning.read_text(),'street_ar_meters=90\ngain=0.7\n')
+        (self.usb/'AR_TUNING').unlink();self.assertNotEqual(self.control('tune').returncode,0)
+        self.assertEqual(self.control('tune-reset').returncode,0);self.assertFalse(tuning.exists())
+        self.assertTrue(self.marker.is_file())
+
+    def test_baseline_request_needs_the_service(self):
+        (self.package/'AR_BUILD.json').write_text('{"variant": "ev6", "schema": 2}\n');self.marker.touch()
+        self.assertNotEqual(self.control('baseline').returncode,0)
+        (self.package/'svc').mkdir();(self.package/'svc/ar-baseline.sh').write_text('stub')
+        (self.usb/'AR_BASELINE_MINUTES').write_text('15\n')
+        self.assertEqual(self.control('baseline').returncode,0)
+        self.assertEqual((self.package/'ar-baseline.requested').read_text(),'15\n')
+        (self.usb/'AR_BASELINE_MINUTES').write_text('999\n');self.control('baseline')
+        self.assertEqual((self.package/'ar-baseline.requested').read_text(),'60\n')
+        self.assertIn(b'baseline capture is pending',self.control('status').stdout)
+
+    def test_control_builder_makes_tuning_kit_within_ranges(self):
+        out=self.root/'kits'
+        result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--street-ar-meters','90','--gain','0.7'],capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        with zipfile.ZipFile(out/'Evergreen-AR-tune.zip') as z:
+            self.assertEqual(z.read('AR_TUNING').decode(),'street_ar_meters=90\ngain=0.7\n');self.assertEqual(z.read('AR_MODE'),b'tune\n')
+        with zipfile.ZipFile(out/'Evergreen-AR-baseline.zip') as z:self.assertEqual(z.read('AR_BASELINE_MINUTES'),b'20\n')
+        for mode in ('trace-on','trace-off','tune-reset'):self.assertTrue((out/('Evergreen-AR-'+mode+'.zip')).is_file())
+        result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--gain','1.5'],capture_output=True)
+        self.assertNotEqual(result.returncode,0)
+        result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--bar-meters','125',
+                               '--turn-offset-meters','20','--exit-side','left','--exit-style','sign','--tune-name','test'],capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        with zipfile.ZipFile(out/'Evergreen-AR-tune-test.zip') as z:
+            self.assertEqual(z.read('AR_TUNING').decode(),'bar_meters=125\nturn_offset_meters=20\nexit_side=left\nexit_style=sign\n')
+        result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--exit-style','sign','--tune-name','exit-sign'],capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        with zipfile.ZipFile(out/'Evergreen-AR-tune-exit-sign.zip') as z:self.assertEqual(z.read('AR_TUNING').decode(),'exit_style=sign\n')
+        result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--turn-offset-meters','61'],capture_output=True)
+        self.assertNotEqual(result.returncode,0)
 
     def test_wrong_firmware_and_unknown_mode_rejected_but_disable_available(self):
         (self.package / "AR_BUILD.json").write_text('{"variant": "ev6"}\n')

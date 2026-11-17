@@ -15,6 +15,9 @@ import java.io.FileReader;
  */
 public final class ArHudIpc {
     public static final String ROOT = "/data/nemesis/apps/wireless.carplay.aa";
+    /** A phone sends nothing while the car waits at a light; the lease follows the route,
+     * not the input cadence. This bound only guards against a stuck sender. */
+    public static final long HOLD_MS = 300000;
     private static final int MAGIC = 0x45564152;
     private static final String boot = bootId();
     private static int publishedBar = -1;
@@ -25,8 +28,21 @@ public final class ArHudIpc {
 
     private ArHudIpc() {}
 
-    public static boolean enabled() { return new File(ROOT, "ar-hud.enabled").isFile(); }
-    public static boolean advanced() { return enabled() && !new File(ROOT, "ar-advanced.disabled").isFile(); }
+    private static long flagsAt = -1;
+    private static boolean flagEnabled, flagAdvanced;
+
+    /** Both opt-in files, checked at most once a second rather than on every 250 ms tick. */
+    private static synchronized void flags() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (flagsAt >= 0 && now >= flagsAt && now - flagsAt < 1000) return;
+        flagsAt = now;
+        try {
+            flagEnabled = new File(ROOT, "ar-hud.enabled").isFile();
+            flagAdvanced = flagEnabled && !new File(ROOT, "ar-advanced.disabled").isFile();
+        } catch (RuntimeException unavailable) { flagEnabled = false; flagAdvanced = false; }
+    }
+    public static boolean enabled() { flags(); return flagEnabled; }
+    public static boolean advanced() { flags(); return flagAdvanced; }
 
     private static String bootId() {
         try {
@@ -41,7 +57,7 @@ public final class ArHudIpc {
         if (!active && !wasActive) return;
         if (active && wasActive && bar == publishedBar && now - publishedAt < 2000) return;
         if (writeLease(new File(ROOT+"/ar-state"),boot,active,bar,sampleAt,now)) {
-            ArHudDebug.event("ipc_written active="+active+" bar="+bar+" sample="+sampleAt+" published="+now);
+            if (ArHudDebug.on()) ArHudDebug.event("ipc_written active="+active+" bar="+bar+" sample="+sampleAt+" published="+now);
             wasActive = active; publishedBar = bar; publishedAt = now;
         }
     }
@@ -71,7 +87,7 @@ public final class ArHudIpc {
     public static int read(long now) {
         if (!advanced() || boot.length() == 0) return -1;
         int value=readLease(new File(ROOT+"/ar-state/progress"),boot,now);
-        if(value!=readBar){ArHudDebug.event("ipc_read bar="+value);readBar=value;}
+        if(value!=readBar){if(ArHudDebug.on())ArHudDebug.event("ipc_read bar="+value);readBar=value;}
         return value;
     }
 
@@ -84,7 +100,7 @@ public final class ArHudIpc {
                 boolean active = in.readBoolean(); int bar = in.readInt();
                 long sampleAt = in.readLong(), published = in.readLong();
                 if (in.read() != -1 || !active || sampleAt < 0 || published < sampleAt || now < published
-                        || now - sampleAt > 5000 || now - published > 3000 || bar < 0 || bar > 90 || bar % 10 != 0) return -1;
+                        || now - sampleAt > HOLD_MS || now - published > 3000 || bar < 0 || bar > 90 || bar % 10 != 0) return -1;
                 return bar;
             } finally { in.close(); }
         } catch (Exception unavailable) { return -1; }

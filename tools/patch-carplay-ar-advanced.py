@@ -20,8 +20,8 @@ V = "com/daudio/app/dipo/e/v.smali"
 CT = "Lcom/daudio/app/dipo/e/c;"
 FIELDS = {
     U: {"Am": "Ljava/util/LinkedHashMap;", "Al": "Ljava/util/LinkedHashMap;"},
-    C: {"aR": "I", "ba": "I", "bd": "[I", "bb":"Ljava/lang/String;"},
-    V: {"DM": "I", "DR": "I", "DS": "I", "DU": "I"},
+    C: {"aR": "I", "aS": "I", "ba": "I", "bd": "[I", "bb":"Ljava/lang/String;"},
+    V: {"DM": "I", "DR": "I", "DS": "I", "DT": "[I", "DU": "I", "DV": "I"},
 }
 TRAP_FIELDS = ("fixedSpeed mobileSpeed overSpeedAlarm redlineSpeed nonSpeed warningZone curveWarning "
                "mergeWarning tollGateCurrency tollGate displayTG barGraphLevel speedLimit busSpeed "
@@ -100,8 +100,11 @@ def patch_dipo(tree, plan):
     replace_method(tree/U, "d(Ljava/lang/Object;)V", lambda t: t.replace(
         "    return-void", "    if-eqz p1, :evergreen_details_done\n\n    invoke-static {p0}, "+RUNTIME+
         "->details(Ljava/lang/Object;)V\n\n    :evergreen_details_done\n    return-void"))
+    # The small HUD's distance follows the gliding arrow: our helper returns the exact
+    # distance in the OEM's own unit while a maneuver is active, else the original value.
     replace_method(tree/U,"sendHudDist(FI)V",lambda t:insert_entry(t,
-        'const-string v0, "hud_distance"\n\n    invoke-static {v0, p1, p2}, '+RUNTIME+'->distanceEvent(Ljava/lang/String;FI)V'))
+        'const-string v0, "hud_distance"\n\n    invoke-static {v0, p1, p2}, '+RUNTIME+'->distanceEvent(Ljava/lang/String;FI)V\n\n'
+        '    invoke-static {p1, p2}, '+RUNTIME+'->hudDistance(FI)F\n\n    move-result p1'))
     for signature,label in (("c(Ljava/lang/Object;)V","route_callback"),("d(Ljava/lang/Object;)V","maneuver_callback")):
         replace_method(tree/U,signature,lambda t,label=label:insert_entry(t,
             'const-string v0, "'+label+'"\n\n    invoke-static {v0}, '+RUNTIME+'->event(Ljava/lang/String;)V'))

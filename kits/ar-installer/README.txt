@@ -1,27 +1,105 @@
-EVERGREEN 1.2.0.105 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.2.0.110 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
-This diagnostic build adds exit recovery, maneuver replacement clearing and
-closer street-turn AR. These changes need their own car test.
+This test build applies what the 1.2.0.104 diagnostic drive showed. Its
+changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
 
+NEW IN 1.2.0.110 (from the recorded 108 drive)
+What the 108 logs show: on the first route the phone delivered no guidance to
+the head unit at all, so there was nothing to draw. After the head-unit
+restart the exit arrived at 447 m, the native exit sign was sent and drawn
+correctly, and two seconds later the phone's guidance stopped arriving for
+nine minutes while the car drove on. Nothing told the HUD to drop the sign.
+Why the phone's guidance stopped is not visible in those logs.
+- Guidance lost while moving now clears the HUD. If the last samples showed
+  the car closing at 12 m/s (27 mph) or more and then nothing arrives, the
+  turn and the small HUD entry are cleared after twice the time the car
+  needed to reach the maneuver plus 10 s, never sooner than 20 s. On the 108
+  drive that is 48 s instead of never. A car that slowed down before the
+  silence (a light, a queue) keeps its picture as before: in the 31 recorded
+  stops the phone always reported the car below 2 m/s first.
+- The native exit sign is the default again (exit_style=sign): it was drawn
+  correctly on the 108 drive. Far away and in the small HUD an exit is the
+  slight-right/left icon 66/71. Evergreen-AR-tune-exit-slight.zip gives the
+  109 arrow instead.
+- The export kit accepts 104 to 110.
+
+NEW IN 1.2.0.109 (after the failed 108 drive, before its logs were available)
+109 assumed the cluster might have ignored icon 81. The 108 logs do not
+support that; see 110 above. What 109 changed and 110 keeps:
+- Exits no longer use icons 81/82. The stock US app refuses to send those to
+  the cluster; icon 66/71 is used far away and in the small HUD.
+- exit_style=slight|sign. Slight is a large AR arrow at 45 degrees within
+  457 m (the 109 default); sign is the native exit sign (the 110 default),
+  with an explicit clear before the next maneuver.
+  Evergreen-AR-tune-exit-generic.zip is the 107 behaviour (icon 86, no AR).
+- If the phone sends nothing for five minutes during a maneuver, the turn and
+  the small HUD entry are cleared instead of staying on the last frame.
+- Diagnostics: a crash of the projection app is recorded (thread, exception
+  class and method names only, never a message), and once per quiet period of
+  15 s the log shows where the app's sender thread is.
+- The export kit takes a plain copy of the logs before it checks anything,
+  and writes the reason for a failure to AR-EXPORT-ERROR.txt on the USB.
+
+NEW IN 1.2.0.108 (from the recorded 107 drive; exit icons changed in 109)
+- Highway exits: the phone's direction-unspecified exit (CarPlay type 8) now
+  gets a side. The stock app maps CarPlay's sided exits to the exit icons and
+  then refuses to send them on US firmware, so no exit ever reached the HUD;
+  the generic icon 86 used in 106/107 is drawn as "continue on this road".
+  Now: right exit (icon 81 far, native EXIT_RIGHT within 457 m) in right-hand
+  traffic, left when the phone's exit angle is negative. Tunable: exit_side=
+  auto|right|left|generic.
+- The bar is back on the stock navigation's scale (90 to 10 over 457 m) instead
+  of filling over the 125 m street window, since the arrow looked further
+  rotated than the real distance on the 107 drive. Tunable: bar_meters.
+- New turn_offset_meters tuning (0-60): adds meters to the large AR arrow's
+  distance only, to test whether the arrow is placed too close. The small HUD
+  number stays the phone's distance.
+- Turn records log the phone's junction angle values and its item 12 for the
+  next exit/roundabout decisions.
+
+NEW IN 1.2.0.107
+- The small HUD's distance number now glides with the AR arrow (4 Hz, same
+  value) instead of stepping once a second with the phone's rounded value.
+- Consecutive maneuvers switch directly from one arrow to the next; the blank
+  frame between them is only sent when the next maneuver cannot be shown yet.
+- Lower overhead: opt-in flags are checked once a second, trace text is only
+  built while tracing is on, and routine trace chatter has its own budget.
+
+NEW IN 1.2.0.106 (from the recorded drive)
+- Route start: the phone's "start route" instruction now shows the small
+  straight cue instead of leaving the HUD blank until the first turn.
+- Waiting at a light no longer drops the progress bar: the lease follows the
+  route, not the phone's update cadence (the phone sends nothing while the car
+  stands still).
+- The bar fills 90 to 10 over the street-turn window instead of staying at 10.
+- Smoother countdown: between phone samples the arrow projects at 80 percent
+  of the measured closing rate and never steps back for small corrections.
+- While the phone reroutes, the plain icon is shown instead of a stale AR arrow.
+- Road-test tuning kit (street AR distance, projection gain, back-step hold)
+  that takes effect without reinstalling; trace on/off kits; a stock-navigation
+  cluster baseline capture for comparison. See TUNING AND BASELINE below.
+
 WHAT THIS BUILD DOES
-Handles the observed code-8 maneuver using a generic exit cue, including its
-small-HUD instruction and distance. It does not invent left/right geometry
-when the phone supplies a direction-unspecified maneuver. Explicit left/right
-exit metadata still uses directional conversion. Deferred street AR is now
-identified as deferred in the logs, rather than mislabeled unmapped.
+Handles the observed code-8 maneuver as a sided exit (right in right-hand
+traffic, left when the phone's exit angle says so, or as set by exit_side),
+drawn as the native exit sign within 457 m unless exit_style=slight, with its
+small-HUD instruction and distance. Explicit left/right exit metadata is drawn
+the same way. Deferred street AR is identified as deferred in the logs, rather
+than mislabeled unmapped.
 Refreshes the existing main-turn and small-HUD paths after maneuver details
 arrive, without waiting for the next distance/route-state update. Missing
 current-maneuver data and stopped routes do not produce a synthetic turn.
 Keeps Evergreen's wireless CarPlay/Android Auto and audio implementation.
-Large ordinary street-turn AR begins within 125 m (about 410 ft). Small
-direction cues remain available earlier. Highway/fork/roundabout native
+Large ordinary street-turn AR begins within 125 m (about 410 ft) unless tuned.
+Small direction cues remain available earlier. Highway/fork/roundabout native
 conversion retains its 457 m (1,500 ft) window; far exit cues use projection icons.
 The advanced build uses the phone's exact maneuver distance and raw turn
 metadata. It estimates the closing rate from consecutive exact distances and
-updates at 250 ms intervals for at most 1.5 seconds after a sample, then holds.
+updates at 250 ms intervals (at 80 percent of that rate, holding rather than
+stepping back) for at most 1.5 seconds after a sample, then holds.
 It does not guess time-to-turn or extrapolate through stale route changes.
 Invalid/missing metadata falls back to the working icon-based AR behavior.
 
@@ -29,7 +107,9 @@ The progress overlay changes only the bar in the navigation app's latest OEM
 trap frame. Speed limits, units, camera and warning fields remain the OEM's.
 It waits for that app's first real trap frame (often a map speed-limit update);
 it never constructs a speed limit from phone data or the cluster's delayed echo.
-The lease expires on stale data, across boots, or when guidance/AR is disabled.
+The lease ends with the route, maneuver, source or connection, across boots,
+or when guidance/AR is disabled; a silent phone at a standstill keeps it,
+silence after the car was last seen moving ends it (see 110 above).
 Both AR and advanced features are enabled by this selected experimental installer.
 Unknown/far/native turns pass through. The HUD must have AR mode selected.
 
@@ -85,13 +165,38 @@ logcat, not buffered in Java memory. Routine events are capped at 50/second; cri
 It covers route/maneuver callbacks, parsed exact/display distance receipts,
 current maneuver/state, missing metadata and icon recovery, replacement clears,
 main cluster calls, small HUD calls/distance, progress IPC and OEM bar overlay,
-resets and worker heartbeat. API return is not physical HUD acknowledgement.
+resets, worker heartbeat, the phone's route and maneuver states and the
+tuning in effect. API return is not physical HUD acknowledgement.
 It does not capture raw CarPlay video, arbitrary phone packets, Wi-Fi passwords,
 road names, coordinates, phone identifiers or general app logs.
 
+TUNING AND BASELINE
+Evergreen-AR-tune.zip (built with tools/build-carplay-ar-controls.py and values
+such as --street-ar-meters 90 --gain 0.7 --backstep-meters 10) writes a small
+ar-tuning file next to the AR flags. Allowed ranges: street_ar_meters 30-457,
+gain 0.5-1, backstep_meters 0-50, bar_meters 30-457, turn_offset_meters 0-60,
+exit_side auto|right|left|generic, exit_style slight|sign; anything else keeps
+the built-in default (125 m, 0.8, 15 m, 457 m, 0 m, auto, sign). Values apply
+within two seconds; start a fresh route. A tune kit replaces the whole file, so
+one kit is in effect at a time. The 110 kits zip has ready-made variants:
+tune-exit-slight (the 109 exit arrow), tune-exit-generic (the 107 exit icon),
+tune-offset-15/-30 (arrow placed 15/30 m further), tune-bar-125 (the 107 bar),
+tune-street-75 (the 104 start distance) and tune-reset.
+Evergreen-AR-tune-reset.zip removes the file. Evergreen-AR-status.zip shows it.
+Evergreen-AR-trace-off.zip stops the detailed per-event trace (the once-per-
+second turn records stay); Evergreen-AR-trace-on.zip restores it.
+Evergreen-AR-baseline.zip asks the head unit to record, once a second for the
+requested minutes (default 20), what the cluster service last received from the
+car's own navigation: turn type, direction, distance and bar. Insert it parked,
+remove the USB, drive a route with the car's navigation, then export with the
+diagnostics or finish kit. Only turn/trap frame lines are kept; the turn list's
+road names are not. This gives the stock exit types and start distances to
+compare the CarPlay conversion against.
+
 AFTER THE DRIVE
 1. Park in READY. Extract the NEW Evergreen-AR-export-stop-clean.zip onto a
-   separate empty USB. This version supports both 104 and 105.
+   separate empty USB, so that NEMESIS.sh and NEMESIS.data are at its root.
+   This version supports 104 to 110.
 2. Insert it and let NEMESIS run the export. Wait for "Export and cleanup complete" before
    removing USB. The kit flushes writes before showing completion.
 3. Zip the AR-DEBUG-FINISHED folder and send it privately, using an upload link if it is
@@ -104,7 +209,9 @@ AFTER THE DRIVE
 
 The finish kit stops persistent recording, verifies USB copies, then removes
 the verified internal logs. AR keeps working. If copying/flushing fails, logs
-are kept internally for retry. The copy-only diagnostics kit remains available
+are kept internally for retry. If NEMESIS reports that the operation failed,
+the USB holds AR-EXPORT-ERROR.txt with the reason and AR-DEBUG-SNAPSHOT with an
+unverified copy of the logs; send both. The copy-only diagnostics kit remains available
 for mid-drive parked checks; it does not stop or delete recording.
 Persistent capture and these behavioral changes are host-tested, not yet
 verified on this car. Missing files are themselves diagnostic evidence.

@@ -1,0 +1,11 @@
+# Synthetic, from the 104 drive's silent gaps: no route data.
+1000,details,7,2,0,67
+1010,route,7,1
+1020,distance,60
+1600,distance,13
+2000,distance,12
+# Waiting at the light: the phone sends nothing for forty seconds.
+42000,tick
+# The driver takes another road: the phone reroutes (state 5), then stops guidance.
+43000,route,7,5
+44000,stop

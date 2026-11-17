@@ -33,7 +33,7 @@ public final class ArHudRoute {
 
     public static synchronized void exact(Object route, int meters, long now) {
         if (route == null) return;
-        ArHudDebug.event("exact meters="+meters+" at="+now);
+        if (ArHudDebug.on()) ArHudDebug.event("exact meters="+meters+" at="+now);
         if (meters < 0 || now < 0) exact.remove(route);
         else {
             int maneuver=-1;
@@ -50,7 +50,7 @@ public final class ArHudRoute {
 
     public static synchronized void finish(Object route) {
         Boolean touched=packets.remove(route);long[] receipt=exact.get(route);
-        ArHudDebug.event("parser_finish state="+state(route)+" current="+identity(route)+" exact_touched="+touched+" receipt="+(receipt!=null));
+        if(ArHudDebug.on())ArHudDebug.event("parser_finish state="+state(route)+" current="+identity(route)+" exact_touched="+touched+" receipt="+(receipt!=null));
         Boolean displayTouched=displayPackets.remove(route);long[] display=displays.get(route);
         int id=identity(route);
         if(display!=null) {
@@ -114,11 +114,31 @@ public final class ArHudRoute {
             return new ArHudSample(p[0], component, current[0], ((Integer)field(maneuver,"DM")).intValue(),
                     ((Integer)field(maneuver,"DR")).intValue(), ((Integer)field(maneuver,"DS")).intValue(),
                     ((Integer)field(maneuver,"DU")).intValue(), packet == null ? -1f : packet[0],
-                    packet == null ? -1 : packet[1], true);
+                    packet == null ? -1 : packet[1], true, state, optionalInt(route, "aS"), optionalLength(maneuver, "DT"),
+                    optionalInts(maneuver, "DT"), optionalInt(maneuver, "DV"));
         } catch (Exception unavailable) {
             if (!warned) { warned=true; android.util.Log.w("EvergreenAR","Metadata unavailable; retaining basic AR",unavailable); }
             return null;
         }
+    }
+
+    /** Diagnostic-only fields; a layout without them still yields a usable sample. */
+    private static int optionalInt(Object object, String name) {
+        try { return ((Integer)field(object, name)).intValue(); } catch (Exception unavailable) { return -1; }
+    }
+    /** At most eight values: enough for any junction, bounded for the trace. */
+    private static int[] optionalInts(Object object, String name) {
+        try {
+            int[] values = (int[])field(object, name);
+            if (values == null) return null;
+            int[] copy = new int[Math.min(values.length, 8)];
+            System.arraycopy(values, 0, copy, 0, copy.length);
+            return copy;
+        } catch (Exception unavailable) { return null; }
+    }
+    private static int optionalLength(Object object, String name) {
+        try { int[] values = (int[])field(object, name); return values == null ? -1 : values.length; }
+        catch (Exception unavailable) { return -1; }
     }
 
     public static int identity(Object route) {
@@ -160,7 +180,7 @@ public final class ArHudRoute {
                 if (current == null || current.length == 0) continue;
                 Object details = ((Map<?, ?>)field(owner,"Am")).get(entry.getKey());
                 if (!(details instanceof Map) || !((Map<?, ?>)details).containsKey(Integer.valueOf(current[0]))) continue;
-                ArHudDebug.event("details_refresh component="+entry.getKey()+" current="+current[0]);
+                if (ArHudDebug.on()) ArHudDebug.event("details_refresh component="+entry.getKey()+" current="+current[0]);
                 sender.invoke(owner, entry.getKey(), route);
             }
         } catch (Exception unavailable) {

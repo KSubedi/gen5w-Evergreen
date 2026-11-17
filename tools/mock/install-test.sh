@@ -43,6 +43,10 @@ done
 QEMU=$(command -v qemu-arm-static)
 ZIP=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); PROD=$2; TD=$3; SRC=$4
 SH=${MOCK_SH:-/bin/sh}
+# The unit has no locales and its tools work on bytes. Under a UTF-8 locale a
+# host grep (busybox, musl regex) stops matching at invalid UTF-8 bytes, which
+# hides part 2's receiver marker inside the rebuilt library.
+export LC_ALL=C
 X=$(mktemp -d "${TMPDIR:-/tmp}/mock-hu.XXXX"); R=$X/root
 mkdir -p "$R/data/nemesis" "$R/data/dalvik-cache" "$R/storage/usb0" "$R/sys/class/net" "$X/stub" "$X/pkg"
 if [ "$MOCK_NO_WIFI" = 1 ]; then

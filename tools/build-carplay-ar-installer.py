@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.2.0.105"
+VERSION = "1.2.0.110"
 
 
 def verifier():
@@ -45,7 +45,7 @@ def archive(files, modes=None):
     return stream.getvalue()
 
 
-def build(patches, output, enable_ar):
+def build(patches, output, enable_ar, trace=True):
     if not enable_ar:
         raise ValueError("explicit --enable-ar is required for this experimental installer")
     patches, output = Path(patches).resolve(), Path(output).absolute()
@@ -77,6 +77,7 @@ def build(patches, output, enable_ar):
             original=field(original,'short-desc','"Experimental smooth CarPlay AR; EV6 USA 260507 only"')
         if data['schema']==2:
             original += "\n[service.2]\nname=ar-debug\nkind=sh\npath=svc/ar-debug.sh\nuid=root\nmode=restart\n"
+            original += "\n[service.3]\nname=ar-baseline\nkind=sh\npath=svc/ar-baseline.sh\nuid=root\nmode=restart\n"
         # Validate the FINAL descriptor, after all experimental overrides.
         # NEMESIS permits dotted numbers only, not SemVer prerelease suffixes.
         checked_descriptor = Path(temp) / "NEMESIS.data"
@@ -93,10 +94,16 @@ def build(patches, output, enable_ar):
             modes['scripts/ar-post.sh']=0o755
             files['svc/ar-debug.sh']=(ROOT/'kits/ar-installer/ar-debug.sh').read_bytes()
             modes['svc/ar-debug.sh']=0o755
+            files['svc/ar-baseline.sh']=(ROOT/'kits/ar-installer/ar-baseline.sh').read_bytes()
+            modes['svc/ar-baseline.sh']=0o755
+            if trace:
+                # Diagnostic candidates trace at navigation cadence; the trace-off control kit removes this.
+                files['ar-trace.enabled']=b"Detailed EvergreenAR tracing for this diagnostic build.\n"
         files["ar-hud.enabled"] = b"Explicit opt-in by the experimental AR installer.\n"
         data = json.loads(files["AR_BUILD.json"])
         data["enabled_by_default"] = True
         data["activation"] = "explicit-experimental-installer"
+        data["trace_enabled"] = bool(trace and data['schema']==2)
         files["AR_BUILD.json"] = (json.dumps(data, indent=2)+"\n").encode()
         files["AR_INSTALL.json"] = (json.dumps({"version": VERSION, "product": "CVEV.USA.*.260507",
             "enable_requested": True, "source_build_report_sha256": hashlib.sha256(source_report.read_bytes()).hexdigest(),
@@ -124,8 +131,9 @@ if __name__ == "__main__":
     p.add_argument("--patches", type=Path, required=True)
     p.add_argument("--out", type=Path, default=ROOT / "dist" / ("Evergreen_EV6_US_260507_AR_"+VERSION+".zip"))
     p.add_argument("--enable-ar", action="store_true")
+    p.add_argument("--no-trace", action="store_true", help="omit ar-trace.enabled (release candidates)")
     a = p.parse_args()
     try:
-        build(a.patches, a.out, a.enable_ar)
+        build(a.patches, a.out, a.enable_ar, not a.no_trace)
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         p.exit(1, str(error)+"\n")
