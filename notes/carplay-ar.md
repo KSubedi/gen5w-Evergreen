@@ -310,3 +310,19 @@ This is a car-test candidate; the unchanged prior release remains the rollback.
 Host validation: 1,055 Java assertions and 29 Python integration cases, including
 logger rate limit/payload preservation, rotation-service invocation, persistent
 log export, zero-gate recovery and exact/display replacement handling.
+
+## Finish diagnostic logging after a drive
+
+`tools/build-ar-finish.py` builds the separate `Evergreen-AR-export-stop-clean.zip`
+for an installed 1.2.0.104. It replaces only our fingerprint-matched recorder
+script with an idle script, stops the NEMESIS recorder service and its isolated
+process group (NEMESIS uses setsid; stopping just the shell can leave logcat).
+It copies and verifies source/destination MD5s, syncs, rechecks all log copies,
+then deletes only those verified internal flow/status logs. USB failure, checksum
+mismatch, sync failure or unconfirmed stop preserves internal logs. AR and OEM
+files stay unchanged. The idle script prevents capture returning at reboot;
+reinstalling a diagnostic build may re-enable it. Android's normal bounded
+in-memory logcat is not disabled or cleared. Output is AR-DEBUG-FINISHED on USB;
+wait for Export and cleanup complete before removing it. Host tests cover success,
+repeat, corruption, unknown recorder, stop/flush failure and process-group syntax
+under sh and mksh. Physical-head-unit execution remains to be verified.
