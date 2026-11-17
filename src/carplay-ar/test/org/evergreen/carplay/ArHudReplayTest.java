@@ -78,6 +78,15 @@ public final class ArHudReplayTest {
         r.event("5000,distance,75");check(r.cluster.type==13,"street AR begins at 75 meters");
         check(ArHudTurns.recoverIcon(13,0,0)==174&&ArHudTurns.recoverIcon(14,0,0)==173,"keep left/right recovery");
         check(ArHudTurns.recoverIcon(999,0,0)==0&&ArHudTurns.recoverIcon(23,0,1)==0,"unknown/roundabout do not invent exits");
+        // Sanitized reproduction from the 104 drive: raw 8 never reaches HUD.
+        r=new ArHudReplay(true);r.livePipeline=true;
+        r.event("1000,details,7,13,0,0");r.event("1010,route,7");r.event("1020,distance,441");
+        check(r.cluster.type==25&&r.hudIcon==174,"observed raw13 recovery reaches main and HUD");
+        r.event("2000,details,8,8,0,0");r.event("2010,route,8");r.event("2020,distance,1100");
+        int rejectedCalls=r.cluster.calls;
+        r.event("3000,distance,716");r.event("4000,distance,2");
+        check(r.cluster.calls==rejectedCalls&&r.cluster.type==0&&r.hudIcon==-1,
+                "known 104 gap: observed raw8 stays blank through valid distance updates");
         ArHudRuntime.reset();System.out.println("ArHudReplayTest: "+checks+" assertions passed");
     }
 }

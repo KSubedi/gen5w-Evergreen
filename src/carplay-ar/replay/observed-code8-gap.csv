@@ -1,0 +1,10 @@
+# Sanitized 104 drive case. Times and maneuver IDs are synthetic; no route data.
+# A recovered keep-left is followed by raw code 8 with zero exit angle.
+1000,details,7,13,0,0
+1010,route,7
+1020,distance,441
+2000,details,8,8,0,0
+2010,route,8
+2020,distance,1100
+3000,distance,716
+4000,distance,2

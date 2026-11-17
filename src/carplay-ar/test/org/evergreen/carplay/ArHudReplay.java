@@ -79,8 +79,8 @@ public final class ArHudReplay {
             ArHudRuntime.reset();maneuvers.clear();route.aR=0;route.bd=null;display=-1;hudIcon=-1;
         } else throw new IllegalArgumentException("Unknown event: "+op);
     }
-    static void replay(String path,boolean candidate,PrintStream out) throws Exception {
-        ArHudReplay r=new ArHudReplay(candidate);BufferedReader input=new BufferedReader(new FileReader(path));
+    static void replay(String path,boolean candidate,boolean live,PrintStream out) throws Exception {
+        ArHudReplay r=new ArHudReplay(candidate);r.livePipeline=live;BufferedReader input=new BufferedReader(new FileReader(path));
         long previous=-1;
         try {
             out.println("time,event,main_calls,main_type,angle,meters,hud_icon,hud_calls");
@@ -98,8 +98,13 @@ public final class ArHudReplay {
         } finally {input.close();ArHudRuntime.reset();}
     }
     public static void main(String[] args) throws Exception {
-        if(args.length<1||args.length>2||(args.length==2&&!args[1].equals("--refresh-details")))
-            throw new IllegalArgumentException("Usage: ArHudReplay scenario.csv [--refresh-details]");
-        replay(args[0],args.length==2,System.out);
+        if(args.length<1)throw new IllegalArgumentException("Usage: ArHudReplay scenario.csv [--refresh-details] [--live]");
+        boolean refresh=false,live=false;
+        for(int i=1;i<args.length;i++) {
+            if(args[i].equals("--refresh-details"))refresh=true;
+            else if(args[i].equals("--live")){live=true;refresh=true;}
+            else throw new IllegalArgumentException("Unknown replay option: "+args[i]);
+        }
+        replay(args[0],refresh,live,System.out);
     }
 }

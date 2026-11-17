@@ -51,3 +51,14 @@ message or an implementation of the OEM icon switch. It shows why the old main
 and small HUD instruction can remain despite a new route, and contrasts that
 with a recognized exit. Run with `--refresh-details` to include the 1.2.0.103
 refresh policy. This trace is not evidence of the real incident's input values.
+
+For the current 104 prepare/clear/distance-readiness/zero-gate behavior, use:
+
+```sh
+sh tools/replay-carplay-ar.sh src/carplay-ar/replay/observed-code8-gap.csv --live
+```
+
+This sanitizes the first diagnostic drive into a regression case: supported raw
+13 recovers to icon 174, but raw 8 is still unmapped with valid distance updates
+from 1,100 m down to 2 m. Times and IDs are synthetic; no raw logs or locations
+are included. The default mode retains the earlier callback-policy comparison.

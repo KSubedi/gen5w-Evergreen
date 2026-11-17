@@ -326,3 +326,33 @@ in-memory logcat is not disabled or cleared. Output is AR-DEBUG-FINISHED on USB;
 wait for Export and cleanup complete before removing it. Host tests cover success,
 repeat, corruption, unknown recorder, stop/flush failure and process-group syntax
 under sh and mksh. Physical-head-unit execution remains to be verified.
+
+## First diagnostic-drive findings
+
+The private 104 export passed all seven recorded file MD5 checks and reported
+successful recorder stop and internal-log cleanup. Parsed own-tag records cover
+two head-unit uptime epochs; that alone does not establish a crash. No raw logs
+are committed.
+
+One current maneuver with raw code 8 and exit angle 0 was rejected by the zero
+gate 78 times despite valid exact-distance updates from 1,100 m to 2 m. The
+recovered icon stayed zero and the sender returned before main/HUD calls. This
+establishes a remaining mapping gap; the earlier angled-22/23 hypothesis was
+not the code observed in this segment. Raw 13 recovered successfully 38 times,
+including native fork output. A sanitized replay now preserves this distinction.
+
+All 675 recorded ordinary-turn native sends were at or below 74.97 m, consistent
+with the 75 m policy. Fourteen maneuver-replacement clear sequences were recorded.
+This demonstrates software sends, not physical HUD acknowledgement. All 1,531
+recorded main-send attempts had paired returns (longest 263 ms); one last HUD
+return was absent amid the logger's dropped-event burst. There were 17 five-second
+input-expiry events, which cannot alone distinguish a stopped phone update from
+stationary/paused guidance. No own-tag exception/failure was recorded.
+
+Diagnostic limits: 145 dropped records in the first DiPO epoch and 50 in the
+second. Critical-transition tracing should be protected from burst sampling.
+The rotated file was about 1 MiB despite requesting 8 MiB; effective device
+rotation limits need confirmation, so the 64 MiB configuration is an upper-bound
+estimate rather than observed retention. The trace label 'unmapped' also includes
+ordinary turns deliberately deferred between 75 m and 457 m; these are not
+unknown maneuver types. These are investigation notes, not a new installer.
