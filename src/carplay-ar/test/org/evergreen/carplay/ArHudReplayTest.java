@@ -89,6 +89,7 @@ public final class ArHudReplayTest {
         r.event("3000,distance,716");r.event("4000,distance,2");
         check(r.cluster.type==86&&r.hudIcon==86&&r.cluster.distance==2,
                 "generic exit stays current through final distance without guessing direction");
+        check(ArHudTurns.recoverIcon(8,-1,-1)==86,"generic exit does not require optional geometry");
         ArHudRuntime.reset();System.out.println("ArHudReplayTest: "+checks+" assertions passed");
     }
 }

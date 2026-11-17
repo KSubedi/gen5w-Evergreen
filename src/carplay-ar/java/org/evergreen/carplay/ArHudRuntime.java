@@ -90,7 +90,7 @@ public final class ArHudRuntime implements Runnable {
             if(!advanced || original!=0)return original;
             int recovered=s==null?0:ArHudTurns.recoverIcon(s.type,s.drivingSide,s.junction);
             ArHudDebug.event("icon_gate original="+original+" recovered="+recovered+" raw="+(s==null?-1:s.type)+
-                    " angle="+(s==null?0:s.angle));
+                    " angle="+(s==null?0:s.angle)+" traffic="+(s==null?-1:s.drivingSide)+" junction="+(s==null?-1:s.junction));
             return recovered;
     }
 

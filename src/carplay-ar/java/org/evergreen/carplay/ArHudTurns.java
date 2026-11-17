@@ -87,10 +87,10 @@ public final class ArHudTurns {
 
     /** Recover only supported unambiguous raw maneuvers rejected by the stock icon table. */
     public static int recoverIcon(int raw,int traffic,int junction) {
+        // A generic exit needs no traffic-side or junction geometry to choose a side.
+        if(raw==8)return 86;
         if(traffic<0||traffic>1||junction!=0)return 0;
         switch(raw) {
-            // Direction-unspecified off-ramp: projection's generic exit, no invented side.
-            case 8:return 86;
             case 1: case 20:return 70;
             case 2: case 21:return 67;
             case 3:return 65;
