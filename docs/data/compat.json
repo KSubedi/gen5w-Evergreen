@@ -117,7 +117,9 @@
       "chip": "TCC803x",
       "product_prefix": [
         "NEEV23.USA.0000.V016.010.260903",
-        "NEEV23SE.USA.0000.V016.010.260903"
+        "NEEV23SE.USA.0000.V016.010.260903",
+        "NEEV23.USA.S5W_M.V016.010.260903",
+        "NEEV23SE.USA.S5W_M.V016.010.260903"
       ],
       "years": "2023–2024",
       "firmware": "V016.010.260903",
@@ -175,7 +177,10 @@
       "name": "Hyundai Ioniq 5",
       "region": "US",
       "chip": "TCC803x",
-      "product_prefix": "NEEV.USA.0000.V016.010.260903",
+      "product_prefix": [
+        "NEEV.USA.0000.V016.010.260903",
+        "NEEV.USA.S5W_M.V016.010.260903"
+      ],
       "years": "2022",
       "firmware": "V016.010.260903",
       "status": "supported",
