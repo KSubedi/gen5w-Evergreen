@@ -8,6 +8,15 @@ public final class ArHudDebugTest {
         byte[] sent;
         public void updateTPTurnListNew(byte[] b){sent=b;}
     }
+    static void write(java.io.File file,String text) throws Exception {
+        java.io.FileWriter out=new java.io.FileWriter(file);
+        try { out.write(text); } finally { out.close(); }
+    }
+    static void remove(java.io.File file) {
+        java.io.File[] children=file.listFiles();
+        for(int i=0;children!=null&&i<children.length;i++)remove(children[i]);
+        file.delete();
+    }
     public static void main(String[] args) throws Exception {
         java.io.File flag=java.io.File.createTempFile("evergreen-ar-","-trace");
         ArHudDebug.flagPath=flag.getPath();ArHudDebug.recheck();
@@ -56,6 +65,38 @@ public final class ArHudDebugTest {
         check(Log.calls==before+1&&Log.last.contains("input_quiet thread=main state=RUNNABLE frames=")&&Log.last.contains("ArHudDebugTest.main:"),"quiet-thread record");
         ArHudDebug.thread("input_quiet",null);check(Log.calls==before+1,"no thread, no record");
         Thread.setDefaultUncaughtExceptionHandler(null);
+        // Health record from a fixture /proc: counters and safe names only, as differences between samples.
+        java.io.File proc=java.io.File.createTempFile("evergreen-ar-","-proc");proc.delete();
+        new java.io.File(proc,"self/task/11").mkdirs();new java.io.File(proc,"self/task/12").mkdirs();new java.io.File(proc,"net").mkdirs();
+        write(new java.io.File(proc,"stat"),"cpu  100 0 100 800 0 0 0 0 0 0\ncpu0 100 0 100 800 0 0 0 0 0 0\n");
+        write(new java.io.File(proc,"loadavg"),"1.50 1.20 1.00 2/300 1234\n");
+        write(new java.io.File(proc,"meminfo"),"MemTotal:        2000000 kB\nMemFree:          345678 kB\n");
+        write(new java.io.File(proc,"self/task/11/stat"),"11 (Dipo Player/1) S 1 1 0 0 -1 4194624 10 0 0 0 30 10 0 0 20 0 5 0 100 0 0\n");
+        write(new java.io.File(proc,"self/task/12/stat"),"12 (Binder_1) S 1 1 0 0 -1 4194624 10 0 0 0 5 5 0 0 20 0 5 0 100 0 0\n");
+        String header="Inter-|   Receive                |  Transmit\n face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets\n";
+        write(new java.io.File(proc,"net/dev"),header+"    lo: 500 5 0 0 0 0 0 0 500 5 0 0 0 0 0 0\n wlan0: 1000 10 0 0 0 0 0 0 200 4 0 0 0 0 0 0\n  p2p0: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n");
+        String radio="Inter-| sta-|   Quality        |   Discarded packets               | Missed | WE\n face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon | 22\n";
+        write(new java.io.File(proc,"net/wireless"),radio+" wlan0: 0000   60.  -40.  -256        0      0      0    100      5        2\n");
+        write(new java.io.File(proc,"net/snmp"),"Ip: Forwarding DefaultTTL\nIp: 1 64\nTcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts\nTcp: 1 200 120000 -1 10 20 0 0 3 1000 500 10 0 0\n");
+        ArHudDebug.procRoot=proc.getPath();ArHudDebug.recheck();before=Log.calls;
+        ArHudDebug.health(100000);check(Log.calls==before,"first health sample only sets the baselines");
+        write(new java.io.File(proc,"stat"),"cpu  150 0 150 880 20 0 0 0 0 0\n");
+        write(new java.io.File(proc,"self/task/11/stat"),"11 (Dipo Player/1) S 1 1 0 0 -1 4194624 10 0 0 0 60 20 0 0 20 0 5 0 100 0 0\n");
+        new java.io.File(proc,"self/task/13").mkdirs();
+        write(new java.io.File(proc,"self/task/13/stat"),"13 (new) R 1 1 0 0 -1 4194624 10 0 0 0 3 1 0 0 20 0 5 0 100 0 0\n");
+        write(new java.io.File(proc,"net/dev"),header+"    lo: 900 9 0 0 0 0 0 0 900 9 0 0 0 0 0 0\n wlan0: 51000 90 0 0 0 0 0 0 1200 9 0 0 0 0 0 0\n  p2p0: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n");
+        write(new java.io.File(proc,"net/wireless"),radio+" wlan0: 0000   55.  -45.  -256        0      0      0    130      5        3\n");
+        write(new java.io.File(proc,"net/snmp"),"Ip: Forwarding DefaultTTL\nIp: 1 64\nTcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs InErrs OutRsts\nTcp: 1 200 120000 -1 10 20 0 0 3 4000 1500 25 0 0\n");
+        ArHudDebug.health(105000);
+        check(Log.calls==before+1&&Log.last.contains(" health dt=5000 busy=50 wait=10 load=1.50 free_kb=345678 threads=3 proc=44 top=Dipo_Player_1:40,new:4 net=wlan0:50000/1000 wifi=wlan0:55/-45/-256/30/0/1 tcp=3000/1000/15 critical_dropped="),
+                "health record: CPU share, load, free memory, busiest threads, bytes per interface, radio quality, TCP counters");
+        for(int i=0;i<200;i++)ArHudDebug.event("flood");
+        ArHudDebug.health(110000);
+        check(Log.last.contains(" health dt=5000 busy=-1 wait=-1 ")&&Log.last.contains(" proc=0 top=- net=wlan0:0/0 wifi=wlan0:55/-45/-256/0/0/0 tcp=0/0/0 "),"an idle interval is recorded as such, and survives a busy second");
+        ArHudDebug.procRoot=proc.getPath()+"-missing";before=Log.calls;ArHudDebug.health(115000);
+        check(Log.calls==before+1&&Log.last.contains(" load=- free_kb=- threads=0 proc=0 top=- net=- wifi=- tcp=- "),"unreadable /proc gives an empty record, never a failure");
+        ArHudDebug.procRoot=null;before=Log.calls;ArHudDebug.health(120000);check(Log.calls==before,"no health record without a /proc root");
+        ArHudDebug.procRoot="/proc";remove(proc);
         System.out.println("AR debug: "+checks+" checks passed");
     }
 }

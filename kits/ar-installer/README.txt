@@ -1,10 +1,70 @@
-EVERGREEN 1.2.0.110 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.2.0.112 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.2.0.112 (from the recorded 111 drive)
+What the 111 logs show (two drives, 50 and 39 minutes; the owner: AR went
+really well, CarPlay froze twice, the HUD kept working): the health records
+caught both freezes and a third one.
+- 6:33 pm: at 18:33:35 everything from the phone stopped, including the
+  guidance (0 bytes received for ten seconds while the head unit was still
+  transmitting). The session dropped at 18:33:45 and was rebuilt by 18:33:56,
+  after which the picture was back but the phone sent no more turn-by-turn
+  data for the rest of that drive. A lost link, not a stuck head unit.
+- 7:11 pm, on the highway 2.9 km before an exit: for 95 seconds the picture
+  stream fell from about 10 MB/s to 70 KB/s while the guidance kept arriving
+  once a second (the HUD worked: 2860 m down to 13 m), the audio stream
+  continued both ways, and the head unit was idle (CPU 16-21 %, no thread
+  busy, 1.9 GB free). The phone stopped sending screen frames; the session
+  stayed up; the picture returned at 19:12:41 without a reconnect.
+- 6:14 pm: the same picture with audio paused as well, 30 s, back by itself.
+  In all three the head unit was healthy; our helper used under 1 % of one
+  core. What this build cannot yet tell is whether the phone stopped sending
+  because the link was losing packets or on its own. 112 adds the radio's
+  link level, retry and missed-beacon counters and the TCP retransmission
+  count to the health record: retransmissions and a weak level during a
+  freeze mean the Wi-Fi link; a quiet, clean link means the phone.
+- Fixed: 25 times on the 111 drive the arrow and HUD entry were blanked for
+  one second (a worker tick read the clock just before the phone's sample
+  arrived and took the sample for a future one). The 5-second health sample
+  now runs after the tick and off its clock, and a sample from the near
+  future is treated as fresh.
+- The export kit accepts 104 to 112.
+Things to try against the freezes, independent of this build: keep the head
+unit's own Wi-Fi client off (it is known to drop projection), and note
+whether the phone was warm or charging wirelessly when it happened.
+
+NEW IN 1.2.0.111 (from the recorded 110 drive)
+What the 110 logs show: guidance arrived once a second for the whole 35
+minutes, every exit and fork was converted, and nothing expired, crashed or
+ran late. Street turns showed the large arrow from 111-125 m, about 7 to 12
+seconds, with the bar at 20 and then 10.
+- The large street-turn arrow now starts at 200 m instead of 125 m
+  (street_ar_meters). On the stock bar scale that also gives it four bar
+  steps (40, 30, 20, 10 from 200, 183, 137 and 91 m) instead of two. Whether
+  the arrow's zoom follows the bar or only the distance is still not known;
+  the kits zip has tune-bar-300 and tune-bar-200 (bar runs 60 to 10 or 90 to
+  10 while the arrow is shown), tune-street-300 (even earlier) and
+  tune-street-125 (the 110 behaviour) to compare. A short drive on the car's
+  own navigation with Evergreen-AR-baseline.zip would show what the stock
+  sends, which is the scale to copy.
+- CarPlay freezing: the owner saw the CarPlay picture stick during the 110
+  drive until leaving and reopening CarPlay. Our records for that drive show
+  the phone's guidance and the projection app running normally throughout,
+  so the cause is outside what they capture; it was also seen before AR
+  existed. To classify the next one, the trace adds one "health" record
+  every five seconds: CPU share in use, load, free memory, the six busiest
+  threads of the projection app by name, and bytes received/sent per network
+  interface. Counters and names only: no addresses, no packet contents. A
+  frozen picture with bytes still arriving points at the head unit's
+  decoding; with no bytes arriving, at the phone or the wireless link.
+  Please note the clock time of a freeze.
+- The analyser separates process runs that reuse a process ID across boots
+  and summarises the health records.
 
 NEW IN 1.2.0.110 (from the recorded 108 drive)
 What the 108 logs show: on the first route the phone delivered no guidance to
@@ -24,7 +84,6 @@ Why the phone's guidance stopped is not visible in those logs.
   correctly on the 108 drive. Far away and in the small HUD an exit is the
   slight-right/left icon 66/71. Evergreen-AR-tune-exit-slight.zip gives the
   109 arrow instead.
-- The export kit accepts 104 to 110.
 
 NEW IN 1.2.0.109 (after the failed 108 drive, before its logs were available)
 109 assumed the cluster might have ignored icon 81. The 108 logs do not
@@ -93,7 +152,7 @@ Refreshes the existing main-turn and small-HUD paths after maneuver details
 arrive, without waiting for the next distance/route-state update. Missing
 current-maneuver data and stopped routes do not produce a synthetic turn.
 Keeps Evergreen's wireless CarPlay/Android Auto and audio implementation.
-Large ordinary street-turn AR begins within 125 m (about 410 ft) unless tuned.
+Large ordinary street-turn AR begins within 200 m (about 650 ft) unless tuned.
 Small direction cues remain available earlier. Highway/fork/roundabout native
 conversion retains its 457 m (1,500 ft) window; far exit cues use projection icons.
 The advanced build uses the phone's exact maneuver distance and raw turn
@@ -165,8 +224,10 @@ logcat, not buffered in Java memory. Routine events are capped at 50/second; cri
 It covers route/maneuver callbacks, parsed exact/display distance receipts,
 current maneuver/state, missing metadata and icon recovery, replacement clears,
 main cluster calls, small HUD calls/distance, progress IPC and OEM bar overlay,
-resets, worker heartbeat, the phone's route and maneuver states and the
-tuning in effect. API return is not physical HUD acknowledgement.
+resets, worker heartbeat, the phone's route and maneuver states, the
+tuning in effect, and every five seconds a health record (CPU share, load,
+free memory, busiest projection-app thread names, bytes per network
+interface, Wi-Fi link level and retry counters, TCP retransmissions). API return is not physical HUD acknowledgement.
 It does not capture raw CarPlay video, arbitrary phone packets, Wi-Fi passwords,
 road names, coordinates, phone identifiers or general app logs.
 
@@ -176,12 +237,14 @@ such as --street-ar-meters 90 --gain 0.7 --backstep-meters 10) writes a small
 ar-tuning file next to the AR flags. Allowed ranges: street_ar_meters 30-457,
 gain 0.5-1, backstep_meters 0-50, bar_meters 30-457, turn_offset_meters 0-60,
 exit_side auto|right|left|generic, exit_style slight|sign; anything else keeps
-the built-in default (125 m, 0.8, 15 m, 457 m, 0 m, auto, sign). Values apply
+the built-in default (200 m, 0.8, 15 m, 457 m, 0 m, auto, sign). Values apply
 within two seconds; start a fresh route. A tune kit replaces the whole file, so
-one kit is in effect at a time. The 110 kits zip has ready-made variants:
-tune-exit-slight (the 109 exit arrow), tune-exit-generic (the 107 exit icon),
-tune-offset-15/-30 (arrow placed 15/30 m further), tune-bar-125 (the 107 bar),
-tune-street-75 (the 104 start distance) and tune-reset.
+one kit is in effect at a time. The 112 kits zip has ready-made variants:
+tune-street-125 (the 110 start distance), tune-street-300, tune-bar-300 and
+tune-bar-200 (the bar runs 60 to 10 or 90 to 10 inside the 200 m window),
+tune-offset-15/-30 (arrow placed 15/30 m further), tune-exit-slight (the 109
+exit arrow), tune-exit-generic (the 107 exit icon), tune-exit-left and
+tune-reset.
 Evergreen-AR-tune-reset.zip removes the file. Evergreen-AR-status.zip shows it.
 Evergreen-AR-trace-off.zip stops the detailed per-event trace (the once-per-
 second turn records stay); Evergreen-AR-trace-on.zip restores it.
@@ -196,7 +259,7 @@ compare the CarPlay conversion against.
 AFTER THE DRIVE
 1. Park in READY. Extract the NEW Evergreen-AR-export-stop-clean.zip onto a
    separate empty USB, so that NEMESIS.sh and NEMESIS.data are at its root.
-   This version supports 104 to 110.
+   This version supports 104 to 112.
 2. Insert it and let NEMESIS run the export. Wait for "Export and cleanup complete" before
    removing USB. The kit flushes writes before showing completion.
 3. Zip the AR-DEBUG-FINISHED folder and send it privately, using an upload link if it is

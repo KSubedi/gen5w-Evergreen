@@ -66,6 +66,36 @@ class AnalyzeTest(unittest.TestCase):
         events,turns=tool.load(self.dir)
         self.assertEqual(tool.analyze(events,turns,records)['thread_records'],records)
         self.assertNotIn('thread_records',tool.analyze(events,turns))
+    def test_reused_pid_is_split_by_version_and_boot(self):
+        later=[record(500,1,'sender_prepare component=5 current=0 state=6').replace('v107','v111'),
+               record(900000,2,'exact meters=40 at=900000').replace('v107','v111'),
+               record(700,1,'sender_prepare component=5 current=1 state=1').replace('v107','v111'),
+               record(1700,2,'exact meters=90 at=1700').replace('v107','v111')]
+        with (self.dir/'flow.log').open('a') as f:f.write('\n'.join(later)+'\n')
+        events,turns=tool.load(self.dir);report=tool.analyze(events,turns)['processes']
+        self.assertEqual([k for k in report if k.startswith('1060')],['1060/1','1060/2','1060/3'])
+        self.assertEqual([report[k]['version'] for k in ('1060/1','1060/2','1060/3')],['v107','v111','v111'])
+        self.assertEqual([report[k]['records'] for k in ('1060/1','1060/2','1060/3')],[27,2,2])
+        self.assertEqual(report['1060/1']['exact']['count'],4);self.assertEqual(report['1060/3']['segments'][0]['maneuver'],'1')
+        self.assertEqual(report['1326']['version'],'v107')
+        names=sorted(x.name for x in tool.write_replays(events,self.dir.parent/'split'))
+        self.assertEqual(names,['replay-pid1060-1.csv','replay-pid1060-2.csv','replay-pid1060-3.csv'])
+    def test_health_records_show_a_silent_link(self):
+        def health(n,rx,busy=20,extra=' wifi=wlan0:60/-41/-256/12/0/0 tcp=900/700/3'):
+            return record(20000+5000*n,100+n,'health dt=5000 busy=%d wait=1 load=1.50 free_kb=%d threads=80 proc=50 top=DipoPlayer_Hand:30,Binder_1:5 net=wlan0:%d/20000,p2p0:0/0%s'%(busy,300000-n,rx,extra))
+        lines=[health(n,2500000) for n in range(6)]+[health(n,0,busy=95,extra=' wifi=wlan0:20/-78/-256/400/9/2 tcp=50/600/120') for n in range(6,9)]+[health(n,2400000,extra='') for n in range(9,12)]
+        lines.append(record(90000,200,'health dt=-1 busy=-1 wait=-1 load=- free_kb=- threads=0 proc=0 top=- net=-'))
+        with (self.dir/'flow.log').open('a') as f:f.write('\n'.join(lines)+'\n')
+        events,turns=tool.load(self.dir);h=tool.analyze(events,turns)['processes']['1060']['health']
+        self.assertEqual(h['samples'],12);self.assertEqual(h['busy_percent'],{'p50':20,'p95':95,'max':95})
+        self.assertEqual(h['interfaces']['wlan0']['rx_bytes_per_s']['max'],500000);self.assertEqual(h['interfaces']['p2p0']['rx_bytes_per_s']['max'],0)
+        self.assertEqual(h['busiest_threads_ticks'],{'DipoPlayer_Hand':360,'Binder_1':60})
+        self.assertEqual(h['receive_quiet'],[{'wall':'11-16 18:28:50.000','t':45000,'seconds':15,'busy_percent_max':95,'tcp_retransmitted':360,'level_dbm_min':-78}])
+        self.assertEqual(h['radio']['wlan0'],{'level_dbm':{'p50':-41,'p5':-78,'min':-78},'retries_per_sample':{'p50':12,'p95':400,'max':400},'missed_beacons':6})
+        self.assertEqual(h['tcp'],{'retransmitted_per_sample':{'p50':3,'p95':120,'max':120},'retransmitted_percent':6.3})
+        self.assertEqual(h['free_kb_min'],299989);self.assertEqual(h['late_samples'],[])
+        result=subprocess.run([sys.executable,'-I',str(ROOT/'tools/analyze-ar-log.py'),str(self.dir)],capture_output=True,text=True)
+        self.assertIn("receive quiet for 10 s or more (wall, s, max busy %, TCP retransmits, min dBm; median 500000 bytes/s): [('11-16 18:28:50.000', 15, 95, 360, -78)]",result.stdout)
     def test_cli(self):
         result=subprocess.run([sys.executable,'-I',str(ROOT/'tools/analyze-ar-log.py'),str(self.dir),'--json'],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr);self.assertEqual(json.loads(result.stdout)['processes']['1060']['records'],27)

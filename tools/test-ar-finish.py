@@ -58,11 +58,15 @@ class FinishTest(unittest.TestCase):
         self.assertEqual(self.runkit().returncode,0)
         (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.110'}))
         self.assertEqual(self.runkit().returncode,0)
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.111'}))
+        self.assertEqual(self.runkit().returncode,0)
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.112'}))
+        self.assertEqual(self.runkit().returncode,0)
         self.assertFalse((self.usb/'AR-EXPORT-ERROR.txt').exists());self.assertFalse((self.usb/'AR-DEBUG-SNAPSHOT').exists())
     def test_unsupported_version_leaves_the_reason_and_a_plain_copy_on_the_usb(self):
-        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.111'}))
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.2.0.113'}))
         self.assertNotEqual(self.runkit().returncode,0)
-        self.assertIn('requires AR 1.2.0.104 to 1.2.0.110',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
+        self.assertIn('requires AR 1.2.0.104 to 1.2.0.112',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
         self.assertIn('AR-DEBUG-SNAPSHOT',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
         for n in ('flow.log','flow.log.1','STATUS.txt'):
             self.assertEqual((self.usb/'AR-DEBUG-SNAPSHOT'/n).read_text(),'trace '+n)

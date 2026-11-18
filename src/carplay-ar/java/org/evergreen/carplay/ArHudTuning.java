@@ -12,7 +12,7 @@ import java.io.FileReader;
  * the file's size or modification time changed. No route data is involved.
  */
 public final class ArHudTuning {
-    public static final float DEFAULT_STREET_AR_METERS = 125f, DEFAULT_GAIN = 0.8f, DEFAULT_BACKSTEP_METERS = 15f;
+    public static final float DEFAULT_STREET_AR_METERS = 200f, DEFAULT_GAIN = 0.8f, DEFAULT_BACKSTEP_METERS = 15f;
     public static final float MIN_STREET_AR_METERS = 30f, MIN_GAIN = 0.5f, MAX_GAIN = 1f, MAX_BACKSTEP_METERS = 50f;
     /** The bar's window: the stock navigation fills it over about 457 m regardless of where AR starts. */
     public static final float DEFAULT_BAR_METERS = ArHudTurns.GUIDE_METERS, MIN_BAR_METERS = 30f;

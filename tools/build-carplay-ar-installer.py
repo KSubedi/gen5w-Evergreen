@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.2.0.110"
+VERSION = "1.2.0.112"
 
 
 def verifier():

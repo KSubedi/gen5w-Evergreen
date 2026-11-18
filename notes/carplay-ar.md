@@ -637,3 +637,129 @@ Changes:
 
 Not proven on the car: the moving-loss clear, and the sign together with the
 66/71 list icon.
+
+## 1.2.0.111 test build
+
+The 110 export (35 minutes, city streets and highway; the owner: "worked
+really well", three requests). The DiPO process logged 26,968 records with
+1,636 exact samples at 1 Hz; no `timer_expired`, no moving-loss expiry, no
+crash record, `worker_alive` never late, callback time p50 5 ms / p99 14 ms.
+
+- Street turns: far icon 67/70, `street_ar_deferred` from about 450 m, native
+  `TURN` from 111-125 m with bar 20, then 10 below 91 m. The large arrow was
+  therefore up for 7-12 s and the bar moved one step. Owner: the rotating
+  arrow comes up only briefly, and it zooms only right before the turn.
+- Forks (raw 14, type 25) from 446 and 406 m and exits (raw 8, native
+  `EXIT_RIGHT`) from 452 and 446 m, each with continuous data down to 0 m
+  and the bar from 90. Raw 12 (icon 112) stays `unmapped`.
+- A main-thread `reset` is the stock `u.nS()` ("stopTurnByTurn"), reached
+  from `e/b.N()` when `DipoService` sees the phone's turn-by-turn state go
+  inactive. It is the phone ending guidance, not the driver leaving the
+  CarPlay screen. On this drive: 16:40:01 (guidance ended and restarted while
+  parked) and 16:53:53 (arrival).
+- "CarPlay got stuck a couple of times, fine after leaving CarPlay and coming
+  back": the records show no gap in the phone's guidance or in the DiPO
+  process while the car moved. The 100 s without a distance change at
+  16:27:56 was a stop 55 m before a turn (three `input_quiet` records, sender
+  idle in its message queue). The one stretch that looks like a driver
+  without a working map is 16:35:34-16:37:27: seven reroutes in two minutes,
+  each new first turn driven past, then a two-minute stop and the guidance
+  restart above. That reading is an inference; the trace has no record of
+  the picture. The freeze with the same recovery predates AR (see the first
+  section). Nothing here shows our code involved, and nothing rules out a
+  cost we add; the health record below is there to find out.
+
+Changes:
+
+- `street_ar_meters` default 200 (was 125): 11-19 s of large arrow at
+  40-65 km/h. The original 457 m was reported as showing before intervening
+  side streets; 125 m is one kit away (`tune-street-125`).
+- The bar keeps the 457 m scale, which inside 200 m gives 40, 30, 20, 10
+  (steps at 183, 137 and 91 m). The reports so far: bar 90-10 over 125 m
+  (106/107) "rotates too far, looks closer than it is"; bar 20-10 (108-110)
+  "zooms only right near the turn". Which input the AR unit animates from is
+  still unknown, and the bar's sense is an assumption. Kits `tune-bar-300`
+  (60-10 inside the window) and `tune-bar-200` (90-10) vary only the bar; the
+  offset kits vary only the distance. A stock baseline capture remains the
+  way to stop guessing.
+- `ArHudDebug.health()`: every five seconds from the worker thread, outside
+  the runtime lock, one critical-budget record `health dt= busy= wait= load=
+  free_kb= threads= proc= top=<thread>:<ticks>,.. net=<if>:<rx>/<tx>,..` from
+  `/proc/stat`, `/proc/loadavg`, `/proc/meminfo`, `/proc/self/task/*/stat`
+  and `/proc/net/dev`. Differences since the previous sample; the first
+  sample only sets baselines. Names are reduced to `[A-Za-z0-9_.-]`; no
+  addresses, no payload. Bytes still arriving during a frozen picture point
+  at decoding/rendering on the head unit; none arriving, at the phone or the
+  link; a pegged CPU or one runaway thread shows in `busy`/`top`.
+- Analyser: process runs are split by helper version and by uptime starting
+  over (the 110 export had PID 1066 as the DiPO process of a 109 boot and of
+  the 110 boot, reported as one), each with its version and wall-clock span;
+  health summary with receive-quiet runs of 10 s or more.
+- Finish kit and recorder checksum list: 104-111.
+
+Not proven on the car: that `/proc/net/dev` and the task table are readable
+from the projection app on this firmware (an unreadable source gives `-`),
+and any effect of the bar on the arrow.
+
+Host validation: 1,579 Java checks and 49 Python cases. The 110 export
+replayed through this build starts its street approaches at 188-199 m with
+bar 40, 30, 20, 10. Mock install and uninstall (Android up and down) return
+to stock.
+
+## 1.2.0.112 test build
+
+The 111 export: two boots (17:49-18:39, PID 1073; 19:03-19:42, PID 1045),
+65,605 DiPO records, 4,307 exact samples at 1 Hz, 1,045 health records.
+Owner: AR went really well; CarPlay froze twice, once around 6:33 pm, once
+while driving; only the CarPlay screen froze, the HUD kept working.
+
+- **Freezes, now visible.** The health record's per-interface byte counts
+  show three stalls of the picture stream (normally 1.2-10 MB/s received on
+  `wlan0`):
+  - 18:14:57-18:15:27, 30 s on the highway: received 13-256 KB/s, sent
+    11-33 KB/s, the `AirPlayScreenRe` and `AirPlayAudioSen` threads idle,
+    guidance continuing at 1 Hz (4947 to 4785 m). Back by itself.
+  - 18:33:35-18:33:56 (the 6:33 pm report): last exact sample 18:33:34.97
+    (201 m), then 0 bytes received for two samples while 46-62 KB/s was
+    still sent; three `reset`s at 18:33:45-46 (`nT()` from the disconnect);
+    `gcd-work` at 72 % CPU 18:33:51 and `AirPlayScreenRe` back at 18:33:56:
+    a session rebuild. Picture back; no turn-by-turn data arrived again in
+    that boot (the drive ended 18:36).
+  - 19:11:06-19:12:41, 95 s on the highway before an exit: received 58-83
+    KB/s, sent a steady 68 KB/s, `AirPlayScreenRe` idle, `AirPlayAudioSen`
+    busy as always, guidance at 1 Hz from 2860 m down to 13 m, CPU 15-21 %,
+    1.9 GB free. No reset; the picture returned (3.9 MB/s) at 19:12:41 as
+    the exit was reached.
+  In none of them was a head-unit thread busy or stuck; the helper's worker
+  (`Evergreen-AR-tu`) used 2-3 ticks per 5 s. The head unit was waiting for
+  frames that did not come. Whether the link lost them (TCP video stream
+  stalling while UDP audio trickles) or the phone stopped encoding cannot be
+  told from byte counts alone.
+- **Bug (111): spurious expiries.** 25 `timer_expired` records with
+  `input_age` of -1 to -29 ms, each followed by `clear_expired_main` and
+  `hud_blank_sent`, then the next sample re-sent the maneuver. `run()` read
+  the clock, `tick()` logged the heartbeat, released the lock to take the
+  health sample (10-30 ms of `/proc` reads), and re-acquired it after the
+  phone's callback had stored a newer `receivedAt`; `now < receivedAt` then
+  counted as an expiry. One blank frame per occurrence.
+- Other: the 200 m street window gave `TURN` from 188-200 m; exits (raw 8)
+  and forks (raw 13/14) converted throughout; `silences >5 s` were all stops
+  (the car below 2 m/s first) except the stalls above.
+
+Changes:
+
+- `ArHudRuntime.tick()` returns whether the heartbeat fired; `run()` takes
+  the health sample afterwards with a fresh clock reading, and inside the
+  lock a `receivedAt` ahead of `now` is treated as `now` (never an expiry).
+  Test `lateTick()`.
+- `ArHudDebug.health()` adds `wifi=<if>:<link>/<level>/<noise>/<retry>/
+  <misc>/<missed>` from `/proc/net/wireless` (counters as differences) and
+  `tcp=<in>/<out>/<retransmitted>` segments from `/proc/net/snmp`. No
+  addresses. The analyser reports level (p50/p5/min), retries, missed
+  beacons, retransmissions per sample and per quiet run.
+- Finish kit and recorder checksum list: 104-112.
+
+Not proven on the car: that `/proc/net/wireless` and `/proc/net/snmp` are
+readable from the projection app (an unreadable source gives `-`).
+
+Host validation: 1,582 Java checks and 49 Python cases.

@@ -34,7 +34,7 @@ def parse_file(path, events, turns):
         r = RECORD.search(rest)
         if r:
             events.append({"wall": m.groupdict().get("wall"), "pid": int(m.group("pid")), "tid": int(m.groupdict().get("tid") or 0),
-                           "t": int(r.group("t")), "seq": int(r.group("seq")), "drop": int(r.group("drop")),
+                           "v": int(r.group("v")), "t": int(r.group("t")), "seq": int(r.group("seq")), "drop": int(r.group("drop")),
                            "msg": r.group("msg"), "file": path.name})
             continue
         u = TURN.search(rest)
@@ -67,14 +67,113 @@ def load(source):
     events, turns = [], []
     for path in files:
         parse_file(path, events, turns)
-    # Rotated files overlap with recent-logcat; keep one record per (pid, seq, t).
+    # Rotated files overlap with recent-logcat; keep one record per (pid, version, seq, t).
     seen, unique = set(), []
     for e in events:
-        key = (e["pid"], e["seq"], e["t"])
+        key = (e["pid"], e["v"], e["seq"], e["t"])
         if key not in seen:
-            seen.add(key); unique.append(e)
+            seen.add(key); e["order"] = len(unique); unique.append(e)
     unique.sort(key=lambda e: (e["pid"], e["t"], e["seq"]))
     return unique, turns
+
+
+def sessions(events):
+    """One list of records per process run, keyed "pid" or "pid/n" when the PID was reused.
+
+    The head unit hands out the same PID boot after boot, and an export spans several boots and
+    helper versions: a new version, or an uptime that starts over, is a different process.
+    """
+    by = collections.defaultdict(list)
+    for e in events: by[e["pid"]].append(e)
+    out = collections.OrderedDict()
+    for pid, L in sorted(by.items()):
+        runs = []
+        # Logging order (oldest rotated file first), not the wall clock: that can be set mid-boot.
+        for e in sorted(L, key=lambda e: e.get("order", 0)):
+            run = runs[-1] if runs else None
+            if e["wall"] is None:
+                # recent-logcat lines carry no time: they belong to the latest run of their version.
+                run = next((r for r in reversed(runs) if r["v"] == e["v"]), None)
+            elif run is not None and (run["v"] != e["v"] or e["t"] < run["last"] - 60000):
+                run = None
+            if run is None:
+                run = {"v": e["v"], "last": e["t"], "events": []}; runs.append(run)
+            run["events"].append(e); run["last"] = max(run["last"], e["t"])
+        for n, run in enumerate(runs, 1):
+            run["events"].sort(key=lambda e: (e["t"], e["seq"]))
+            out[str(pid) if len(runs) == 1 else "%d/%d" % (pid, n)] = run["events"]
+    return out
+
+
+def analyze_health(events):
+    """The helper's five-second health records (111): CPU, busiest threads, bytes per interface."""
+    rows = []
+    for e in events:
+        if not e["msg"].startswith("health "): continue
+        d = kv(e["msg"])
+        try: dt = int(d["dt"])
+        except (KeyError, ValueError): continue
+        if dt <= 0: continue
+        net = {}
+        for part in d.get("net", "-").split(","):
+            name, _, counts = part.partition(":"); rx, _, tx = counts.partition("/")
+            if rx.lstrip("-").isdigit() and tx.lstrip("-").isdigit(): net[name] = (int(rx) * 1000 / dt, int(tx) * 1000 / dt)
+        top = {}
+        for part in d.get("top", "-").split(","):
+            name, _, ticks = part.rpartition(":")
+            if name and ticks.isdigit(): top[name] = int(ticks)
+        number = lambda key: int(d[key]) if d.get(key, "").lstrip("-").isdigit() else None
+        # 112: wifi=<if>:<link>/<level>/<noise>/<retry>/<misc>/<missed beacons>; tcp=<in>/<out>/<retransmitted> segments.
+        radio = {}
+        for part in d.get("wifi", "-").split(","):
+            name, _, counts = part.partition(":"); f = counts.split("/")
+            if len(f) == 6 and all(x.lstrip("-").isdigit() for x in f): radio[name] = [int(x) for x in f]
+        tcp = d.get("tcp", "-").split("/")
+        tcp = [int(x) for x in tcp] if len(tcp) == 3 and all(x.lstrip("-").isdigit() for x in tcp) else None
+        rows.append({"t": e["t"], "wall": e["wall"], "dt": dt, "busy": number("busy"), "wait": number("wait"), "free_kb": number("free_kb"),
+                     "load": float(d["load"]) if re.fullmatch(r"\d+(\.\d+)?", d.get("load", "")) else None,
+                     "proc": (number("proc") or 0) * 1000 / dt, "net": net, "top": top, "rx": sum(v[0] for v in net.values()),
+                     "radio": radio, "tcp": tcp})
+    if not rows: return None
+    def spread(values):
+        values = [v for v in values if v is not None and v >= 0]
+        return {"p50": quantile(values, .5), "p95": quantile(values, .95), "max": max(values)} if values else None
+    out = {"samples": len(rows), "busy_percent": spread(r["busy"] for r in rows), "iowait_percent": spread(r["wait"] for r in rows),
+           "load": spread(r["load"] for r in rows), "process_ticks_per_s": spread(round(r["proc"]) for r in rows),
+           "free_kb_min": min([r["free_kb"] for r in rows if r["free_kb"] is not None] or [None]),
+           "late_samples": [{"wall": r["wall"], "t": r["t"], "dt": r["dt"]} for r in rows if r["dt"] >= 7500][:20]}
+    names = sorted({n for r in rows for n in r["net"]})
+    out["interfaces"] = {n: {"rx_bytes_per_s": spread(round(r["net"][n][0]) for r in rows if n in r["net"]),
+                             "tx_bytes_per_s": spread(round(r["net"][n][1]) for r in rows if n in r["net"])} for n in names}
+    ticks = collections.Counter()
+    for r in rows: ticks.update(r["top"])
+    out["busiest_threads_ticks"] = dict(ticks.most_common(10))
+    radios = sorted({n for r in rows for n in r["radio"]})
+    def low(values):
+        values = sorted(values)
+        return {"p50": quantile(values, .5), "p5": quantile(values, .05), "min": values[0]} if values else None
+    out["radio"] = {n: {"level_dbm": low(-abs(r["radio"][n][1]) for r in rows if n in r["radio"]),
+                        "retries_per_sample": spread(r["radio"][n][3] for r in rows if n in r["radio"]),
+                        "missed_beacons": sum(r["radio"][n][5] for r in rows if n in r["radio"])} for n in radios}
+    tcp_rows = [r for r in rows if r["tcp"]]
+    out["tcp"] = {"retransmitted_per_sample": spread(r["tcp"][2] for r in tcp_rows),
+                  "retransmitted_percent": round(100 * sum(r["tcp"][2] for r in tcp_rows) / max(1, sum(r["tcp"][1] for r in tcp_rows)), 2)} if tcp_rows else None
+    # A link that falls silent while the session lasts: where a frozen picture would show if the data stopped arriving.
+    median = quantile([r["rx"] for r in rows], .5) or 0
+    limit = max(1000, median * 0.05)
+    quiet, run = [], None
+    for r in rows:
+        if median > limit and r["rx"] < limit:
+            if run is None: run = {"wall": r["wall"], "t": r["t"] - r["dt"], "seconds": 0, "busy": [], "retrans": 0, "level": []}; quiet.append(run)
+            run["seconds"] += round(r["dt"] / 1000); run["busy"].append(r["busy"])
+            run["retrans"] += r["tcp"][2] if r["tcp"] else 0
+            run["level"] += [-abs(v[1]) for v in r["radio"].values()]
+        else: run = None
+    out["receive_quiet"] = [{"wall": q["wall"], "t": q["t"], "seconds": q["seconds"], "busy_percent_max": max([b for b in q["busy"] if b is not None] or [None]),
+                             "tcp_retransmitted": q["retrans"], "level_dbm_min": min(q["level"]) if q["level"] else None}
+                            for q in quiet if q["seconds"] >= 10][:40]
+    out["receive_median_bytes_per_s"] = round(median)
+    return out
 
 
 def quantile(values, q):
@@ -127,6 +226,7 @@ def analyze_process(events):
     out["replacement_to_next_send_ms"] = replacements
     out["clears"] = dict(collections.Counter(e["msg"].split()[0] for e in events if e["msg"].startswith("clear_")))
     out["tuning"] = sorted({e["msg"] for e in events if e["msg"].startswith("tuning")})
+    out["health"] = analyze_health(events)
     segments, current = [], None
     for e in events:
         k = e["msg"].split()[0]
@@ -151,8 +251,6 @@ def analyze_process(events):
 
 
 def analyze(events, turns, threads=None):
-    by = collections.defaultdict(list)
-    for e in events: by[e["pid"]].append(e)
     def label(t):
         f = kv("x " + t["msg"])
         text = "icon=%s raw=%s result=%s output=%s" % (f.get("icon"), f.get("raw"), f.get("result"), f.get("output"))
@@ -165,20 +263,20 @@ def analyze(events, turns, threads=None):
     report = {"processes": {}, "turn_records": dict(collections.Counter(label(t) for t in turns).most_common(40))}
     if threads:
         report["thread_records"] = threads
-    for pid, L in sorted(by.items()):
+    for name, L in sessions(events).items():
         kinds = collections.Counter(e["msg"].split()[0] for e in L)
         role = "dipo" if "sender_prepare" in kinds or "exact" in kinds else "navigation" if "trap_input" in kinds else "unknown"
-        report["processes"][str(pid)] = dict(role=role, **(analyze_process(L) if role == "dipo" else {"records": len(L), "events": dict(kinds.most_common())}))
+        walls = [e["wall"] for e in L if e["wall"]]
+        report["processes"][name] = dict(role=role, version="v%d" % L[0]["v"], wall_first=walls[0] if walls else None, wall_last=walls[-1] if walls else None,
+                                         **(analyze_process(L) if role == "dipo" else {"records": len(L), "events": dict(kinds.most_common())}))
     return report
 
 
 def write_replays(events, directory):
     """One sanitized trace per DiPO process: details/packet/route/tick/stop only."""
     directory = Path(directory); directory.mkdir(parents=True, exist_ok=True)
-    by = collections.defaultdict(list)
-    for e in events: by[e["pid"]].append(e)
     written = []
-    for pid, L in sorted(by.items()):
+    for name, L in sessions(events).items():
         if not any(e["msg"].startswith("sender_prepare") for e in L): continue
         lines = ["# Sanitized from a diagnostic export by tools/analyze-ar-log.py: maneuver numbers,",
                  "# raw types, icons, states and meters only. Times are relative milliseconds."]
@@ -214,7 +312,7 @@ def write_replays(events, directory):
                 state, current = new_state, new_current
             elif k == "timer_expired" or k == "worker_alive":
                 emit(e["t"], "tick")
-        path = directory / ("replay-pid%d.csv" % pid); path.write_text("\n".join(lines) + "\n"); written.append(path)
+        path = directory / ("replay-pid%s.csv" % name.replace("/", "-")); path.write_text("\n".join(lines) + "\n"); written.append(path)
     return written
 
 
@@ -232,7 +330,7 @@ def main():
         print(json.dumps(report, indent=2))
     else:
         for pid, r in report["processes"].items():
-            print("process %s (%s): %d records" % (pid, r["role"], r["records"]))
+            print("process %s %s (%s): %d records, %s .. %s" % (pid, r["version"], r["role"], r["records"], r["wall_first"], r["wall_last"]))
             if r["role"] != "dipo": continue
             print("  uptime %d..%d s, max dropped %d" % (r["t_first"] // 1000, r["t_last"] // 1000, r["max_dropped"]))
             print("  exact receipts %d, median interval %s ms, silences >5 s: %s" % (r["exact"]["count"], r["exact"]["median_interval_ms"], r["exact"]["silences_over_5s"]))
@@ -243,6 +341,17 @@ def main():
             print("  expiries (meters before, after, silent s, lost while moving):", [(x["meters_before"], x["meters_after"], x["silent_s"], x["moving"]) for x in r["expiries"]])
             print("  replacement -> next send ms:", r["replacement_to_next_send_ms"], "clears:", r["clears"])
             if r["tuning"]: print("  tuning:", r["tuning"])
+            h = r["health"]
+            if h:
+                print("  health: %d samples; CPU busy %% p50/p95/max %s; load %s; this process ticks/s %s; least free memory %s kB" % (
+                    h["samples"], h["busy_percent"], h["load"], h["process_ticks_per_s"], h["free_kb_min"]))
+                for name, i in h["interfaces"].items(): print("  health: %s bytes/s received %s sent %s" % (name, i["rx_bytes_per_s"], i["tx_bytes_per_s"]))
+                print("  health: busiest threads (ticks):", h["busiest_threads_ticks"])
+                for name, i in h["radio"].items(): print("  health: %s level dBm %s, retries per sample %s, missed beacons %d" % (name, i["level_dbm"], i["retries_per_sample"], i["missed_beacons"]))
+                if h["tcp"]: print("  health: TCP retransmitted per sample %s (%s%% of sent segments)" % (h["tcp"]["retransmitted_per_sample"], h["tcp"]["retransmitted_percent"]))
+                print("  health: receive quiet for 10 s or more (wall, s, max busy %%, TCP retransmits, min dBm; median %d bytes/s):" % h["receive_median_bytes_per_s"],
+                      [(q["wall"], q["seconds"], q["busy_percent_max"], q["tcp_retransmitted"], q["level_dbm_min"]) for q in h["receive_quiet"]])
+                if h["late_samples"]: print("  health: worker late:", [(x["wall"], x["dt"]) for x in h["late_samples"]])
             for s in r["segments"]:
                 print("  state=%s maneuver=%s %4ds in=%s gate=%s out=%s mstate=%s" % (s["state"], s["maneuver"], s["seconds"], s["inputs"], s["gate"], s["out"], s["mstate"]))
         if report["turn_records"]:

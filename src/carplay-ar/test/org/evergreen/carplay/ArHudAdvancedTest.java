@@ -74,8 +74,8 @@ public final class ArHudAdvancedTest {
         float[] tuning=ArHudTuning.parse("street_ar_meters=60\ngain=0.9\nbackstep_meters=0\n");
         check(tuning[0]==60f&&tuning[1]==0.9f&&tuning[2]==0f,"tuning parse");
         tuning=ArHudTuning.parse("street_ar_meters=29\ngain=0.49\nbackstep_meters=51\n");
-        check(tuning[0]==125f&&tuning[1]==0.8f&&tuning[2]==15f,"tuning below/above range keeps defaults");
-        check(ArHudTuning.parse(null)[0]==125f,"missing tuning file keeps defaults");
+        check(tuning[0]==200f&&tuning[1]==0.8f&&tuning[2]==15f,"tuning below/above range keeps defaults");
+        check(ArHudTuning.parse(null)[0]==200f,"missing tuning file keeps defaults");
         tuning=ArHudTuning.parse("bar_meters=125\nturn_offset_meters=20\nexit_side=left\n");
         check(tuning[3]==125f&&tuning[4]==20f&&tuning[5]==ArHudTuning.EXIT_LEFT,"bar window, turn offset and exit side parse");
         tuning=ArHudTuning.parse("bar_meters=29\nturn_offset_meters=61\nexit_side=sideways\n");
@@ -88,7 +88,7 @@ public final class ArHudAdvancedTest {
         check(ArHudTuning.exitStyleName(ArHudTuning.EXIT_STYLE_SIGN).equals("sign")&&ArHudTuning.exitStyleName(7).equals("slight"),"exit style names");
         check(ArHudTuning.exitSideName(ArHudTuning.EXIT_LEFT).equals("left")&&ArHudTuning.exitSideName(9).equals("auto"),"exit side names");
         tuning=ArHudTuning.parse("street_ar_meters=NaN\ngain=Infinity\n");
-        check(tuning[0]==125f&&tuning[1]==0.8f,"non-finite tuning rejected");
+        check(tuning[0]==200f&&tuning[1]==0.8f,"non-finite tuning rejected");
         check(ArHudTurns.bar(60,125)==40&&ArHudTurns.bar(124,125)==90&&ArHudTurns.bar(0,125)==10&&ArHudTurns.bar(126,125)==0,"bar over a street window");
         check(ArHudTurns.bar(229)==50,"default bar window unchanged");
         check(ArHudTurns.cueOnly(11)&&!ArHudTurns.cueOnly(3)&&!ArHudTurns.cueOnly(8),"start route is a cue only");

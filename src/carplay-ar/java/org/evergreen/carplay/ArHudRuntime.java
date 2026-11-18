@@ -314,20 +314,27 @@ public final class ArHudRuntime implements Runnable {
                 " offset="+(int)offset, null);
     }
 
-    static void tick(long now, boolean advanced) {
+    /** One worker step; true on the five-second heartbeat, after which run() takes the health sample. */
+    static boolean tick(long now, boolean advanced) {
         NavigationCluster staleCluster=null;Object staleOwner=null;Thread quiet=null;
+        boolean beat;
         synchronized(ArHudRuntime.class) {
-            if(heartbeatAt<0 || now<heartbeatAt || now-heartbeatAt>=5000) {
+            beat=heartbeatAt<0 || now<heartbeatAt || now-heartbeatAt>=5000;
+            if(beat) {
                 if(ArHudDebug.on())ArHudDebug.event("worker_alive active="+active+" advanced="+advanced+" input_age="+(now-receivedAt));heartbeatAt=now;
             }
-            if (!active) return;
+            if (!active) return beat;
+            // The phone's callback may land between this tick's clock reading and the lock (the
+            // 111 drive: 25 expiries with a negative input age, each blanking the arrow for a
+            // second). A sample from the near future is simply fresh.
+            if (now < receivedAt) now = receivedAt;
             // A silent phone usually means a stationary car; the route end, a maneuver change,
             // a source change or a disconnect end the lease. HOLD_MS catches a stuck sender, and
             // input that stops while the car is moving ends it once the maneuver is behind the car
             // (the 108 drive: nothing from the phone for nine minutes, 410 m before an exit).
             long passedAt = motion.passedAt();
             boolean passed = passedAt >= 0 && now > passedAt && now - receivedAt >= ArHudMotion.MIN_PASS_MS;
-            if (!advanced || now < receivedAt || now - receivedAt > ArHudIpc.HOLD_MS || passed) {
+            if (!advanced || now - receivedAt > ArHudIpc.HOLD_MS || passed) {
                 if(ArHudDebug.on())ArHudDebug.event("timer_expired advanced="+advanced+" input_age="+(now-receivedAt)+" passed="+passed);
                 active = false; motion.reset(); acceptedExactAt = -1;
                 ArHudIpc.publish(false, 0, now, now);
@@ -346,14 +353,17 @@ public final class ArHudRuntime implements Runnable {
             try { ArHudForwarder.forward(false,staleCluster,0,0,0,0,0,0,0,0,0); } catch(RuntimeException unavailable) { /* stale display only */ }
         }
         if(staleOwner!=null) { ArHudDebug.event("clear_expired_hud"); ArHudRoute.blank(staleOwner); }
+        return beat;
     }
 
     public void run() {
         while (true) {
             try { Thread.sleep(250); }
             catch (InterruptedException stopped) { synchronized (ArHudRuntime.class) { running = false; reset(); } return; }
-            try { tick(SystemClock.elapsedRealtime(), ArHudIpc.advanced()); }
-            catch (RuntimeException unavailable) { reset(); }
+            try {
+                // The health sample reads /proc after the tick, outside the lock and off the sender's clock.
+                if (tick(SystemClock.elapsedRealtime(), ArHudIpc.advanced())) ArHudDebug.health(SystemClock.elapsedRealtime());
+            } catch (RuntimeException unavailable) { reset(); }
         }
     }
 }

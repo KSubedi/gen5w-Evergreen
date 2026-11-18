@@ -23,7 +23,7 @@ public final class ArHudReplayTest {
             r.event("2400,details,8,1,270,70");r.event("2500,tick");
             check(r.cluster.calls==calls,"source change prevents old route replay");
             r.event("2600,route,8");check(r.cluster.calls==calls,"new route cannot inherit old display distance");
-            r.event("2700,distance,200");
+            r.event("2700,distance,220");
             check(r.cluster.type==70&&r.hudIcon==70,"far left turn keeps small cue");
             r.event("2800,stop");calls=r.cluster.calls;r.event("3000,tick");
             check(r.cluster.calls==calls,"stop cancels smoothing");
@@ -77,8 +77,8 @@ public final class ArHudReplayTest {
         check(r.cluster.type==0&&r.hudIcon==-1,"new maneuver cannot borrow previous rounded distance");
         r.event("4020,distance,300");
         check(r.cluster.type==67&&r.hudIcon==67,"street-turn small cue remains at 300 meters");
-        r.event("5000,distance,126");check(r.cluster.type==67,"street AR remains deferred just outside 125 meters");
-        r.event("6000,distance,125");check(r.cluster.type==13,"street AR begins at 125 meters");
+        r.event("5000,distance,201");check(r.cluster.type==67,"street AR remains deferred just outside 200 meters");
+        r.event("6000,distance,200");check(r.cluster.type==13&&r.cluster.bar==40,"street AR begins at 200 meters, four bar steps from the turn");
         check(ArHudTurns.recoverIcon(13,0,0)==174&&ArHudTurns.recoverIcon(14,0,0)==173,"keep left/right recovery");
         check(ArHudTurns.recoverIcon(999,0,0)==0&&ArHudTurns.recoverIcon(23,0,1)==0,"unknown/roundabout do not invent exits");
         // Regression from the 104 drive: raw 8 previously never reached HUD.

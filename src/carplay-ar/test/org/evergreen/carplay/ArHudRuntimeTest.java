@@ -281,6 +281,19 @@ public final class ArHudRuntimeTest {
         } finally {file.delete();ArHudTuning.path=null;ArHudTuning.reload();}
     }
 
+    /** 111 drive: a tick whose clock reading predates the phone's latest sample blanked the arrow 25 times. */
+    private static void lateTick() {
+        ArHudRuntime.background=false;ArHudRuntime.reset();Cluster c=new Cluster();Object owner=new Object();
+        ArHudRuntime.update(c,67,0,0,100,0,0,0,0,0,sample(owner,7,100,700000),700000,true);
+        int expired=logged("timer_expired"),calls=c.calls;
+        ArHudRuntime.tick(699980,true);
+        check(logged("timer_expired")==expired&&c.calls==calls&&c.type==13,"a tick timed just before the phone's sample keeps the lease");
+        ArHudRuntime.update(c,67,0,0,100,0,0,0,0,0,sample(owner,7,95,701000),701000,true);
+        check(c.calls==calls+1&&c.type==13,"the next sample continues the same maneuver without a clear");
+        check(ArHudRuntime.tick(706000,true)&&!ArHudRuntime.tick(706250,true),"heartbeat every five seconds, reported to the caller");
+        ArHudRuntime.reset();
+    }
+
     private static void tuning() throws Exception {
         File file=File.createTempFile("evergreen-ar-","-tuning");
         try {
@@ -288,9 +301,9 @@ public final class ArHudRuntimeTest {
             write(file,"street_ar_meters=90\ngain=0.6\nbackstep_meters=5\n");
             check(ArHudTuning.streetArMeters(1000)==90f&&ArHudTuning.gain(1000)==0.6f&&ArHudTuning.backstepMeters(1000)==5f,"tuning file read");
             write(file,"street_ar_meters=1250\ngain=2\nbackstep_meters=-1\n");ArHudTuning.reload();
-            check(ArHudTuning.streetArMeters(5000)==125f&&ArHudTuning.gain(5000)==0.8f&&ArHudTuning.backstepMeters(5000)==15f,"out-of-range values keep defaults");
-            write(file,"# comment\nstreet_ar_meters = 200\nunknown=1\ngain=abc\n");ArHudTuning.reload();
-            check(ArHudTuning.streetArMeters(9000)==200f&&ArHudTuning.gain(9000)==0.8f,"comments, spaces, unknown keys and bad numbers tolerated");
+            check(ArHudTuning.streetArMeters(5000)==200f&&ArHudTuning.gain(5000)==0.8f&&ArHudTuning.backstepMeters(5000)==15f,"out-of-range values keep defaults");
+            write(file,"# comment\nstreet_ar_meters = 210\nunknown=1\ngain=abc\n");ArHudTuning.reload();
+            check(ArHudTuning.streetArMeters(9000)==210f&&ArHudTuning.gain(9000)==0.8f,"comments, spaces, unknown keys and bad numbers tolerated");
             write(file,"street_ar_meters=90\n");ArHudTuning.reload();
             ArHudRuntime.background=false;ArHudRuntime.reset();Cluster c=new Cluster();Object owner=new Object();
             ArHudRuntime.update(c,67,0,0,100,0,0,0,0,0,sample(owner,7,100,20000),20000,true);
@@ -323,7 +336,7 @@ public final class ArHudRuntimeTest {
             ArHudRuntime.update(c,86,0,0,300,0,0,0,0,0,exit,29400,true);
             check(c.type==86,"generic mode never sends a native exit");
             file.delete();ArHudTuning.reload();
-            check(ArHudTuning.streetArMeters(30000)==125f&&ArHudTuning.barMeters(30000)==457f
+            check(ArHudTuning.streetArMeters(30000)==200f&&ArHudTuning.barMeters(30000)==457f
                     &&ArHudTuning.turnOffsetMeters(30000)==0f&&ArHudTuning.exitSide(30000)==ArHudTuning.EXIT_AUTO
                     &&ArHudTuning.exitStyle(30000)==ArHudTuning.EXIT_STYLE_SIGN,"removed file returns to defaults");
             ArHudRuntime.reset();
@@ -332,7 +345,7 @@ public final class ArHudRuntimeTest {
 
     public static void main(String[] args) throws Exception {
         ArHudDebug.flagPath=null; // Host tests read the trace without the car's flag file.
-        motion();route();runtime();traps();ipc();tuning();glide();deferredClear();selfHeal();
+        motion();route();runtime();traps();ipc();tuning();glide();deferredClear();selfHeal();lateTick();
         System.out.println("AR runtime, metadata, interpolation, IPC and OEM frame preservation: "+checks+" checks passed");
     }
 }
