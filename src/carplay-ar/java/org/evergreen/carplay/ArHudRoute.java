@@ -7,7 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-/** Read-only adapter for the inspected US EV6 260507 DiPO field layout.
+/** Adapter for the inspected US EV6 260507 DiPO field layout. It reads, except for one write:
+ * the display distance text is made parseable (distanceText) before DiPO's sender reads it.
  * The patch builder verifies class/method fingerprints and all field types.
  * Reflection crosses the app's private fields without changing their visibility.
  * Missing fields fail back to the proven icon adapter, never crash the bridge.
@@ -25,10 +26,40 @@ public final class ArHudRoute {
     private ArHudRoute() {}
 
     private static synchronized Object field(Object object, String name) throws Exception {
+        return fieldOf(object, name).get(object);
+    }
+    private static synchronized Field fieldOf(Object object, String name) throws Exception {
         String key = object.getClass().getName() + ":" + name;
         Field f = fields.get(key);
         if (f == null) { f = object.getClass().getDeclaredField(name); f.setAccessible(true); fields.put(key, f); }
-        return f.get(object);
+        return f;
+    }
+
+    /** The phone's display distance as stock DiPO can parse it (Float.parseFloat). Apple Maps
+     * sends 1,000 ft as "1,000": the parse failed and DiPO sent the cluster and HUD distance 0
+     * (a US owner's log, 2026-11-18). Grouping commas and spaces go, and a decimal comma
+     * ("0,8") becomes a point; anything else is returned unchanged for DiPO to handle as before.
+     */
+    static String distanceText(String text) {
+        if (text == null) return null;
+        String t = text.trim();
+        if (t.matches("[0-9]{1,3}([,\u00a0\u202f ][0-9]{3})+(\\.[0-9]+)?"))
+            return t.replace(",", "").replace("\u00a0", "").replace("\u202f", "").replace(" ", "");
+        if (t.matches("[0-9]+,[0-9]{1,2}")) return t.replace(',', '.');
+        return text;
+    }
+
+    /** Rewrites the route update's display distance (field bb) before DiPO's sender parses it. */
+    private static void fixDistanceText(Object route) {
+        try {
+            Field f = fieldOf(route, "bb");
+            Object value = f.get(route);
+            if (!(value instanceof String)) return;
+            String fixed = distanceText((String) value);
+            if (fixed.equals(value)) return;
+            f.set(route, fixed);
+            if (ArHudDebug.on()) ArHudDebug.event("distance_text fixed length="+((String)value).length()+" value="+fixed);
+        } catch (Exception unavailable) { /* DiPO parses its own text as before */ }
     }
 
     public static synchronized void exact(Object route, int meters, long now) {
@@ -78,6 +109,7 @@ public final class ArHudRoute {
     }
 
     public static void prepare(Object owner, Integer component, Object route) {
+        if (route != null) fixDistanceText(route);
         long epoch;
         synchronized (ArHudRoute.class) { epoch = generation; }
         prepared.set(new Object[] {owner, component, route, Long.valueOf(epoch)});

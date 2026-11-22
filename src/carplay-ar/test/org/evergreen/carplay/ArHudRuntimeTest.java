@@ -25,7 +25,7 @@ public final class ArHudRuntimeTest {
             legacy=new int[]{a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15,a16};modern=null;calls++;
         }
     }
-    static final class Route {private int aR=1;private int[] bd={7};}
+    static final class Route {private int aR=1;private int[] bd={7};private String bb="0.8";}
     static final class Maneuver {private int DM=2,DR=0,DS=0,DU=90;}
     static final class Owner {
         private final Map<Integer,Object> Am=new HashMap<Integer,Object>();
@@ -58,6 +58,18 @@ public final class ArHudRuntimeTest {
     }
 
     private static void route() throws Exception {
+        // Apple Maps' "1,000" (feet) made stock DiPO's parse fail and send distance 0.
+        check("1000".equals(ArHudRoute.distanceText("1,000"))&&"12500".equals(ArHudRoute.distanceText("12,500"))
+                &&"1000".equals(ArHudRoute.distanceText("1 000"))&&"1000".equals(ArHudRoute.distanceText("1\u00a0000"))
+                &&"1234.5".equals(ArHudRoute.distanceText("1,234.5")),"grouping separators removed");
+        check("0.8".equals(ArHudRoute.distanceText("0,8"))&&"12.25".equals(ArHudRoute.distanceText("12,25")),"decimal comma becomes a point");
+        check("0.8".equals(ArHudRoute.distanceText("0.8"))&&"700".equals(ArHudRoute.distanceText("700"))&&"".equals(ArHudRoute.distanceText(""))
+                &&"1,0000".equals(ArHudRoute.distanceText("1,0000"))&&"abc".equals(ArHudRoute.distanceText("abc"))
+                &&ArHudRoute.distanceText(null)==null,"anything else unchanged");
+        for(String text:new String[]{"1,000","12,500","0,8","1 000"})Float.parseFloat(ArHudRoute.distanceText(text));
+        Route shown=new Route();shown.bb="1,000";ArHudRoute.prepare(new Owner(),1,shown);ArHudRoute.take();
+        check("1000".equals(shown.bb),"prepare fixes the route update's text before DiPO parses it");
+        shown.bb=null;ArHudRoute.prepare(new Owner(),1,shown);ArHudRoute.take();check(shown.bb==null,"no text, nothing changed");
         Owner owner=new Owner();Route route=new Route();Map<Integer,Object> maneuvers=new HashMap<Integer,Object>();
         maneuvers.put(7,new Maneuver());owner.Am.put(1,maneuvers);
         ArHudRoute.prepare(owner,1,route);ArHudSample s=ArHudRoute.take();

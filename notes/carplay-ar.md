@@ -763,3 +763,23 @@ Not proven on the car: that `/proc/net/wireless` and `/proc/net/snmp` are
 readable from the projection app (an unreadable source gives `-`).
 
 Host validation: 1,582 Java checks and 49 Python cases.
+
+## After 1.2.0.112: the "1,000" distance
+
+From another US EV6 owner's logs (2026-11-18, an AR build from before 105): Apple Maps
+sends the 1,000 ft display distance as the text `"1,000"`. Stock DiPO's sender
+(`e/u.a(Integer, Object)`) parses `c.bb` with `Float.parseFloat`, catches the
+`NumberFormatException`, prints it and sends the cluster `mDistance 0.0` and the HUD
+distance (2C) 0: six failures in four seconds on one approach, while the phone's exact
+distance was 304 m. This is stock code kept by every turn-by-turn build, not the helper's.
+In the AR builds the large arrow uses the exact meters; the HUD number and the non-AR path
+showed 0.
+
+`ArHudRoute.prepare()` (inserted at the start of `u.a`, before the parse) now rewrites
+`bb` through `distanceText()`: grouping commas and spaces (also U+00A0 and U+202F) are
+removed and a decimal comma with one or two digits (`"0,8"`) becomes a point; any other text
+is left for DiPO as before. `bb` was already in the builder's verified field list. Trace
+event `distance_text fixed`. Plain Evergreen's turn-by-turn DiPO patch, built with the
+maintainer's private tools, still has the stock parse.
+
+Host validation: 1,587 Java checks and 49 Python cases. Not yet in a release build.
