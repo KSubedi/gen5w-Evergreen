@@ -113,7 +113,8 @@ def dipo(tree):
               '.field public static UserInitiated:%s%s;\n'%(tel[1:]+name,tel,name))
     callbacks=''.join('.method public %s\n    .registers %d\n    const/4 v0, 0x0\n    return-void\n.end method\n'%(m,r)
                       for m,r in (('onScreenTimeout()V',4),('onNotifyDecodeFailure(I)V',5),('onScreenStarted()V',4),
-                                  ('onScreenStopped()V',4),('onSessionStarted(I)V',5),('onSessionFinalized(I)V',6)))
+                                  ('onScreenStopped()V',4),('onSessionStarted(I)V',5),('onSessionFinalized(I)V',6),
+                                  ('oniAPSendMessage([BI)V',7)))
     controls=''.join('.method %s %s\n    .registers 4\n    const/4 v0, 0x0\n    %s\n.end method\n'%(kind,m,ret) for kind,m,ret in (
         ('public','forceKeyFrame()'+tel+'CarPlayReturn;','return-object v0'),
         ('public','changeModeBorrowScreen('+tel+'CarPlayTransferPriority;'+tel+'CarPlayConstraint;Ljava/lang/String;)V','return-void'),
@@ -181,7 +182,7 @@ class AdvancedTest(unittest.TestCase):
         dipo(self.dipo);navi(self.navi);framework(self.fw);gpm(self.gpm)
 
     def test_adapter_hooks_assemble_and_reject_repeat(self):
-        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),16)
+        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),17)
         adapter.patch_dipo(self.dipo,plan)
         simple.patch(self.dipo,HELPERS,1)
         base.run('smali','a','-j','1','--api','18','-o',self.root/'patched.dex',self.dipo)
@@ -192,6 +193,7 @@ class AdvancedTest(unittest.TestCase):
         self.assertIn('->hudDistance(FI)F\n\n    move-result p1',hud)
         service=(self.dipo/adapter.CPS).read_text()
         self.assertEqual(service.count('ArHudRecovery;->screen(Ljava/lang/Object;II)V'),6)
+        self.assertIn('invoke-static {}, Lorg/evergreen/carplay/ArHudRecovery;->iap()V',adapter.method(service,'oniAPSendMessage([BI)V')[0])
         decode=adapter.method(service,'onNotifyDecodeFailure(I)V')[0]
         self.assertIn('const/4 v0, 0x2\n\n    invoke-static {p0, v0, p1}, Lorg/evergreen/carplay/ArHudRecovery;->screen',decode)
         timeout=adapter.method(service,'onScreenTimeout()V')[0]
@@ -312,10 +314,10 @@ class AdvancedTest(unittest.TestCase):
         script=work/'service.sh';script.write_text(source)
         subprocess.run(['sh',str(script)],timeout=10,capture_output=True)
         lines=(work/'logged').read_text().splitlines()
-        self.assertEqual(lines,['-p w -t EvergreenAR v116 wifi kernel_s=10.602161 event=ap_up',
-                                '-p w -t EvergreenAR v116 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
-                                '-p w -t EvergreenAR v116 wifi kernel_s=4121.925019 event=deauth reason=4',
-                                '-p w -t EvergreenAR v116 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
+        self.assertEqual(lines,['-p w -t EvergreenAR v117 wifi kernel_s=10.602161 event=ap_up',
+                                '-p w -t EvergreenAR v117 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
+                                '-p w -t EvergreenAR v117 wifi kernel_s=4121.925019 event=deauth reason=4',
+                                '-p w -t EvergreenAR v117 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
         self.assertNotIn(':af',(work/'logged').read_text())
         self.assertFalse((work/'logs/.wifi').exists())
 

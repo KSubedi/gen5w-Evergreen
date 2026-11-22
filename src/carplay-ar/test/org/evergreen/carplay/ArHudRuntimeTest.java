@@ -293,6 +293,40 @@ public final class ArHudRuntimeTest {
         } finally {file.delete();ArHudTuning.path=null;ArHudTuning.reload();}
     }
 
+    /** Owner logs 2026-11-21/22: the phone left the Wi-Fi, the session never ended, the arrow stayed. */
+    private static void deadLink() throws Exception {
+        File file=File.createTempFile("evergreen-ar-","-tuning");
+        try {
+            ArHudTuning.path=file.getPath();write(file,"");ArHudTuning.reload();
+            ArHudRecovery.background=false;ArHudRecovery.reset();ArHudRecovery.calls=new StringBuilder();ArHudDebug.recheck();
+            Cluster c=new Cluster();ArHudForwarder.lastCluster=c;ArHudForwarder.lastType=67;c.type=67;
+            ArHudRecovery.event(1000,ArHudRecovery.SESSION_STARTED,0);
+            ArHudRecovery.tick(100000);check(ArHudRecovery.calls.length()==0&&c.type==67,"not armed before the first iAP2 message (wired CarPlay)");
+            android.os.SystemClock.now=200000;ArHudRecovery.iap();ArHudRecovery.guidance(1,200000);
+            ArHudRecovery.tick(229000);check(ArHudRecovery.calls.length()==0&&c.type==67,"29 s without iAP2: still alive");
+            ArHudRecovery.tick(230000);
+            check(c.type==0,"dead link: the main frame is cleared at once");
+            check(ArHudRecovery.calls.toString().equals("disconnectCarPlay;"),"dead link: the session is ended");
+            ArHudRecovery.event(231000,ArHudRecovery.SESSION_ENDED,0);
+            ArHudRecovery.tick(232000);check(!ArHudRecovery.calls.toString().contains("restartBonjour"),"advertise after a short pause");
+            ArHudRecovery.tick(233000);check(ArHudRecovery.calls.toString().endsWith("restartBonjour;"),"CarPlay advertised again, though the session ended in between");
+            ArHudRecovery.tick(400000);check(!ArHudRecovery.calls.toString().contains("restartGuidance"),"no guidance restart over a dead link");
+            ArHudRecovery.event(410000,ArHudRecovery.SESSION_STARTED,0);ArHudDebug.recheck();
+            android.os.SystemClock.now=411000;ArHudRecovery.iap();
+            ArHudRecovery.calls.setLength(0);ArHudRecovery.tick(430000);check(ArHudRecovery.calls.length()==0,"a new session starts fresh");
+            // A link that recovers by itself is logged; nothing more happens.
+            write(file,"recover=keyframe\n");ArHudTuning.reload();c.type=67;ArHudForwarder.lastType=67;
+            ArHudRecovery.tick(441000);check(c.type==0&&ArHudRecovery.calls.length()==0,"recover=keyframe: the display is cleared, the session left alone");
+            android.os.SystemClock.now=442000;ArHudRecovery.iap();
+            check(android.util.Log.last.contains("link_back after_ms=1000"),"the link coming back is logged");
+            // A stop (DiPO's stopTurnByTurn) never leaves a main frame behind.
+            ArHudForwarder.lastType=67;c.type=67;ArHudRuntime.reset();
+            check(c.type==0,"reset clears a frame still showing");
+            int calls=c.calls;ArHudRuntime.reset();check(c.calls==calls,"nothing showing: no extra clear");
+        } finally {file.delete();ArHudTuning.path=null;ArHudTuning.reload();ArHudRecovery.calls=null;ArHudRecovery.reset();
+            ArHudForwarder.lastCluster=null;ArHudForwarder.lastType=0;android.os.SystemClock.now=-1;}
+    }
+
     /** Owner logs (EV6 US): the picture stalls while the session continues; the phone's guidance goes quiet. */
     private static void recovery() throws Exception {
         File file=File.createTempFile("evergreen-ar-","-tuning");
@@ -421,7 +455,7 @@ public final class ArHudRuntimeTest {
 
     public static void main(String[] args) throws Exception {
         ArHudDebug.flagPath=null; // Host tests read the trace without the car's flag file.
-        motion();route();runtime();traps();ipc();tuning();glide();deferredClear();selfHeal();lateTick();recovery();
+        motion();route();runtime();traps();ipc();tuning();glide();deferredClear();selfHeal();lateTick();recovery();deadLink();
         System.out.println("AR runtime, metadata, interpolation, IPC and OEM frame preservation: "+checks+" checks passed");
     }
 }

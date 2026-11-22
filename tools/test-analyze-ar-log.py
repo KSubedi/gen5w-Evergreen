@@ -105,20 +105,23 @@ class AnalyzeTest(unittest.TestCase):
                rec(62000,302,'screen timeout'),rec(62001,303,'recover step=1 key_frame'),rec(62002,304,'screen stopped recovering_ms=20 step=1'),
                rec(66000,305,'recover step=2 borrow_screen after_ms=4000'),rec(67500,306,'recover step=2 return_screen after_ms=5500'),
                rec(68500,307,'recover_ok after_ms=6500 step=2'),rec(200000,308,'guidance_restart silent_ms=91000 state=1'),
-               rec(200001,309,'guidance_restart_failed java.lang.NoSuchFieldException')]
+               rec(200001,309,'guidance_restart_failed java.lang.NoSuchFieldException'),
+               rec(300000,310,'link_dead silent_ms=30000 guidance_state=1'),rec(300001,311,'recover step=link end_session'),
+               rec(330000,312,'link_back after_ms=30000')]
         with (self.dir/'flow.log').open('a') as f:f.write('\n'.join(lines)+'\n')
         wifi=tool.wifi_records(self.dir);self.assertEqual([w['event'] for w in wifi],['ch_switch','deauth'])
         self.assertEqual(wifi[0]['freq'],5785);self.assertEqual(wifi[1]['reason'],4)
         events,turns=tool.load(self.dir);report=tool.analyze(events,turns,None,wifi)
         sc=report['processes']['1070']['screen']
         self.assertEqual(sc['events']['timeout'],1);self.assertEqual(sc['events']['step 2 borrow_screen'],1)
-        self.assertEqual(sc['recovered'],[{'wall':'11-16 18:28:08.500','after_ms':6500,'step':2}])
+        self.assertEqual(sc['recovered'],[{'wall':'11-16 18:28:08.500','after_ms':6500,'step':2},{'wall':'11-16 18:28:30.000','after_ms':30000,'step':'link'}])
         self.assertEqual(sc['guidance_restarts'],[{'wall':'11-16 18:28:20.000','silent_ms':91000}])
-        self.assertEqual(sc['failures'],['guidance_restart_failed java.lang.NoSuchFieldException'])
+        self.assertEqual(sc['failures'],['guidance_restart_failed java.lang.NoSuchFieldException','link_dead silent_ms=30000'])
+        self.assertEqual(sc['events']['link_dead'],1);self.assertEqual(sc['events']['step link end_session'],1)
         self.assertEqual(sc['stalls'],[{'wall':'11-16 18:28:02.000','channel_switch_within_60s':[('11-16 18:28:59.000',5785)]}])
         self.assertEqual(report['wifi']['channels'],{5785:1})
         result=subprocess.run([sys.executable,'-I',str(ROOT/'tools/analyze-ar-log.py'),str(self.dir)],capture_output=True,text=True)
-        self.assertIn("picture recovered (wall, after ms, step): [('11-16 18:28:08.500', 6500, 2)]",result.stdout)
+        self.assertIn("picture recovered (wall, after ms, step): [('11-16 18:28:08.500', 6500, 2), ('11-16 18:28:30.000', 30000, 'link')]",result.stdout)
         self.assertIn("hotspot kernel events: {'ch_switch': 1, 'deauth': 1}",result.stdout)
     def test_android_auto_process(self):
         rec=lambda t,seq,msg:record(t,seq,msg,pid=1080,tid=1500).replace('v107','v114')

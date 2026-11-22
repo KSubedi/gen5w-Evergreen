@@ -988,3 +988,49 @@ Tests: `tools/test-ar-combo.py` (sh and mksh), the installer build test checks t
 zip's layout. Not proven on the car: `nemesis install` started from a drive script (the same
 command NEMESIS itself runs for an install drive), and the log export with recording
 restarted.
+
+## 1.3.0.117 test build: the arrow stuck forever
+
+A tester's two days of Leafia-kit captures on Evergreen 1.2.0.103-beta.1 (2026-11-21 and -22,
+ten captures; day 1 is the 2026-11-21 set analysed above, without the over-redaction). The
+tester's own reading, confirmed:
+
+| Capture | `onSendConnectionFailed` | `WaitDetectTimeout` | CarPlay library lines | turn-by-turn mode true | session end / iAP2 disconnect |
+|---|---|---|---|---|---|
+| day 1, 5 (stuck right arrow) | 69 | 35 | 0 | 60 | none |
+| day 2, 1 | 67 | 33 | 0 | 59 | none |
+| day 2, 2 | 45 | 31 | 0 | 47 | yes (reconnected) |
+| healthy captures | 0 | 0 | 199-303 | 42-59 | - |
+
+The kernel log adds the cause: in both stuck captures the phone left the hotspot
+(`WLC_E_DEAUTH_IND`, reason 8, the station leaving), at 13:16:41 and 08:59:03, about 4 and 17
+minutes before the captures, and never rejoined. Iap2ServerApp loops its link detection
+(`Iap2SvcSendLocationData: called before the iap2 is ready`, `ACTION_IAP2_CONNECTFAIL`
+broadcasts that DiPO doesn't listen to). DiPO never sees `onSessionFinalized` or an iAP2
+disconnect, so it stays in turn-by-turn mode with the last frame on the cluster. My earlier
+reading of day 1 capture 5 ("nothing from the phone") missed the Iap2Service lines.
+
+Would 113-116 have helped? The 90 s guidance restart fires (session not ended, guidance
+silent), but `e/b.N()` asks the dead link to stop route guidance; only if that doesn't throw
+does DiPO's `stopTurnByTurn()` run, and that blanks only the small HUD list
+(`sendHudBlank`), not the main frame. Worse, our hook on it reset the AR runtime without a
+clear, which also cancelled the 110 expiry that would have cleared the arrow. So 113-116
+could leave the arrow latched in exactly this case.
+
+Changes:
+
+- `ArHudRecovery` hooks `CarPlayService.oniAPSendMessage([BI)V` (`iap()`), the phone's
+  iAP2 over the CarPlay channel: about one a second in every healthy capture, with or without
+  navigation, none in the stuck ones. Armed by the first message of a session (wired CarPlay
+  never arms it). After 30 s without one: `link_dead`, `ArHudRuntime.clearDisplay()` (main
+  frame type 0 to DiPO's last cluster, and DiPO's own `sendHudBlank`), and with `recover`
+  `screen` or `reconnect` (default) `disconnectCarPlay()` then `restartBonjour()` 3 s later.
+  The re-advertise survives the session end that the disconnect causes. `link_back` is
+  logged if messages return. No guidance restart over a dead link.
+- `ArHudRuntime.reset()` (DiPO's stopTurnByTurn and reset hooks) clears a main frame still
+  showing (ours, or DiPO's last frame through the forwarder).
+- Plan `advanced-plan-117`: one more site per DiPO variant; nothing else changed.
+- Analyser: `link_dead`/`link_back` in the screen summary.
+
+Not proven on the car: that `disconnectCarPlay` and `restartBonjour` work on a wedged session
+and that the phone then reconnects; the 30 s threshold against real link gaps.

@@ -85,6 +85,10 @@ def analyze_screen(events, wifi):
             if what == "timeout": stalls.append(e)
         elif k == "recover":
             kinds["step " + kv(msg).get("step", "?") + " " + msg.split()[2]] += 1
+        elif k in ("link_dead", "link_back"):
+            kinds[k] += 1
+            (recovered if k == "link_back" else failures).append(
+                {"wall": e["wall"], "after_ms": int(kv(msg).get("after_ms", -1)), "step": "link"} if k == "link_back" else msg.split(" guidance_state")[0])
         elif k == "recover_ok":
             d = kv(msg); recovered.append({"wall": e["wall"], "after_ms": int(d.get("after_ms", -1)), "step": int(d.get("step", -1))})
         elif k in ("recover_failed", "guidance_restart_failed"):

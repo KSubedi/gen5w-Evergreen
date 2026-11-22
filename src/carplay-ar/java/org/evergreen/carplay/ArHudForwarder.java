@@ -6,10 +6,14 @@ import com.hkmc.cluster.NavigationCluster;
 /** Replaces only DiPO's updateTBTInfo call; the OEM service remains the sender. */
 public final class ArHudForwarder {
     private ArHudForwarder() {}
+    /** The cluster and type of DiPO's latest main frame: what a clear has to undo. */
+    static volatile NavigationCluster lastCluster;
+    static volatile int lastType;
 
     public static void update(NavigationCluster cluster, int type, int sideStreet,
             float direction, float distance, int distanceError, int combiSideStreet,
             int unit, int bar, int barError) {
+        lastCluster = cluster; lastType = type;
         boolean enabled = false;
         try {
             enabled = ArHudIpc.enabled();

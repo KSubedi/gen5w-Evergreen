@@ -1,10 +1,27 @@
-EVERGREEN 1.3.0.116 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.3.0.117 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.117: THE ARROW STUCK FOREVER (a tester's two days of logs)
+What the logs show: the phone left the head unit's Wi-Fi and never came
+back, but the head unit's CarPlay never noticed the session had ended. It
+stayed in turn-by-turn mode, the iAP2 link retried every couple of seconds,
+and the HUD kept the last arrow until the head unit was restarted.
+- During a wireless CarPlay session the phone's iAP2 messages arrive about
+  once a second, with or without navigation. After 30 seconds without one,
+  the HUD's arrow and turn list are cleared at once, and the dead session
+  is ended and CarPlay advertised again so the phone can reconnect (off with
+  tune-recover-keyframe or tune-recover-off: then the HUD is still cleared).
+- Fixed in 113-116: the 90-second guidance restart reset the AR state
+  without clearing the arrow, which could stop the arrow ever being cleared.
+  A stop now always clears a frame still showing.
+- The 90-second restart no longer runs over a dead link (it can't reach the
+  phone); the link watchdog above handles that case.
+- The export kit accepts 104 to 1.3.0.117.
 
 NEW IN 1.3.0.116: ONE DRIVE FOR INSTALLING AND FOR LOGS
 The installer drive now also collects the logs; there's no separate log kit.
@@ -24,7 +41,6 @@ The installer drive now also collects the logs; there's no separate log kit.
   an update. To reinstall the same version, put an empty file named
   EVERGREEN-INSTALL on the drive. To stop recording for good, use
   Evergreen-AR-export-stop-clean.zip from the controls zip.
-- The export kit accepts 104 to 1.3.0.116.
 
 NEW IN 1.3.0.115: EV FEATURES FOR ANDROID AUTO (first EV6 build)
 Evergreen's EV features (from egmp-aa-ev-feat by willemcvu), until now only
@@ -372,7 +388,7 @@ AFTER THE DRIVE
    Android Auto) and send them privately, using an upload link if too large for
    chat. Recording continues, so you can do this after every drive.
    (Evergreen-AR-export-stop-clean.zip, in the controls zip, also exports but
-   stops recording for good. This version supports 104 to 1.3.0.116.)
+   stops recording for good. This version supports 104 to 1.3.0.117.)
 4. Tell us the approximate time, what Apple Maps showed versus HUD, left/right
    exit and whether switching out of CarPlay and back changed it. No interaction
    with diagnostics or observation tasks are needed from the driver in motion.

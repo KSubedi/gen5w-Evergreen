@@ -37,6 +37,8 @@ TEL = "Lcom/daudio/app/dipo/telechips/"
 SCREEN_SITES = (("onScreenTimeout()V", 1, None), ("onNotifyDecodeFailure(I)V", 2, "p1"),
                 ("onScreenStarted()V", 3, None), ("onScreenStopped()V", 4, None),
                 ("onSessionStarted(I)V", 5, None), ("onSessionFinalized(I)V", 6, None))
+# The phone's iAP2 messages over the CarPlay channel: ArHudRecovery's dead-link watchdog.
+IAP_SITE = "oniAPSendMessage([BI)V"
 # What ArHudRecovery calls by reflection; checked so a different DiPO fails the build, not the car.
 REFLECTED = {
     CPS: ("forceKeyFrame()"+TEL+"CarPlayReturn;",
@@ -127,6 +129,11 @@ def inspect_dipo(tree):
         if registers - params < 2 or text.count("    return-void") != 1:
             raise ValueError("recovery hook needs two free locals and one return: " + signature)
         sites.append({"file":CPS,"method":signature,"sha256":hashlib.sha256(text.encode()).hexdigest(),"registers":registers})
+    text = method((tree/CPS).read_text(), IAP_SITE)[0]
+    if RECOVERY in text:
+        raise ValueError("recovery adapter already present")
+    sites.append({"file":CPS,"method":IAP_SITE,"sha256":hashlib.sha256(text.encode()).hexdigest(),
+                  "registers":int(re.search(r"\.registers (\d+)", text)[1])})
     return sites
 
 
@@ -170,6 +177,7 @@ def patch_dipo(tree, plan):
         replace_method(tree/CPS, signature, lambda t, code=code, argument=argument: insert_entry(t,
             "const/4 v0, 0x%x\n\n    " % code + ("" if argument else "const/4 v1, 0x0\n\n    ") +
             "invoke-static {p0, v0, " + (argument or "v1") + "}, " + RECOVERY + "->screen(Ljava/lang/Object;II)V"))
+    replace_method(tree/CPS, IAP_SITE, lambda t: insert_entry(t, "invoke-static {}, " + RECOVERY + "->iap()V"))
 
 
 def inspect_gpm(tree):

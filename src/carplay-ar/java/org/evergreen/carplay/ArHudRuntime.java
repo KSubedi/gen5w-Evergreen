@@ -18,6 +18,8 @@ public final class ArHudRuntime implements Runnable {
     private static float sentMeters = -1f;
     private static boolean running, active;
     private static Object seenOwner;
+    /** DiPO's turn-by-turn manager from the latest route update, in any mode: its sendHudBlank. */
+    private static volatile Object lastOwner;
     private static int seenComponent=-1, seenManeuver=-1;
     private static String traceKey;
     private static long traceAt = -1, heartbeatAt = -1;
@@ -60,6 +62,7 @@ public final class ArHudRuntime implements Runnable {
     }
     static void prepare(Object owner,Integer component,Object route,boolean advanced) {
         ArHudRoute.prepare(owner, component, route);
+        if (owner != null) lastOwner = owner;
         int current=ArHudRoute.identity(route), state=ArHudRoute.state(route);
         ArHudRecovery.guidance(state, SystemClock.elapsedRealtime());
         if(ArHudDebug.on())ArHudDebug.event("sender_prepare component="+component+" current="+current+" state="+state);
@@ -184,7 +187,39 @@ public final class ArHudRuntime implements Runnable {
         return text.length()==0?"none":text.toString();
     }
 
-    public static synchronized void reset() {
+    /** DiPO stopped or restarted turn-by-turn (its stopTurnByTurn and clear hooks), or a failure.
+     * DiPO's stopTurnByTurn blanks only the small HUD list; a main frame still showing is cleared
+     * here, so a stop never leaves the arrow behind (the 113 guidance restart could). */
+    public static void reset() {
+        NavigationCluster shown;
+        synchronized (ArHudRuntime.class) {
+            shown = shownType != 0 || ArHudForwarder.lastType != 0 ? (cluster != null ? cluster : ArHudForwarder.lastCluster) : null;
+            resetState();
+        }
+        if (shown != null) {
+            ArHudDebug.event("clear_on_reset");
+            try { ArHudForwarder.forward(false, shown, 0, 0, 0, 0, 0, 0, 0, 0, 0); ArHudForwarder.lastType = 0; }
+            catch (RuntimeException unavailable) { /* stale display only */ }
+        }
+    }
+
+    /** Clear the main frame and the small HUD now (a dead CarPlay link: nothing will refresh them). */
+    public static void clearDisplay(String why) {
+        NavigationCluster target; Object owner;
+        synchronized (ArHudRuntime.class) {
+            target = cluster != null ? cluster : ArHudForwarder.lastCluster;
+            owner = lastOwner;
+            resetState();
+        }
+        ArHudDebug.event("clear_" + why);
+        if (target != null) {
+            try { ArHudForwarder.forward(false, target, 0, 0, 0, 0, 0, 0, 0, 0, 0); ArHudForwarder.lastType = 0; }
+            catch (RuntimeException unavailable) { /* stale display only */ }
+        }
+        if (owner != null) ArHudRoute.blank(owner);
+    }
+
+    private static synchronized void resetState() {
         ArHudDebug.event("reset");
         ArHudRecovery.guidanceStopped();
         active = false; sample = null; cluster = null; motion.reset();

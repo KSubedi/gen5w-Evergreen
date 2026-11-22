@@ -25,7 +25,7 @@ while :; do
         rm -f "$REQUEST"
         if mkdir -p "$DIR" && chmod 700 "$DIR"; then
             OUT=$DIR/cluster-baseline.log
-            echo "cluster baseline v116 start $(date) minutes=$MINUTES" > "$OUT"
+            echo "cluster baseline v117 start $(date) minutes=$MINUTES" > "$OUT"
             SAMPLES=$((MINUTES * 60))
             COUNT=0
             while [ "$COUNT" -lt "$SAMPLES" ]; do
