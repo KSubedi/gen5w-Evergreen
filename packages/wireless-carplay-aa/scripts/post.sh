@@ -21,6 +21,9 @@ for _p in $PARTS; do
             continue
         fi
     fi
+    # A part whose post step failed may have changed some files before it stopped:
+    # undo it as well (each part's undo restores its own snapshot, if it made one).
+    [ "$_step" = post ] && _done="$_p $_done"
     log "FAIL: $(part_name $_p) did not install ($_step step) - undoing: ${_done:-nothing}"
     if [ -n "$_done" ] && ! uninstall_parts "$_done"; then
         log "FAIL: undo incomplete - see /data/nemesis/*.log before rebooting"

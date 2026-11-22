@@ -48,7 +48,7 @@ copy_verified() {
 rm -f AR-EXPORT-ERROR.txt
 case "$(getprop ro.build.product)" in CVEV.USA.*.260507) ;; *) fail "Unsupported firmware" ;; esac
 snapshot
-[ -f "$PKG/AR_INSTALL.json" ] && grep -q -e '"version": "1.2.0.10[4-9]"' -e '"version": "1.2.0.11[0-2]"' -e '"version": "1.3.0.11[3-7]"' "$PKG/AR_INSTALL.json" || fail "This finish kit requires AR 1.2.0.104 to 1.3.0.117"
+[ -f "$PKG/AR_INSTALL.json" ] && grep -q -e '"version": "1.2.0.10[4-9]"' -e '"version": "1.2.0.11[0-2]"' -e '"version": "1.3.0.11[3-9]"' -e '"version": "1.3.0.120"' "$PKG/AR_INSTALL.json" || fail "This finish kit requires AR 1.2.0.104 to 1.3.0.120"
 mkdir -p "$OUT" || fail "Cannot create USB export folder"
 : > "$OUT/VERIFIED.txt" || fail "USB not writable"
 [ -f original-md5.txt ] || fail "Missing recorder fingerprints"

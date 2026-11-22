@@ -362,19 +362,27 @@ class ControlTest(unittest.TestCase):
         tool('dmesg','echo "<6>[ 3977.580579] wl_cfg80211_ch_switch_notify : Channel switch notification for freq: 5785 chanspec: 0xd89f"\n'
                      'echo "<6>[   10.552688] wl_cfg80211_del_station : Disconnect STA : c6:2b:cc:2e:b0:af scb_val.val 3"\n'
                      'echo "<4>[  415.307040] dhd_module_init in"\n')
-        tool('logcat','echo "11-21 08:23:22.700 D/hostapd ( 1364): chanspec=0xd095 obss=1 glitch=1 knoise=-59"\n'
+        tool('logcat','i=0; while [ $i -lt 450 ]; do i=$((i+1)); echo "11-21 08:23:20.000 D/hostapd ( 1364): chanspec old n=$i"; done\n'
+                      'echo "11-21 08:23:22.700 D/hostapd ( 1364): chanspec=0xd095 obss=1 glitch=1 knoise=-59"\n'
                       'echo "11-21 08:23:25.490 D/hostapd ( 1364): ap_handle_timer: c6:2b:cc:2e:b0:af flags=0x23"\n')
+        tool('tail','echo "tail: not found" >&2; exit 127\n')  # the unit has none
         tool('wl','case "$3" in chanspec) echo "157 (0xd09d)";; assoclist) echo "assoclist c6:2b:cc:2e:b0:af";; *) echo "$3: n/a";; esac\n')
         conf=self.root/'car/data/misc/wifi';conf.mkdir(parents=True)
+        (conf/'softap.conf').write_bytes(b'\x00\x02\x00\tSECRETNET\x00\x0aSECRETPASS\x01')
+        (conf/'other.conf').write_text('ssid=SECRETNET\nSECRETPASS\nnetwork={\n\tpsk=SECRETPASS\n}\nchannel=157\n')
         (conf/'hostapd.conf').write_text('# comment\ninterface=wlan0\nssid=SECRETNET\nwpa_passphrase=SECRETPASS\nbssid=aa:bb:cc:dd:ee:ff\n'
                                          'hw_mode=a\nchannel=149\nieee80211n=1\ncountry_code=US\n')
         result=self.control('hotspot')
         self.assertEqual(result.returncode,0,result.stderr)
         text=(self.usb/'HOTSPOT/hotspot.txt').read_text()
-        for wanted in ('channel=149','hw_mode=a','country_code=US','ssid=<removed>','wpa_passphrase=<removed>','bssid=<removed>',
+        self.assertIn('softap.conf (binary',text)
+        for wanted in ('channel=149','channel=157','hw_mode=a','country_code=US','ssid=<removed>','wpa_passphrase=<removed>','bssid=<removed>',
                        'freq: 5785','157 (0xd09d)','chanspec=0xd095','[wifi.interface]: [wlan0]','associated phones: 1'):
             self.assertIn(wanted,text)
         for secret in ('SECRETNET','SECRETPASS','aa:bb:cc','c6:2b:cc'):self.assertNotIn(secret,text)
+        # the last 400 hostapd lines, without tail: n=52..450 plus the chanspec=0xd095 line
+        self.assertIn('n=52\n',text);self.assertNotIn('n=51\n',text);self.assertIn('n=450\n',text);self.assertNotIn('tail',text)
+        self.assertFalse((self.usb/'HOTSPOT/.lastn').exists())
         self.assertFalse(self.marker.exists())
 
     def test_regular_evergreen_cannot_be_enabled(self):

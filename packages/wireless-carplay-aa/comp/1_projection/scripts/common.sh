@@ -362,7 +362,8 @@ snap_pp_settings() {
         esac
     done
     putline "late $_late" >> "$PP_FILE.tmp" || return 1
-    mv -f "$PP_FILE.tmp" "$PP_FILE" || return 1
+    # toolbox mv takes no options (mv -f fails on the unit); rename replaces the target anyway
+    mv "$PP_FILE.tmp" "$PP_FILE" || return 1
     _v=""
     while read -r _k _late2; do [ "$_k" = late ] || _v="$_v $_k=$_late2"; done < "$PP_FILE"
     log "projection settings snapshot:$_v"
@@ -671,9 +672,12 @@ restore_all() {
         log "WARN: no snapshot - nothing to restore (not installed, or already undone)"
         return 0
     fi
+    # a snapshot that never finished: install stopped before changing anything
+    # (apply_all refuses to run without "saved"), so there is nothing to put back
     if [ ! -s "$BACKUP_DIR/saved" ]; then
-        log "FAIL: no snapshot to restore"
-        return 1
+        log "WARN: unfinished snapshot - nothing was changed; removing it"
+        remove_backup_dir || return 1
+        return 0
     fi
     if ! sys_rw; then
         log "FAIL: remount /system rw"

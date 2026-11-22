@@ -20,8 +20,9 @@ class ComboTest(unittest.TestCase):
         def tool(name, body): (self.bin/name).write_text('#!/bin/sh\n'+body); (self.bin/name).chmod(0o755)
         tool('getprop', 'case "$1" in sys.boot_completed) echo "${BOOT-1}";; ro.build.product) echo "${PRODUCT-CVEV.USA.0000.V015.012.260507}";; esac\n')
         tool('nemesis', 'echo "$*" >> "%s"\ncase "$1" in\n pkg-list) [ -n "$INSTALLED" ] && echo "%s|Evergreen|0|application";;\n'
-             ' install) exit "${INSTALL_RC-0}";;\n service) [ "$2" = status ] && echo "%s/ar-debug|restart|running|0";;\nesac\nexit 0\n' % (self.calls, ID, ID))
+             ' install) case "$*" in *--force*) exit "${FORCE_RC-0}";; esac; exit "${INSTALL_RC-0}";;\n log) echo "nemesis log line";;\n service) [ "$2" = status ] && echo "%s/ar-debug|restart|running|0";;\nesac\nexit 0\n' % (self.calls, ID, ID))
         tool('am', 'echo "$*" >> "%s"\n' % self.toasts)
+        tool('tail', 'echo "tail: not found" >&2; exit 127\n')  # the unit has none
         tool('logcat', 'echo "EvergreenAR: recent"\n')
         tool('md5', 'case "$1" in *AR-LOGS-*) [ -n "$BAD_COPY" ] && { echo 00000000000000000000000000000000 "$1"; exit 0; };; esac\nexec md5sum "$@"\n')
         self.env = dict(os.environ, EVERGREEN_AR_SOURCE_ROOT=str(self.car), PATH=str(self.bin)+os.pathsep+os.environ['PATH'])
@@ -78,6 +79,7 @@ class ComboTest(unittest.TestCase):
         self.assertTrue((out/'hotspot.txt').is_file()); self.assertFalse((self.usb/'AR_MODE').exists())
         self.assertIn('Recording continues', (self.usb/'EVERGREEN-STATUS.txt').read_text())
         self.assertIn((out/'AR_INSTALL.json').read_text(), (self.pkg/'AR_INSTALL.json').read_text())
+        self.assertFalse((out/'install-logs').exists())
 
     def test_failed_copy_check_deletes_nothing_and_restarts_recording(self):
         self.installed('1.3.0.116')
@@ -95,7 +97,29 @@ class ComboTest(unittest.TestCase):
         r = self.run_kit(INSTALL_RC='20'); self.assertEqual(r.returncode, 1)
         self.assertIn('compatibility risk', (self.usb/'EVERGREEN-STATUS.txt').read_text())
         r = self.run_kit(INSTALL_RC='22'); self.assertIn('blocked', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        (self.car/'data/nemesis').mkdir(parents=True, exist_ok=True); (self.car/'data/nemesis'/(ID+'.log')).write_text('install steps')
         r = self.run_kit(INSTALL_RC='1'); self.assertIn('code 1', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        (self.car/'data/nemesis/wireless.projection.log').write_text('part steps')
+        r = self.run_kit(INSTALL_RC='1')
+        self.assertEqual((self.usb/'INSTALL-LOG'/(ID+'.log')).read_text(), 'install steps')
+        self.assertEqual((self.usb/'INSTALL-LOG/wireless.projection.log').read_text(), 'part steps')
+        self.assertIn('parts installed: none', (self.usb/'INSTALL-LOG/state.txt').read_text())
+        self.assertIn('nemesis log line', (self.usb/'INSTALL-LOG/nemesis.log').read_text())
+        self.assertIn('INSTALL-LOG folder', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+
+    def test_old_version_with_no_parts_is_replaced_past_its_failed_uninstall(self):
+        self.installed('1.3.0.115')
+        r = self.run_kit(INSTALLED='1', INSTALL_RC='5'); self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn('install --update --force packages/%s.zip' % ID, self.calls_text())
+        self.assertTrue((self.usb/'INSTALL-LOG-FIRST-TRY').is_dir())
+        r = self.run_kit(INSTALLED='1', INSTALL_RC='5', FORCE_RC='1'); self.assertEqual(r.returncode, 1)
+        self.assertIn('code 1', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+
+    def test_installed_parts_are_never_forced(self):
+        self.installed('1.3.0.115')
+        (self.car/'data/nemesis'/(ID+'.parts')).write_text('1_projection 2_tbt\n')
+        r = self.run_kit(INSTALLED='1', INSTALL_RC='5'); self.assertEqual(r.returncode, 1)
+        self.assertNotIn('--force', self.calls_text()); self.assertIn('code 5', (self.usb/'EVERGREEN-STATUS.txt').read_text())
 
     def test_other_cars_and_incomplete_drives_are_refused(self):
         r = self.run_kit(PRODUCT='NEEV.USA.0000.V015.012.260507'); self.assertEqual(r.returncode, 1)

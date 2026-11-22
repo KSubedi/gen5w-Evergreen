@@ -16,6 +16,13 @@ DEBUG=$SOURCE/data/nemesis/$ID-ar-debug
 SERVICE=$ID/ar-debug
 ZIP=packages/$ID.zip
 STATUS=EVERGREEN-STATUS.txt
+# The package's install logs: its own and one per part (steps, checksums and settings
+# values; no names or passwords).
+NDATA=$SOURCE/data/nemesis
+INSTALL_LOG=$NDATA/$ID.log
+PART_LOGS="$ID wireless.projection projection.tbt wireless.carplay.bt carplay.wifi.audio projection.menu"
+# The parts the installed version applied; none after a failed install that was undone.
+PARTS_FILE=$NDATA/$ID.parts
 read -r OURS < AR_VERSION 2>/dev/null || OURS=
 
 toast() {
@@ -46,6 +53,22 @@ copy_verified() {
     _copy=$(ar_digest "$2") || return 1
     [ "$_before" = "$_after" ] && [ "$_before" = "$_copy" ] || return 1
     echo "$_copy  ${2##*/}" >> "$OUT/VERIFIED.txt"
+}
+
+# save_install_logs <folder>: everything needed to see why an install failed.
+save_install_logs() {
+    mkdir -p "$1" 2>/dev/null || return 0
+    for _n in $PART_LOGS; do
+        [ -f "$NDATA/$_n.log" ] && cp "$NDATA/$_n.log" "$1/$_n.log"
+    done
+    { echo "parts installed: $(cat "$PARTS_FILE" 2>/dev/null || echo none)"
+      echo "projection snapshot:"; ls -l "$NDATA/backup/wireless.projection" 2>&1
+      echo "space:"; df /system /data 2>&1
+      echo "/system mount:"; grep ' /system ' /proc/mounts 2>&1
+    } > "$1/state.txt" 2>/dev/null
+    # The unit has no tail; NEMESIS already keeps the dump to its last 128 KiB.
+    nemesis log dump > "$1/nemesis.log" 2>/dev/null
+    sync
 }
 
 if [ "$(getprop sys.boot_completed)" != 1 ]; then
@@ -79,12 +102,22 @@ Next time you plug this drive in (parked, head unit fully started), it collects 
     # NEMESIS's own install, as for a package drive. On success the package restarts the unit.
     nemesis install $UPDATE "$ZIP"
     RC=$?
+    # 5: the old version's uninstall step failed, so NEMESIS kept it. When that version
+    # has no parts installed (its own install failed and was undone), there is nothing to
+    # remove: --force only carries on past that step (NEMESIS 1.16; older ones ignore it).
+    if [ "$RC" = 5 ] && [ -n "$UPDATE" ] && [ ! -s "$PARTS_FILE" ]; then
+        save_install_logs INSTALL-LOG-FIRST-TRY
+        echo "The old version has no parts installed: retrying past its failed uninstall"
+        nemesis install --update --force "$ZIP"
+        RC=$?
+    fi
     case "$RC" in
         0) status "Installed Evergreen EV6 AR $OURS. Restart the head unit if it didn't restart by itself.
 Next time you plug this drive in, it collects the logs."; exit 0 ;;
         20) fail "NEMESIS needs you to accept a compatibility risk: install packages/$ID.zip from NEMESIS Manager instead" ;;
         21|22|23) fail "NEMESIS blocked the install (another package depends on or conflicts with it); see NEMESIS Manager" ;;
-        *) fail "Install failed (NEMESIS code $RC); see NEMESIS Manager's log" ;;
+        *) save_install_logs INSTALL-LOG
+           fail "Install failed (NEMESIS code $RC). Restart the head unit, then send the INSTALL-LOG folder from this drive" ;;
     esac
 fi
 
@@ -113,6 +146,7 @@ done
 for NAME in BUILD AR_BUILD.json AR_INSTALL.json ar-tuning; do
     [ -f "$PKG/$NAME" ] && cp "$PKG/$NAME" "$OUT/"
 done
+[ -f "$INSTALL_LOG" ] && save_install_logs "$OUT/install-logs"
 logcat -d -v brief -s EvergreenAR:W '*:S' > "$OUT/recent-logcat.txt" 2>&1 || echo "Recent logcat unavailable" >> "$OUT/recent-logcat.txt"
 sync || { restart_recorder; fail "Cannot flush the drive"; }
 # Recheck every source against its copy before anything is deleted.

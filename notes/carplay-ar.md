@@ -1034,3 +1034,35 @@ Changes:
 
 Not proven on the car: that `disconnectCarPlay` and `restartBonjour` work on a wedged session
 and that the phone then reconnects; the 30 s threshold against real link gaps.
+
+## 1.3.0.118-120: the install failure of 113-117
+
+The owner's 117 install "didn't install": NEMESIS registered 117, the head unit never
+restarted, and the 112 apps kept running. 118 then stopped with NEMESIS code 5. 119 saved
+every part's log to the drive, which showed the cause:
+
+- Part 1 (`wireless.projection`) snapshots the head unit's projection settings
+  (`snap_pp_settings`, added in 806eabd for the wired-CarPlay uninstall fix, first shipped
+  in 113). It wrote `ppsettings.tmp` (all nine settings plus `late`, 376 bytes) and then ran
+  `mv -f`. Android 4.4 toolbox `mv` takes no options, so it failed, and so did every fresh
+  snapshot with Android up. (With Android down, `settings` fails first and the step is
+  skipped.) 113-117 were withdrawn. The mock head unit's `mv` now rejects options.
+- NEMESIS updates run the old version's `preuninstall` first. The failed 117 left an
+  unfinished snapshot (no `saved`), which its `restore_all` treated as a failure, so every
+  later update stopped with code 5. Now an unfinished snapshot means nothing was changed and
+  is removed. A part whose post step fails is undone too (before, `undoing: nothing` could
+  leave its first `/system` edits), with a `MOCK_FAIL_PROJECTION` mock run.
+- The drive retries code 5 with `nemesis install --update --force` only when the old
+  version has no parts file (nothing installed). `--force` only carries on past the old
+  version's failed uninstall step; older NEMESIS ignores the flag. This got 119 past 117 on
+  the car.
+- On failure the drive saves `INSTALL-LOG/` (each part's log, `state.txt` with free space,
+  `/system` mount and the projection snapshot listing, and `nemesis log dump`). Log runs save
+  the same as `install-logs/`.
+- No `tail` on the unit: the hotspot report's last two sections and the first
+  `nemesis.log` were empty. Both now use shell loops, and the tests put a failing `tail` on
+  PATH.
+- Privacy: the hotspot report printed the binary `softap.conf` (network name and
+  password). It's now skipped, and other configuration files keep only `key=value` lines.
+
+120 installed on the owner's car. No CarPlay, Android Auto or HUD changes from 117.

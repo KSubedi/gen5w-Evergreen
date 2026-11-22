@@ -38,6 +38,9 @@
 #   MOCK_PP_SETTINGS=1      while installed, the head unit's Phone Projection pages rewrite
 #                           its projection settings (wired CarPlay off): the uninstall must put
 #                           the stock values back, or leave them for the new version on an update
+#   MOCK_FAIL_PROJECTION=1  part 1's post step fails after it changed build.prop and
+#                           featurexml (writing the CarPlay feature file fails): the install
+#                           must undo it, leave /system stock, and a later uninstall must pass
 #
 # Needs: qemu-arm-static (runs the ARM lpatch), unzip, md5sum.
 set -e
@@ -128,6 +131,11 @@ if [ "$MOCK_ANDROID_DOWN" = 1 ]; then
     cp "$X/stub/am" "$X/stub/pm"
 fi
 printf '#!/bin/sh\nexec "%s" "%s/pkg/tools/lpatch" "$@"\n' "$QEMU" "$X" > "$X/stub/lpatch_q"
+if [ "$MOCK_FAIL_PROJECTION" = 1 ]; then
+    printf '#!/bin/sh\nfor a; do case "$a" in */etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml) echo "cp: write error" >&2; exit 1 ;; esac; done\nexec /bin/cp "$@"\n' > "$X/stub/cp"
+fi
+# The unit's mv is Android 4.4 toolbox: no options at all ("mv -f" fails there).
+printf '#!/bin/sh\ncase "$1" in -*) echo "mv: failed on $1" >&2; exit 255 ;; esac\nexec /bin/mv "$@"\n' > "$X/stub/mv"
 chmod 755 "$X"/stub/*
 
 # unpack the package and point its scripts at the sandbox instead of the real paths
@@ -163,6 +171,19 @@ case "$POST_HOOK" in scripts/post.sh|scripts/ar-post.sh) ;; *) echo "unsupported
 ok=1
 if "$SH" "$PRE_HOOK" > "$X/pre.log" 2>&1; then
     "$SH" "$POST_HOOK" > "$X/post.log" 2>&1 || true
+    if [ "$MOCK_FAIL_PROJECTION" = 1 ]; then
+        (cd "$R" && find system -type f -exec md5sum {} \; | sort -k2) > "$X/afterfail.md5"
+        grep -q 'FAIL: wireless.projection did not install (post step) - undoing: 1_projection' "$X/post.log" \
+            && echo "INSTALL FAILED as planned and undid part 1" || { echo "the failed part 1 was not undone"; ok=0; }
+        diff -q "$X/before.md5" "$X/afterfail.md5" > /dev/null && echo "/system stock after the failed install" \
+            || { echo "/system changed after the failed install"; ok=0; }
+        rm -f "$X/stub/cp"
+        if "$SH" scripts/preun.sh > "$X/preun.log" 2>&1; then echo "uninstall after the failure passes"; else echo "uninstall after the failure FAILED"; ok=0; fi
+        (cd "$R" && find system -type f -exec md5sum {} \; | sort -k2) > "$X/after.md5"
+        diff -q "$X/before.md5" "$X/after.md5" > /dev/null && echo "UNINSTALL -> identical to stock" || { echo "UNINSTALL left differences"; ok=0; }
+        echo "sandbox (logs: pre.log post.log preun.log): $X"
+        [ $ok = 1 ]; exit
+    fi
     if grep -q 'all parts installed' "$X/post.log"; then
         echo "INSTALL OK $(grep -o -E "(full|basic) mode[^)]*" "$X/post.log" | head -1)"
     else

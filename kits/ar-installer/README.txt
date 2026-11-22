@@ -1,10 +1,43 @@
-EVERGREEN 1.3.0.117 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.3.0.120 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.120: THE INSTALL FAILURE OF 117 TO 119
+- The cause: the wireless projection part saves the head unit's projection
+  settings (added in 117) and renamed that file with "mv -f". The head
+  unit's mv takes no options, so the step failed on every fresh install.
+  It now uses plain mv, and the test head unit rejects mv options as the
+  real one does.
+- The head unit has no "tail": the hotspot report's last two sections (hostapd
+  channel messages, projection session events) came out empty, and so did
+  the NEMESIS log in INSTALL-LOG. Both are fixed.
+- 1.3.0.113 to 1.3.0.117 are withdrawn (118 and 119 were never released):
+  their install fails with the head
+  unit running. Use 1.3.0.120.
+
+NEW IN 1.3.0.119: INSTALL FIXES AND HOTSPOT PRIVACY
+- An update over a version whose own install failed no longer stops with
+  NEMESIS code 5: that version has nothing installed, so the drive retries
+  past its failed uninstall step (NEMESIS --force, which skips only that
+  step). A version with parts installed is never forced.
+- A part that failed partway through its install is now undone as well, so
+  a failed install leaves the system files stock. Before, the wireless
+  projection part could leave its first edits behind, and its unfinished
+  backup then blocked the next uninstall.
+- If an install fails, the drive saves an INSTALL-LOG folder: the install
+  log of the package and of each part, free space and the NEMESIS log (no
+  names or passwords). Restart the head unit and send that folder. Each log
+  run also saves it as install-logs in the logs folder.
+- Privacy fix: the hotspot report printed the hotspot's softap.conf, which
+  holds the hotspot name and password. It now skips that file and keeps only
+  plain setting lines from the other configuration files. If you shared a
+  hotspot.txt from 116 or 117, consider changing the hotspot password.
+- No CarPlay, Android Auto or HUD changes from 117.
+- The export kit accepts 104 to 1.3.0.120.
 
 NEW IN 1.3.0.117: THE ARROW STUCK FOREVER (a tester's two days of logs)
 What the logs show: the phone left the head unit's Wi-Fi and never came
@@ -388,7 +421,7 @@ AFTER THE DRIVE
    Android Auto) and send them privately, using an upload link if too large for
    chat. Recording continues, so you can do this after every drive.
    (Evergreen-AR-export-stop-clean.zip, in the controls zip, also exports but
-   stops recording for good. This version supports 104 to 1.3.0.117.)
+   stops recording for good. This version supports 104 to 1.3.0.120.)
 4. Tell us the approximate time, what Apple Maps showed versus HUD, left/right
    exit and whether switching out of CarPlay and back changed it. No interaction
    with diagnostics or observation tasks are needed from the driver in motion.

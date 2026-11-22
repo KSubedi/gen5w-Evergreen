@@ -21,6 +21,16 @@ redact() {
         esac
     done
 }
+# Configuration files: plain key=value lines only. Anything else (binary files such as
+# softap.conf, which holds the network name and password, or free text) is dropped.
+redact_conf() {
+    while IFS= read -r _l; do
+        case "$_l" in *=*) ;; *) continue ;; esac
+        _k=${_l%%=*}; _k=${_k#"${_k%%[! 	]*}"}
+        case "$_k" in ''|*[!A-Za-z0-9_.-]*) continue ;; esac
+        echo "$_l" | redact
+    done
+}
 nomac() {
     # Hardware addresses out of free text; without sed, lines that carry one are dropped.
     if command -v sed >/dev/null 2>&1; then
@@ -31,6 +41,14 @@ nomac() {
 }
 if [ "$MODE" = hotspot ]; then
     OUT=HOTSPOT; mkdir -p "$OUT" || exit 1; F=$OUT/hotspot.txt
+    # lastn <n>: the last n lines of stdin (the unit has no tail)
+    lastn() {
+        _t=$OUT/.lastn; cat > "$_t"; _c=0
+        while IFS= read -r _l || [ -n "$_l" ]; do _c=$((_c + 1)); done < "$_t"
+        _s=$((_c - $1)); _i=0
+        while IFS= read -r _l || [ -n "$_l" ]; do _i=$((_i + 1)); [ "$_i" -gt "$_s" ] && echo "$_l"; done < "$_t"
+        rm -f "$_t"
+    }
     {
         echo "hotspot report $(date)"; echo "product $(getprop ro.build.product)"; echo "uptime $(cat /proc/uptime)"
         [ -f "$PKG/AR_INSTALL.json" ] && grep '"version"' "$PKG/AR_INSTALL.json"
@@ -50,7 +68,8 @@ if [ "$MODE" = hotspot ]; then
         for C in $CONFS "$SOURCE"/data/misc/wifi/hostapd.conf "$SOURCE"/data/misc/wifi/*.conf "$SOURCE"/system/etc/wifi/*.conf "$SOURCE"/system/etc/hostapd/*.conf; do
             [ -f "$C" ] || continue
             case " $DONE " in *" $C "*) continue ;; esac; DONE="$DONE $C"
-            echo "--- $C"; redact < "$C"
+            case "${C##*/}" in softap.conf) echo "--- $C (binary, holds the network name and password: not copied)"; continue ;; esac
+            echo "--- $C"; redact_conf < "$C"
         done
         echo; echo "===== files"; ls -l "$SOURCE"/data/misc/wifi "$SOURCE"/system/etc/wifi 2>&1
         echo; echo "===== properties"; getprop | grep -i -e wifi -e wlan -e hostapd -e softap -e country -e channel -e ap_ | redact
@@ -70,9 +89,9 @@ if [ "$MODE" = hotspot ]; then
         echo; echo "===== kernel: channel switches, disconnects, access point, radar"
         dmesg 2>/dev/null | grep -e ch_switch -e WLC_E_ -e 'AP/GO' -e chanspec -e radar -e DFS -e CSA -e start_ap | nomac
         echo; echo "===== hostapd interference statistics and channel messages (last 400)"
-        logcat -d -v time -s hostapd:V 2>/dev/null | grep -i -e chanspec -e channel -e csa -e acs -e interference | nomac | tail -400
+        logcat -d -v time -s hostapd:V 2>/dev/null | grep -i -e chanspec -e channel -e csa -e acs -e interference | nomac | lastn 400
         echo; echo "===== projection: screen timeouts, session ends (last 200)"
-        logcat -d -v time 2>/dev/null | grep -e onScreenTimeout -e onSessionFinalized -e onSessionStarted -e onNotifyDecodeFailure -e 'wifi kernel_s' | nomac | tail -200
+        logcat -d -v time 2>/dev/null | grep -e onScreenTimeout -e onSessionFinalized -e onSessionStarted -e onNotifyDecodeFailure -e 'wifi kernel_s' | nomac | lastn 200
     } > "$F" 2>&1
     sync
     echo "Saved HOTSPOT/hotspot.txt to the USB (no network name, password or hardware address). Export complete."
