@@ -30,12 +30,16 @@ simple=module('patch-carplay-ar')
 def inputs(stock,patches):
     lines, entries, fingerprint=base.inputs(stock,'ev6',patches)
     wanted=dict(line.split() for line in (patches/'ev6/stock').read_text().splitlines() if line.strip())
-    for name in ('HKMC_Navi_ExSL.apk','HKMC_Navi_ExSL.odex'):
+    for name in ('HKMC_Navi_ExSL.apk','HKMC_Navi_ExSL.odex','HKMC_GPM.apk','HKMC_GPM.odex'):
         if base.md5(stock/'app'/name)!=wanted.get(name):raise ValueError('stock checksum mismatch: '+name)
         fingerprint[name]=base.sha256(stock/'app'/name)
     navi=[line.split() for line in lines if line.split()[:3]==['2_tbt','app','HKMC_Navi_ExSL']]
     if len(navi)!=1:raise ValueError('expected one navigation build')
     entries+=navi
+    # Android Auto (GPM): one turn-by-turn build on the EV6.
+    gpm=[line.split() for line in lines if line.split()[:3]==['2_tbt','app','HKMC_GPM']]
+    if len(gpm)!=1:raise ValueError('expected one Android Auto build')
+    entries+=gpm
     framework={p.name:base.sha256(p) for p in sorted((stock/'framework').iterdir()) if p.suffix in ('.jar','.odex')}
     if not all(n in framework for n in ('core.odex','automotive.jar','automotive.odex')):
         raise ValueError('full matching framework collection required')
@@ -57,7 +61,8 @@ def reconstruct(stock,patches,entry,temp,lpatch):
     base.run(lpatch,'zipadd',stock/'app'/(name+'.apk'),dex,apk)
     if base.md5(apk)!=want:raise ValueError('base Evergreen APK checksum mismatch: '+name)
     base.run('baksmali','d',dex,'-o',tree)
-    sites=adapter.inspect_dipo(tree) if name=='HKMC_DiPO' else adapter.inspect_navi(tree)
+    sites=(adapter.inspect_dipo(tree) if name=='HKMC_DiPO' else adapter.inspect_gpm(tree) if name=='HKMC_GPM'
+           else adapter.inspect_navi(tree))
     report={'part':part,'name':name,'base_patch':delta,'base_patch_sha256':base.sha256(patches/delta),
             'base_dex_sha256':base.sha256(dex),'sites':sites}
     if name=='HKMC_Navi_ExSL':report['native_turn_sites']=simple.inspect(tree)
@@ -81,7 +86,7 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
     patches=Path(patches or ROOT/'patches').resolve();lpatch=Path(lpatch or ROOT/'tools/lpatch/lpatch-host').resolve()
     if output.exists() or output.is_relative_to(stock) or (output.is_relative_to(ROOT) and not output.is_relative_to(ROOT/'dist')):
         raise ValueError('choose a NEW private output directory or ignored dist directory')
-    if {p.name for p in helpers.rglob('*.smali')}!=simple.HELPER_NAMES:raise ValueError('build the twelve helpers first')
+    if {p.name for p in helpers.rglob('*.smali')}!=simple.HELPER_NAMES:raise ValueError('build the AR helpers first')
     lines,entries,fingerprint,fw=inputs(stock,patches)
     if not isinstance(plan,dict) or plan.get('schema')!=2 or plan.get('mode')!='advanced' or plan.get('variant')!='ev6':
         raise ValueError('an advanced EV6 inspection plan is required')
@@ -95,7 +100,8 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
         staged=temp/'patches';shutil.copytree(patches,staged)
         report={'schema':2,'variant':'ev6','on_car_tested':False,'enabled_by_default':False,
                 'baseline_on_car_confirmed':'1.2.0.101','stock_sha256':fingerprint,'framework_sha256':fw,'framework_api':api,
-                'features':{'icon_ar':True,'metadata_adapter':True,'distance_adapter':True,'progress_adapter':True},
+                'features':{'icon_ar':True,'metadata_adapter':True,'distance_adapter':True,'progress_adapter':True,
+                            'carplay_recovery':True,'android_auto_ar':True},
                 'helper_sha256':{p.name:base.sha256(p) for p in sorted(helpers.rglob('*.smali'))},'builds':[]}
         for entry in entries:
             part,kind,name,old_patch,want=entry
@@ -104,6 +110,7 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
             if expected!=inspected:raise ValueError('adapter plan changed for '+part+'/'+name)
             if name=='HKMC_DiPO':
                 adapter.patch_dipo(tree,expected['sites']);simple.patch(tree,helpers,1)
+            elif name=='HKMC_GPM':adapter.patch_gpm(tree,helpers,expected['sites'])
             else:adapter.patch_navi(tree,helpers,expected['sites'])
             key=part+'-'+name;dex=temp/(key+'.dex');repeat=temp/(key+'-repeat.dex')
             for target in (dex,repeat):base.run('smali','a','-j','1','--api','18','-o',target,tree)
@@ -112,7 +119,8 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
             remaining=simple.inspect(checked)
             own=[p for p in remaining if p['file'].startswith('org/evergreen/carplay/')]
             original=[p for p in remaining if not p['file'].startswith('org/evergreen/carplay/')]
-            if len(own)!=3 or original!=inspected.get('native_turn_sites',[]):
+            # Our own direct calls: the forwarder's two, the CarPlay runtime's and the Android Auto send.
+            if len(own)!=4 or original!=inspected.get('native_turn_sites',[]):
                 raise ValueError('unexpected direct turn calls after adapter injection')
             if name=='HKMC_Navi_ExSL':
                 sites=adapter.inspect_navi(checked)
@@ -125,7 +133,8 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
             apk=temp/(key+'-result.apk');base.run(lpatch,'zipadd',stock/'app'/(name+'.apk'),dex,apk);checksum=base.md5(apk)
             lines=[' '.join((part,kind,name,delta,checksum)) if line.split()==entry else line for line in lines]
             report['builds'].append({'part':part,'name':name,'patch':delta,'patch_sha256':base.sha256(staged/delta),
-                                     'apk_md5':checksum,'dex_sha256':base.sha256(dex),'calls':1 if name=='HKMC_DiPO' else len(expected['sites'])})
+                                     'apk_md5':checksum,'dex_sha256':base.sha256(dex),
+                                     'calls':1 if name=='HKMC_DiPO' else len(adapter.GPM_CALLS) if name=='HKMC_GPM' else len(expected['sites'])})
         if actual!=plan:raise ValueError('inspection plan contains unexpected fields or builds')
         (staged/'ev6/manifest').write_text('\n'.join(lines)+'\n')
         with tempfile.TemporaryDirectory(prefix='.ar-publish-',dir=output.parent) as publish:

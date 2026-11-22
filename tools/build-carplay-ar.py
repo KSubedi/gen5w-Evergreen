@@ -143,7 +143,8 @@ def build(stock, variant, output, helpers, calls=None, patches=None, lpatch=None
             # Dalvik verification or the OEM service's actual behavior on a car.
             run("baksmali", "d", result, "-o", temp / (part + "-verify"))
             remaining = module.inspect(temp / (part + "-verify"))
-            if (len(remaining) != 3 or {s["file"] for s in remaining} != {
+            # The forwarder's two (CarPlay fallback, Android Auto send) and the CarPlay runtime's.
+            if (len(remaining) != 4 or {s["file"] for s in remaining} != {
                     "org/evergreen/carplay/ArHudForwarder.smali", "org/evergreen/carplay/ArHudRuntime.smali"}):
                 raise ValueError("unexpected direct cluster calls after injection")
             new_patch = variant + "/HKMC_DiPO." + part.split("_", 1)[1] + ".ar.lpd"

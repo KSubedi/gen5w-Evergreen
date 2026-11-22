@@ -882,3 +882,62 @@ and whether `dmesg` is readable from the recorder (root) on every unit.
 Host validation: 1,614 Java checks and 53 Python cases; the 111 export replays through the
 helper; mock install/uninstall (Android up and down, update, projection settings) return to
 stock; the shipped DiPO patches carry all six screen hooks on both variants.
+
+## 1.3.0.114 test build: Android Auto AR
+
+Owner report: with Android Auto the HUD shows every turn and the turn list, but no AR.
+GPM (`com.google.android.projection.sink`, Evergreen's turn-by-turn build) sends every
+Android Auto turn through one call, `GpmNaviTBTManager.updateTBTInfo()`, as a projection icon
+(`mDisplayType`, 64 and up, side streets 65535); the AR HUD animates only native types.
+HMG-API's Wireless mod reports the same on a US Ioniq 5 and draws Android Auto turns as
+native types near a maneuver (its `tbt_standard`), which the AR HUD animates.
+
+### What GPM receives
+
+- `onNextTurn(String road, int side, int event, int angle, int number)` from the Android Auto
+  library (Evergreen's library patch multiplexes extras through it: 0x20 destination name,
+  0x21 dump, 0x22 lanes, 0x40-0x43 the ahead list). Event and side are Android Auto's legacy
+  `NextTurnEnum`/`TurnSide`, checked against AOSP's `CarNavigationStatusManager`: 1 depart,
+  2 name change, 3 slight, 4 turn, 5 sharp, 6 U-turn, 7 on-ramp, 8 off-ramp, 9 fork, 10 merge,
+  11/12/13 roundabout enter/exit/enter-and-exit, 14 straight, 16/17 ferry, 19 destination; side
+  1 left, 2 right, 3 unspecified. Angle and number are only for roundabouts (angle between
+  entry and exit in the direction of travel, -1 unused).
+- `onNextTurnDistance(meters, display_e3, display_unit)` from
+  `GalConnectionSession` (`navigationNextTurnDistanceCallback(meters, time, e3, unit)`):
+  exact meters to the maneuver.
+- `onStatus(int)`: 1 active, 2 inactive, 3 rerouting.
+- GPM, like DiPO, runs as `android.uid.system` (manifest), so it can write the bar lease
+  (`ar-state/progress`) that the navigation app's `ArHudTrap` overlays.
+
+### Changes
+
+- `ArHudAuto` (14th helper class): entry hooks on the three callbacks; both GPM cluster
+  calls (`updateTBTInfo()`, and the clear in `releaseGuidance()`) go to `ArHudAuto.update`.
+  Near a maneuver it sends the native type through the CarPlay table (`ArHudTurns.maneuver`,
+  US right-hand traffic): turn/slight/sharp left/right -> `TURN` 270/90, 315/45, 225/135;
+  straight -> `TURN` 0; U-turn -> `U_TURN` (left 270, right 90); fork -> `FORK_2` 270/90;
+  off-ramp -> exit sign 18/17 (or the slight arrow with `exit_style=slight`; unspecified side
+  -> `exit_side`); roundabouts -> 32/33 from GPM's own exit icon (only the documented exits).
+  Everything else, and anything beyond the window, is GPM's frame unchanged. Street turns use
+  `street_ar_meters` (200) and `bar_meters`; exits, forks and U-turns the 457 m window.
+  Distance: Android Auto's exact meters while fresh (5 s), gliding at 4 Hz in advanced mode
+  (`ArHudMotion`, back-step hold), converted to GPM's frame unit (unknown units: GPM's frame).
+  A jump of 50 m or more, a new maneuver or rerouting resets the glide. Expiry as for CarPlay
+  (300 s, or the maneuver passed while moving); status 2 stops ours.
+- `android_auto=on|off` tuning (`tune-android-auto-off`); the AR opt-in files apply to both.
+- Trace: `auto_turn`, `auto_distance`, `auto_input`, `auto_sent`, `auto_passed`, `auto_status`,
+  `auto_expired`, `auto_stopped`, `auto_alive`, and a once-a-second `aaturn` record (event,
+  side, angle, number, icon, exact, meters, result, output, direction, bar, unit); health
+  records from GPM's worker too. Numbers only.
+- Build: GPM joins the advanced build (fingerprinted plan `advanced-plan-114`, five sites; the
+  CarPlay sites are unchanged); the inspector refuses a GPM with any other cluster turn call.
+  `ArHudForwarder.send` is the fourth direct call in the helpers (checks updated).
+- Analyser: an `android_auto` process role with maneuvers, native frames, glide frames, GPM
+  frames passed, exact-distance cadence, expiries; `aaturn` records summarised.
+
+Not proven on the car: everything above. Specifically whether the AR HUD animates these
+frames when they come from GPM (HMG-API saw it on an Ioniq 5, not an EV6), how often Google
+Maps and Waze send distance updates, and how GPM's own HUD list and ahead list look next to
+the native types.
+
+Host validation: 1,660 Java checks and 56 Python cases.

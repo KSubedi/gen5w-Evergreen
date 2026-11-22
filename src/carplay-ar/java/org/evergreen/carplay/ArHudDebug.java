@@ -10,7 +10,7 @@ import com.hkmc.cluster.NavigationCluster;
  * five seconds), so a general release does not log at navigation cadence.
  */
 public final class ArHudDebug implements Thread.UncaughtExceptionHandler {
-    public static final String VERSION="v113";
+    public static final String VERSION="v114";
     private static long window=-1, sequence, flagCheckedAt=-1;
     private static int count, criticalCount, chatterCount, dropped, criticalDropped;
     private static boolean flagged;
@@ -243,9 +243,12 @@ public final class ArHudDebug implements Thread.UncaughtExceptionHandler {
                 message.startsWith("hud_list") || message.startsWith("hud_blank") || message.startsWith("reset") ||
                 message.startsWith("sender_prepare") || message.startsWith("tuning") || message.startsWith("rerouting") ||
                 message.startsWith("clear_") || message.startsWith("timer_expired") || message.startsWith("health") ||
-                message.startsWith("screen") || message.startsWith("recover") || message.startsWith("guidance_restart");
+                message.startsWith("screen") || message.startsWith("recover") || message.startsWith("guidance_restart") ||
+                message.startsWith("auto_turn") || message.startsWith("auto_status") || message.startsWith("auto_expired") ||
+                message.startsWith("auto_stopped") || message.startsWith("auto_clear");
         // Routine 4 Hz chatter gets its own small budget so it cannot crowd out transitions.
-        boolean chatter=message.startsWith("ipc_") || message.startsWith("worker_alive") || message.startsWith("hud_distance");
+        boolean chatter=message.startsWith("ipc_") || message.startsWith("worker_alive") || message.startsWith("hud_distance") ||
+                message.startsWith("auto_alive");
         if(critical ? criticalCount++>=100 : chatter ? chatterCount++>=20 : count++>=50){dropped++;if(critical)criticalDropped++;return;}
         Log.w("EvergreenAR",VERSION+" t="+now+" seq="+(++sequence)+" dropped="+dropped+" "+message+
                 " critical_dropped="+criticalDropped,null);

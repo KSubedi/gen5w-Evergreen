@@ -22,7 +22,7 @@ README = ("Unzip to an empty USB drive and run through NEMESIS while parked.\n"
           "The normal Evergreen package has no AR prototype to enable.\n")
 
 
-def tuning(values, exit_side=None, exit_style=None, recover=None):
+def tuning(values, exit_side=None, exit_style=None, recover=None, android_auto=None):
     lines = []
     for key, value in values.items():
         low, high = RANGES[key]
@@ -43,6 +43,10 @@ def tuning(values, exit_side=None, exit_style=None, recover=None):
         if recover not in RECOVER:
             raise ValueError("recover must be one of " + ", ".join(RECOVER))
         lines.append("recover=" + recover)
+    if android_auto is not None:
+        if android_auto not in ("on", "off"):
+            raise ValueError("android_auto must be on or off")
+        lines.append("android_auto=" + android_auto)
     if values.get("guidance_restart_s") not in (None, 0) and values["guidance_restart_s"] < 60:
         raise ValueError("guidance_restart_s must be 0 (off) or between 60 and 600")
     if not lines:
@@ -73,6 +77,7 @@ def main():
     p.add_argument("--exit-style", choices=EXIT_STYLES, help="exits as a slight-turn arrow or the native exit sign (default)")
     p.add_argument("--recover", choices=RECOVER, help="stalled CarPlay picture: off, key frame, + screen return (default), + reconnect")
     p.add_argument("--guidance-restart-s", type=float, help="restart silent phone guidance after this many seconds (60-600, 0 off; default 90)")
+    p.add_argument("--android-auto", choices=("on", "off"), help="Android Auto turns as AR (on, default) or GPM's icons only")
     p.add_argument("--tune-name", help="suffix for the tuning kit file name: Evergreen-AR-tune-<name>.zip")
     p.add_argument("--baseline-minutes", type=int, default=20, help="stock-navigation cluster capture length (1-60)")
     a = p.parse_args()
@@ -85,9 +90,9 @@ def main():
     values = {"street_ar_meters": a.street_ar_meters, "gain": a.gain, "backstep_meters": a.backstep_meters,
               "bar_meters": a.bar_meters, "turn_offset_meters": a.turn_offset_meters,
               "guidance_restart_s": a.guidance_restart_s}
-    if any(v is not None for v in values.values()) or a.exit_side is not None or a.exit_style is not None or a.recover is not None:
+    if any(v is not None for v in values.values()) or a.exit_side is not None or a.exit_style is not None or a.recover is not None or a.android_auto is not None:
         try:
-            text = tuning(values, a.exit_side, a.exit_style, a.recover)
+            text = tuning(values, a.exit_side, a.exit_style, a.recover, a.android_auto)
         except ValueError as error:
             p.exit(1, str(error) + "\n")
         name = "Evergreen-AR-tune" + ("-" + a.tune_name if a.tune_name else "") + ".zip"

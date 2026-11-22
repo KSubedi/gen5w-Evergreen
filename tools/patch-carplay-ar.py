@@ -16,7 +16,7 @@ FORWARD = "Lorg/evergreen/carplay/ArHudForwarder;->update(" + NC + SIG[1:]
 CALL = re.compile(r"^(\s*)invoke-virtual/range\s+(\{[^}\n]+\}),\s*"
                   + re.escape(NC + "->updateTBTInfo" + SIG) + r"\s*$", re.M)
 HELPER_NAMES = {name + ".smali" for name in ("ArHudTurns", "ArHudForwarder", "ArHudDistance", "ArHudProgress",
-                "ArHudMotion", "ArHudSample", "ArHudRoute", "ArHudIpc", "ArHudRuntime", "ArHudTrap", "ArHudDebug", "ArHudTuning", "ArHudRecovery")}
+                "ArHudMotion", "ArHudSample", "ArHudRoute", "ArHudIpc", "ArHudRuntime", "ArHudTrap", "ArHudDebug", "ArHudTuning", "ArHudRecovery", "ArHudAuto")}
 
 
 def inspect(tree):

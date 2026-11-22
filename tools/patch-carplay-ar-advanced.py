@@ -5,6 +5,7 @@ Contains only our inserted calls and structural/field metadata, no copied OEM
 methods. All method bodies remain in the private disassembly supplied by caller.
 """
 import hashlib
+import importlib.util
 from pathlib import Path
 import re
 import shutil
@@ -14,6 +15,15 @@ RUNTIME = "Lorg/evergreen/carplay/ArHudRuntime;"
 TRAP = "Lorg/evergreen/carplay/ArHudTrap;"
 DEBUG = "Lorg/evergreen/carplay/ArHudDebug;"
 RECOVERY = "Lorg/evergreen/carplay/ArHudRecovery;"
+AUTO = "Lorg/evergreen/carplay/ArHudAuto;"
+FORWARDER = "Lorg/evergreen/carplay/ArHudForwarder;"
+GPM = "com/google/android/projection/sink/navigation/GpmNaviTBTManager.smali"
+# Android Auto (GPM): entry hooks that hand ArHudAuto the raw maneuver, exact distance and status,
+# and the turn manager's two cluster calls (main frame, release clear) routed to ArHudAuto.update.
+GPM_HOOKS = (("onNextTurn(Ljava/lang/String;IIII)V", "invoke-static {p2, p3, p4, p5}, "+AUTO+"->turn(IIII)V"),
+             ("onNextTurnDistance(III)V", "invoke-static {p1, p2, p3}, "+AUTO+"->distance(III)V"),
+             ("onStatus(I)V", "invoke-static {p1}, "+AUTO+"->status(I)V"))
+GPM_CALLS = ("updateTBTInfo()V", "releaseGuidance()V")
 ZERO_GATE = re.compile(r"(?m)^    if-eqz v0, (:[A-Za-z0-9_]+)\n\n    if-eqz v1, \1$")
 U = "com/daudio/app/dipo/e/u.smali"
 C = "com/daudio/app/dipo/e/c.smali"
@@ -160,6 +170,50 @@ def patch_dipo(tree, plan):
         replace_method(tree/CPS, signature, lambda t, code=code, argument=argument: insert_entry(t,
             "const/4 v0, 0x%x\n\n    " % code + ("" if argument else "const/4 v1, 0x0\n\n    ") +
             "invoke-static {p0, v0, " + (argument or "v1") + "}, " + RECOVERY + "->screen(Ljava/lang/Object;II)V"))
+
+
+def inspect_gpm(tree):
+    """Fingerprints of the GPM turn manager methods the Android Auto adapter changes."""
+    tree = Path(tree); sites = []
+    text = (tree/GPM).read_text()
+    if AUTO in text:
+        raise ValueError("Android Auto adapter already present")
+    for signature, _ in GPM_HOOKS:
+        body = method(text, signature)[0]
+        registers = int(re.search(r"\.registers (\d+)", body)[1])
+        if registers > 16:
+            raise ValueError("Android Auto hook needs parameters in the low registers: " + signature)
+        sites.append({"file": GPM, "method": signature, "sha256": hashlib.sha256(body.encode()).hexdigest(), "registers": registers})
+    for signature in GPM_CALLS:
+        body = method(text, signature)[0]
+        if body.count(NC + "->updateTBTInfo(IIFFIIIII)V") != 1:
+            raise ValueError("expected one cluster turn call in " + signature)
+        sites.append({"file": GPM, "method": signature, "sha256": hashlib.sha256(body.encode()).hexdigest(),
+                      "registers": int(re.search(r"\.registers (\d+)", body)[1])})
+    others = [p for p in tree.rglob("*.smali") if p != tree/GPM and NC + "->updateTBTInfo" in
+              "\n".join(l for l in p.read_text().splitlines() if not l.lstrip().startswith("#"))]
+    if others:
+        raise ValueError("cluster turn calls outside the turn manager: " + ", ".join(str(p.relative_to(tree)) for p in others))
+    return sites
+
+
+def _simple():
+    """The icon-forwarder patcher (tools/patch-carplay-ar.py): copies the helpers and rewrites the calls."""
+    spec = importlib.util.spec_from_file_location("patch_carplay_ar", Path(__file__).with_name("patch-carplay-ar.py"))
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module); return module
+
+
+def patch_gpm(tree, helpers, plan):
+    tree = Path(tree)
+    if inspect_gpm(tree) != plan:
+        raise ValueError("advanced GPM plan is stale")
+    for signature, call in GPM_HOOKS:
+        replace_method(tree/GPM, signature, lambda t, call=call: insert_entry(t, call))
+    _simple().patch(tree, helpers, len(GPM_CALLS))
+    text = (tree/GPM).read_text()
+    if text.count(FORWARDER + "->update(") != len(GPM_CALLS):
+        raise ValueError("unexpected forwarded calls in the turn manager")
+    (tree/GPM).write_text(text.replace(FORWARDER + "->update(", AUTO + "->update("))
 
 
 NEW_SIG = "(Lcom/hkmc/cluster/NavigationCluster$NaviTbtTrapInfo;)V"

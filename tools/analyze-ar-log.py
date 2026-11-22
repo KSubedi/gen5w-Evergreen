@@ -16,6 +16,8 @@ import statistics
 RECORD = re.compile(r"EvergreenAR(?:\(\s*(?P<bpid>\d+)\))?: v(?P<v>\d+) t=(?P<t>\d+) seq=(?P<seq>\d+) dropped=(?P<drop>\d+) (?P<msg>.*?)(?: critical_dropped=(?P<cdrop>\d+))?$")
 THREADTIME = re.compile(r"^(?P<wall>\d\d-\d\d \d\d:\d\d:\d\d\.\d+)\s+(?P<pid>\d+)\s+(?P<tid>\d+)\s+W\s+(?P<rest>EvergreenAR.*)$")
 BRIEF = re.compile(r"^W/(?P<rest>EvergreenAR\(\s*(?P<pid>\d+)\): .*)$")
+# 114: Android Auto's once-a-second conversion record (GPM).
+AATURN = re.compile(r"EvergreenAR(?:\(\s*\d+\))?: aaturn (?P<msg>event=.*)$")
 TURN = re.compile(r"EvergreenAR(?:\(\s*\d+\))?: turn (?P<msg>icon=.*)$")
 # 109 records outside the event stream: a crash of the projection app, or where its sender thread is while input is quiet.
 # 113: the recorder's copy of the hotspot's kernel events (channel switch, disconnects).
@@ -42,6 +44,10 @@ def parse_file(path, events, turns):
         u = TURN.search(rest)
         if u:
             turns.append({"pid": int(m.group("pid")), "msg": u.group("msg")})
+            continue
+        a = AATURN.search(rest)
+        if a:
+            turns.append({"pid": int(m.group("pid")), "msg": a.group("msg"), "aa": True})
 
 
 def wifi_records(source):
@@ -305,6 +311,35 @@ def analyze_process(events):
     return out
 
 
+AA_EVENTS = {1: "depart", 2: "name_change", 3: "slight", 4: "turn", 5: "sharp", 6: "u_turn", 7: "on_ramp", 8: "off_ramp",
+             9: "fork", 10: "merge", 11: "roundabout_enter", 12: "roundabout_exit", 13: "roundabout", 14: "straight",
+             16: "ferry_boat", 17: "ferry_train", 19: "destination"}
+AA_SIDES = {1: "left", 2: "right", 3: "unspecified"}
+
+
+def analyze_auto(events):
+    """114: Android Auto (GPM) turns, what went out as native AR, distance cadence, expiries."""
+    turns = collections.Counter(); sent = collections.Counter(); passed = collections.Counter(); status = collections.Counter()
+    distances, expiries, stops = [], [], 0
+    for e in events:
+        k = e["msg"].split()[0]; d = kv(e["msg"])
+        if k == "auto_turn":
+            ev, sd = int(d.get("event", -1)), int(d.get("side", 0))
+            turns["%s %s" % (AA_EVENTS.get(ev, "event%d" % ev), AA_SIDES.get(sd, "side%d" % sd))] += 1
+        elif k == "auto_sent" and d.get("force") == "true": sent[d.get("type")] += 1
+        elif k == "auto_passed": passed[d.get("icon")] += 1
+        elif k == "auto_distance": distances.append(e["t"])
+        elif k == "auto_status": status[d.get("status")] += 1
+        elif k == "auto_expired": expiries.append({"wall": e["wall"], "input_age": int(d.get("input_age", -1)), "passed": d.get("passed") == "true"})
+        elif k == "auto_stopped": stops += 1
+    gaps = [b - a for a, b in zip(distances, distances[1:])]
+    glides = sum(1 for e in events if e["msg"].startswith("auto_sent") and "force=false" in e["msg"])
+    return {"maneuvers": dict(turns.most_common()), "native_sent": dict(sent.most_common()), "glide_sends": glides,
+            "gpm_frames_passed": dict(passed.most_common(12)), "status": dict(status),
+            "distance_updates": len(distances), "distance_median_interval_ms": statistics.median(gaps) if gaps else None,
+            "distance_silences_over_5s": sorted(g for g in gaps if g >= 5000)[-10:], "expiries": expiries, "stops": stops}
+
+
 def analyze(events, turns, threads=None, wifi=None):
     def label(t):
         f = kv("x " + t["msg"])
@@ -315,7 +350,14 @@ def analyze(events, turns, threads=None, wifi=None):
             if key in f and f[key] not in ("0", "-"):
                 text += " %s=%s" % (key, f[key])
         return text
-    report = {"processes": {}, "turn_records": dict(collections.Counter(label(t) for t in turns).most_common(40))}
+    def aa_label(t):
+        f = kv("x " + t["msg"])
+        ev = int(f.get("event", "-1")) if f.get("event", "-1").lstrip("-").isdigit() else -1
+        sd = int(f.get("side", "0")) if f.get("side", "0").isdigit() else 0
+        return "%s %s icon=%s result=%s output=%s dir=%s" % (AA_EVENTS.get(ev, "event%d" % ev), AA_SIDES.get(sd, "side%d" % sd),
+                                                             f.get("icon"), f.get("result"), f.get("output"), f.get("dir"))
+    report = {"processes": {}, "turn_records": dict(collections.Counter(label(t) for t in turns if not t.get("aa")).most_common(40)),
+              "android_auto_records": dict(collections.Counter(aa_label(t) for t in turns if t.get("aa")).most_common(40))}
     if threads:
         report["thread_records"] = threads
     if wifi:
@@ -325,12 +367,16 @@ def analyze(events, turns, threads=None, wifi=None):
     for name, L in sessions(events).items():
         kinds = collections.Counter(e["msg"].split()[0] for e in L)
         role = ("dipo" if "sender_prepare" in kinds or "exact" in kinds or "screen" in kinds else
+                "android_auto" if "auto_input" in kinds or "auto_turn" in kinds or "auto_alive" in kinds else
                 "navigation" if "trap_input" in kinds else "unknown")
         walls = [e["wall"] for e in L if e["wall"]]
         report["processes"][name] = dict(role=role, version="v%d" % L[0]["v"], wall_first=walls[0] if walls else None, wall_last=walls[-1] if walls else None,
                                          **(analyze_process(L) if role == "dipo" else {"records": len(L), "events": dict(kinds.most_common())}))
         if role == "dipo":
             report["processes"][name]["screen"] = analyze_screen(L, wifi or [])
+        if role == "android_auto":
+            report["processes"][name]["android_auto"] = analyze_auto(L)
+            report["processes"][name]["health"] = analyze_health(L)
     return report
 
 
@@ -393,6 +439,16 @@ def main():
     else:
         for pid, r in report["processes"].items():
             print("process %s %s (%s): %d records, %s .. %s" % (pid, r["version"], r["role"], r["records"], r["wall_first"], r["wall_last"]))
+            if r["role"] == "android_auto":
+                a = r["android_auto"]
+                print("  maneuvers from Android Auto:", a["maneuvers"])
+                print("  native AR frames (new maneuver/update):", a["native_sent"], "glide frames:", a["glide_sends"])
+                print("  GPM frames passed unchanged (by icon):", a["gpm_frames_passed"])
+                print("  exact distance updates %d, median interval %s ms, silences >5 s: %s" % (
+                    a["distance_updates"], a["distance_median_interval_ms"], a["distance_silences_over_5s"]))
+                print("  status:", a["status"], "expiries (wall, input age ms, passed):", [(x["wall"], x["input_age"], x["passed"]) for x in a["expiries"]], "stops:", a["stops"])
+                if r.get("health"): print("  health: %d samples; CPU busy %% %s" % (r["health"]["samples"], r["health"]["busy_percent"]))
+                continue
             if r["role"] != "dipo": continue
             print("  uptime %d..%d s, max dropped %d" % (r["t_first"] // 1000, r["t_last"] // 1000, r["max_dropped"]))
             print("  exact receipts %d, median interval %s ms, silences >5 s: %s" % (r["exact"]["count"], r["exact"]["median_interval_ms"], r["exact"]["silences_over_5s"]))
@@ -426,6 +482,9 @@ def main():
         if report["turn_records"]:
             print("turn records:")
             for k, n in report["turn_records"].items(): print("  %5d  %s" % (n, k))
+        if report.get("android_auto_records"):
+            print("Android Auto turn records:")
+            for k, n in report["android_auto_records"].items(): print("  %5d  %s" % (n, k))
         for k, n in report.get("thread_records", {}).items(): print("thread record x%d: %s" % (n, k))
         if report.get("wifi"):
             w = report["wifi"]

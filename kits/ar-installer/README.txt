@@ -1,10 +1,33 @@
-EVERGREEN 1.3.0.113 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.3.0.114 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.114: ANDROID AUTO AR (first test build)
+Android Auto's turns already reached the HUD and its turn list, but as
+projection icons, which the AR HUD does not animate. Near a maneuver they now
+go out as the car's own types, the same way as CarPlay's:
+- Right/left/slight/sharp turns and straight: the large rotating AR arrow
+  from 200 m (street_ar_meters), at Android Auto's exact distance, gliding
+  smoothly between its once-a-second updates.
+- Highway exits: the native right/left exit sign within 457 m. Android Auto
+  says which side, so no guessing (exit_style=slight gives the arrow).
+- Forks (keep left/right), U-turns, roundabouts (from the exit Android Auto
+  gives): native types within 457 m.
+- On-ramps, merges, ferries, destinations and anything farther away keep the
+  Android Auto icon, as before.
+- The progress bar fills like CarPlay's. If the phone's guidance stops while
+  you drive, the arrow is cleared once the maneuver is behind you.
+- tune-android-auto-off turns this off (Android Auto icons only); disable
+  turns off AR for both CarPlay and Android Auto.
+What we need from a test drive with Android Auto (Google Maps or Waze): the
+AR logs (get-logs kit), and for anything odd the clock time, the maneuver
+(e.g. "right exit"), what the phone showed and what the HUD showed. The logs
+record Android Auto's maneuver type, side and exact distance and what was
+sent to the HUD; never road names.
 
 NEW IN 1.3.0.113 (from two more owners' logs)
 Numbered 1.3.0.x because it now builds on Evergreen 1.3.0; it installs over
@@ -34,7 +57,7 @@ Numbered 1.3.0.x because it now builds on Evergreen 1.3.0; it installs over
   hotspot's channel settings (no network name, password or address) so we
   can find where the switching comes from. Please run it after a drive with
   a freeze or drop and send HOTSPOT/hotspot.txt.
-- The export kit accepts 104 to 1.3.0.113.
+- The export kit accepts 104 to 1.3.0.114.
 What we need from a test drive: the AR logs (get-logs kit) and, for every
 freeze or drop, the clock time, whether the picture came back by itself
 (with or without a short black flash) and whether the HUD kept working.
@@ -271,17 +294,19 @@ such as --street-ar-meters 90 --gain 0.7 --backstep-meters 10) writes a small
 ar-tuning file next to the AR flags. Allowed ranges: street_ar_meters 30-457,
 gain 0.5-1, backstep_meters 0-50, bar_meters 30-457, turn_offset_meters 0-60,
 exit_side auto|right|left|generic, exit_style slight|sign,
-recover off|keyframe|screen|reconnect, guidance_restart_s 0 or 60-600;
-anything else keeps the built-in default (200 m, 0.8, 15 m, 457 m, 0 m,
-auto, sign, screen, 90). Values apply
+recover off|keyframe|screen|reconnect, guidance_restart_s 0 or 60-600,
+android_auto on|off; anything else keeps the built-in default (200 m, 0.8,
+15 m, 457 m, 0 m, auto, sign, screen, 90, on). The distance and exit
+settings apply to Android Auto as well. Values apply
 within two seconds; start a fresh route. A tune kit replaces the whole file, so
-one kit is in effect at a time. The 1.3.0.113 kits zip has ready-made variants:
+one kit is in effect at a time. The 1.3.0.114 kits zip has ready-made variants:
 tune-street-125 (the 110 start distance), tune-street-300, tune-bar-300 and
 tune-bar-200 (the bar runs 60 to 10 or 90 to 10 inside the 200 m window),
 tune-offset-15/-30 (arrow placed 15/30 m further), tune-exit-slight (the 109
 exit arrow), tune-exit-generic (the 107 exit icon), tune-exit-left,
 tune-recover-keyframe (key frame only), tune-recover-reconnect (adds the
-session restart), tune-recover-off, tune-guidance-restart-off and tune-reset.
+session restart), tune-recover-off, tune-guidance-restart-off,
+tune-android-auto-off and tune-reset.
 Evergreen-AR-hotspot.zip writes HOTSPOT/hotspot.txt with the hotspot's
 channel settings and history (read-only; works with any Evergreen build;
 see notes/hotspot-channel-debugging.md in the repository).
@@ -299,7 +324,7 @@ compare the CarPlay conversion against.
 AFTER THE DRIVE
 1. Park in READY. Extract the NEW Evergreen-AR-export-stop-clean.zip onto a
    separate empty USB, so that NEMESIS.sh and NEMESIS.data are at its root.
-   This version supports 104 to 1.3.0.113.
+   This version supports 104 to 1.3.0.114.
 2. Insert it and let NEMESIS run the export. Wait for "Export and cleanup complete" before
    removing USB. The kit flushes writes before showing completion.
 3. Zip the AR-DEBUG-FINISHED folder and send it privately, using an upload link if it is

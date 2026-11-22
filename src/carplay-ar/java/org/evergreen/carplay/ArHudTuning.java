@@ -35,6 +35,7 @@ public final class ArHudTuning {
     public static final int DEFAULT_EXIT_STYLE = EXIT_STYLE_SIGN;
     private static int exitSide = EXIT_AUTO, exitStyle = DEFAULT_EXIT_STYLE, recover = DEFAULT_RECOVER;
     private static float guidanceRestartS = DEFAULT_GUIDANCE_RESTART_S;
+    private static boolean androidAuto = true;
     private static long checkedAt = -1, seenModified = -2, seenLength = -2;
 
     private ArHudTuning() {}
@@ -56,6 +57,8 @@ public final class ArHudTuning {
 
     /** RECOVER_OFF, RECOVER_KEYFRAME, RECOVER_SCREEN or RECOVER_RECONNECT. */
     public static synchronized int recoverMode(long now) { refresh(now); return recover; }
+    /** Android Auto turns as AR (android_auto=on, the default) or GPM's icons only (off). */
+    public static synchronized boolean androidAuto(long now) { refresh(now); return androidAuto; }
     /** Milliseconds of silent active guidance before a restart; 0: never. */
     public static synchronized long guidanceRestartMs(long now) { refresh(now); return (long) (guidanceRestartS * 1000f); }
 
@@ -74,16 +77,16 @@ public final class ArHudTuning {
             float[] values = parse(present && length <= MAX_BYTES ? read(file) : null);
             streetArMeters = values[0]; gain = values[1]; backstepMeters = values[2];
             barMeters = values[3]; turnOffsetMeters = values[4]; exitSide = (int) values[5];
-            exitStyle = (int) values[6]; recover = (int) values[7]; guidanceRestartS = values[8];
+            exitStyle = (int) values[6]; recover = (int) values[7]; guidanceRestartS = values[8]; androidAuto = values[9] != 0f;
             ArHudDebug.event("tuning present=" + present + " street_ar_meters=" + streetArMeters
                     + " gain=" + gain + " backstep_meters=" + backstepMeters + " bar_meters=" + barMeters
                     + " turn_offset_meters=" + turnOffsetMeters + " exit_side=" + exitSideName(exitSide)
                     + " exit_style=" + exitStyleName(exitStyle) + " recover=" + recoverName(recover)
-                    + " guidance_restart_s=" + (int) guidanceRestartS);
+                    + " guidance_restart_s=" + (int) guidanceRestartS + " android_auto=" + (androidAuto ? "on" : "off"));
         } catch (RuntimeException unavailable) {
             streetArMeters = DEFAULT_STREET_AR_METERS; gain = DEFAULT_GAIN; backstepMeters = DEFAULT_BACKSTEP_METERS;
             barMeters = DEFAULT_BAR_METERS; turnOffsetMeters = DEFAULT_TURN_OFFSET_METERS; exitSide = EXIT_AUTO;
-            exitStyle = DEFAULT_EXIT_STYLE; recover = DEFAULT_RECOVER; guidanceRestartS = DEFAULT_GUIDANCE_RESTART_S;
+            exitStyle = DEFAULT_EXIT_STYLE; recover = DEFAULT_RECOVER; guidanceRestartS = DEFAULT_GUIDANCE_RESTART_S; androidAuto = true;
         }
     }
 
@@ -123,12 +126,12 @@ public final class ArHudTuning {
     }
 
     /** {street AR meters, gain, backstep meters, bar meters, turn offset meters, exit side, exit style,
-     * recover mode, guidance restart seconds}.
+     * recover mode, guidance restart seconds, Android Auto AR (1 on, 0 off)}.
      * Unknown keys and bad values are ignored. */
     static float[] parse(String text) {
         float[] values = {DEFAULT_STREET_AR_METERS, DEFAULT_GAIN, DEFAULT_BACKSTEP_METERS,
                 DEFAULT_BAR_METERS, DEFAULT_TURN_OFFSET_METERS, EXIT_AUTO, DEFAULT_EXIT_STYLE,
-                DEFAULT_RECOVER, DEFAULT_GUIDANCE_RESTART_S};
+                DEFAULT_RECOVER, DEFAULT_GUIDANCE_RESTART_S, 1f};
         if (text == null) return values;
         String[] lines = text.split("\n");
         for (int i = 0; i < lines.length; i++) {
@@ -142,6 +145,11 @@ public final class ArHudTuning {
                 else if (text1.equals("left")) values[5] = EXIT_LEFT;
                 else if (text1.equals("generic")) values[5] = EXIT_GENERIC;
                 else if (text1.equals("auto")) values[5] = EXIT_AUTO;
+                continue;
+            }
+            if (key.equals("android_auto")) {
+                if (text1.equals("on")) values[9] = 1f;
+                else if (text1.equals("off")) values[9] = 0f;
                 continue;
             }
             if (key.equals("recover")) {

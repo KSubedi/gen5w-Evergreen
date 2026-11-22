@@ -29,6 +29,12 @@ public final class ArHudForwarder {
         ArHudRuntime.mainSent();
     }
 
+    /** The Android Auto adapter's frames, exactly as given. */
+    static void send(NavigationCluster cluster, int type, int sideStreet, float direction, float distance,
+            int distanceError, int combiSideStreet, int unit, int bar, int barError) {
+        cluster.updateTBTInfo(type, sideStreet, direction, distance, distanceError, combiSideStreet, unit, bar, barError);
+    }
+
     static void forward(boolean enabled, NavigationCluster cluster, int type, int sideStreet,
             float direction, float distance, int distanceError, int combiSideStreet,
             int unit, int bar, int barError) {

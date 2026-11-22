@@ -14,6 +14,7 @@ java -cp "$tmp" org.evergreen.carplay.ArHudAdvancedTest
 java -cp "$tmp" org.evergreen.carplay.ArHudRuntimeTest
 java -cp "$tmp" org.evergreen.carplay.ArHudReplayTest
 java -cp "$tmp" org.evergreen.carplay.ArHudDebugTest
+java -cp "$tmp" org.evergreen.carplay.ArHudAutoTest
 python3 "$ROOT/tools/test-carplay-ar.py"
 python3 "$ROOT/tools/test-carplay-ar-advanced.py"
 python3 "$ROOT/tools/test-analyze-ar-log.py"

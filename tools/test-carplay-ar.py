@@ -442,8 +442,11 @@ class ControlTest(unittest.TestCase):
         (self.usb/'AR_TUNING').write_text('bar_meters=125\nturn_offset_meters=20\nexit_side=left\nexit_style=sign\n')
         self.assertEqual(self.control('tune').returncode,0)
         self.assertEqual(tuning.read_text(),'bar_meters=125\nturn_offset_meters=20\nexit_side=left\nexit_style=sign\n')
+        (self.usb/'AR_TUNING').write_text('android_auto=off\nrecover=keyframe\nguidance_restart_s=120\n')
+        self.assertEqual(self.control('tune').returncode,0)
+        self.assertEqual(tuning.read_text(),'android_auto=off\nrecover=keyframe\nguidance_restart_s=120\n')
         (self.usb/'AR_TUNING').write_text('street_ar_meters=90\ngain=0.7\n');self.assertEqual(self.control('tune').returncode,0)
-        for bad in ('street_ar_meters=90\nrm -rf /=1\n','gain=abc\n','gain=0.7;reboot\n','speed=1\n','exit_side=up\n','exit_side=left;reboot\n','bar_meters=left\n','exit_style=generic\n','exit_style=sign;reboot\n','exit_style=1\n'):
+        for bad in ('android_auto=maybe\n','recover=always\n','street_ar_meters=90\nrm -rf /=1\n','gain=abc\n','gain=0.7;reboot\n','speed=1\n','exit_side=up\n','exit_side=left;reboot\n','bar_meters=left\n','exit_style=generic\n','exit_style=sign;reboot\n','exit_style=1\n'):
             (self.usb/'AR_TUNING').write_text(bad)
             self.assertNotEqual(self.control('tune').returncode,0,bad)
             self.assertEqual(tuning.read_text(),'street_ar_meters=90\ngain=0.7\n')

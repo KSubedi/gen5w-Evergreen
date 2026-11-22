@@ -126,6 +126,21 @@ def dipo(tree):
           ''.join('.field private '+x+':I\n' for x in ('DM','DR','DS','DU','DV'))+'.field private DT:[I\n')
 
 
+def gpm(tree):
+    """A synthetic GPM turn manager with the five methods the Android Auto adapter touches."""
+    nc='Lcom/hkmc/cluster/NavigationCluster;'
+    call='    invoke-virtual/range {v0 .. v9}, '+nc+'->updateTBTInfo(IIFFIIIII)V\n'
+    zero=''.join('    const/4 v%d, 0x0\n'%i for i in range(10))
+    write(tree/adapter.GPM,'.class public Lcom/google/android/projection/sink/navigation/GpmNaviTBTManager;\n.super Ljava/lang/Object;\n'
+          '.method public onNextTurn(Ljava/lang/String;IIII)V\n    .registers 12\n    return-void\n.end method\n'
+          '.method public onNextTurnDistance(III)V\n    .registers 6\n    return-void\n.end method\n'
+          '.method public onStatus(I)V\n    .registers 4\n    return-void\n.end method\n'
+          '.method private updateTBTInfo()V\n    .registers 11\n'+zero+call+'    return-void\n.end method\n'
+          '.method private releaseGuidance()V\n    .registers 12\n'+zero+call+'    return-void\n.end method\n')
+    write(tree/'com/google/android/projection/sink/navigation/a.smali','.class final Lcom/google/android/projection/sink/navigation/a;\n.super Ljava/lang/Object;\n'
+          '.method public x()V\n    .registers 1\n    # invokes: Lcom/google/android/projection/sink/navigation/GpmNaviTBTManager;->updateTBTInfo()V\n    return-void\n.end method\n')
+
+
 def navi(tree):
     write(tree/'synthetic/Nav.smali','''.class public Lsynthetic/Nav;
 .super Ljava/lang/Object;
@@ -162,7 +177,8 @@ class AdvancedTest(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name);self.dipo=self.root/'dipo';self.navi=self.root/'navi';self.fw=self.root/'fw'
-        dipo(self.dipo);navi(self.navi);framework(self.fw)
+        self.gpm=self.root/'gpm'
+        dipo(self.dipo);navi(self.navi);framework(self.fw);gpm(self.gpm)
 
     def test_adapter_hooks_assemble_and_reject_repeat(self):
         plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),16)
@@ -189,6 +205,29 @@ class AdvancedTest(unittest.TestCase):
             with self.assertRaises(ValueError,msg=path):adapter.inspect_dipo(self.dipo)
         dipo(self.dipo);f=self.dipo/adapter.CPS;f.write_text(f.read_text().replace('    .registers 4\n    const/4 v0, 0x0\n    return-void\n.end method\n.method public onNotify','    .registers 1\n    return-void\n.end method\n.method public onNotify',1))
         with self.assertRaises(ValueError):adapter.inspect_dipo(self.dipo)
+
+    def test_android_auto_hooks_and_calls_assemble(self):
+        plan=adapter.inspect_gpm(self.gpm);self.assertEqual(len(plan),5)
+        adapter.patch_gpm(self.gpm,HELPERS,plan)
+        base.run('smali','a','-j','1','--api','18','-o',self.root/'gpm.dex',self.gpm)
+        text=(self.gpm/adapter.GPM).read_text()
+        self.assertEqual(text.count('ArHudAuto;->update('),2);self.assertNotIn('ArHudForwarder;->update(',text)
+        self.assertIn('invoke-static {p2, p3, p4, p5}, Lorg/evergreen/carplay/ArHudAuto;->turn(IIII)V',text)
+        self.assertIn('invoke-static {p1, p2, p3}, Lorg/evergreen/carplay/ArHudAuto;->distance(III)V',text)
+        self.assertIn('invoke-static {p1}, Lorg/evergreen/carplay/ArHudAuto;->status(I)V',text)
+        self.assertTrue((self.gpm/'org/evergreen/carplay/ArHudAuto.smali').is_file())
+        with self.assertRaises(ValueError):adapter.patch_gpm(self.gpm,HELPERS,plan)
+
+    def test_android_auto_refuses_unknown_gpm(self):
+        plan=adapter.inspect_gpm(self.gpm)
+        f=self.gpm/adapter.GPM;f.write_text(f.read_text().replace('.method public onStatus(I)V\n    .registers 4','.method public onStatus(I)V\n    .registers 5'))
+        with self.assertRaises(ValueError):adapter.patch_gpm(self.gpm,HELPERS,plan)
+        gpm(self.gpm);extra=self.gpm/'com/google/android/projection/sink/Other.smali'
+        write(extra,'.class public Lcom/google/android/projection/sink/Other;\n.super Ljava/lang/Object;\n.method public y()V\n    .registers 10\n'
+              +''.join('    const/4 v%d, 0x0\n'%i for i in range(10))+'    invoke-virtual/range {v0 .. v9}, Lcom/hkmc/cluster/NavigationCluster;->updateTBTInfo(IIFFIIIII)V\n    return-void\n.end method\n')
+        with self.assertRaises(ValueError):adapter.inspect_gpm(self.gpm)
+        extra.unlink();f.write_text(f.read_text().replace('.method public onNextTurnDistance(III)V','.method public onNextTurnDistance(IIII)V'))
+        with self.assertRaises(ValueError):adapter.inspect_gpm(self.gpm)
 
     def test_stale_or_unknown_metadata_fails_before_edits(self):
         plan=adapter.inspect_dipo(self.dipo)
@@ -273,10 +312,10 @@ class AdvancedTest(unittest.TestCase):
         script=work/'service.sh';script.write_text(source)
         subprocess.run(['sh',str(script)],timeout=10,capture_output=True)
         lines=(work/'logged').read_text().splitlines()
-        self.assertEqual(lines,['-p w -t EvergreenAR v113 wifi kernel_s=10.602161 event=ap_up',
-                                '-p w -t EvergreenAR v113 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
-                                '-p w -t EvergreenAR v113 wifi kernel_s=4121.925019 event=deauth reason=4',
-                                '-p w -t EvergreenAR v113 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
+        self.assertEqual(lines,['-p w -t EvergreenAR v114 wifi kernel_s=10.602161 event=ap_up',
+                                '-p w -t EvergreenAR v114 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
+                                '-p w -t EvergreenAR v114 wifi kernel_s=4121.925019 event=deauth reason=4',
+                                '-p w -t EvergreenAR v114 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
         self.assertNotIn(':af',(work/'logged').read_text())
         self.assertFalse((work/'logs/.wifi').exists())
 
@@ -305,7 +344,7 @@ class AdvancedTest(unittest.TestCase):
         for name in ('core.odex','automotive.jar','automotive.odex'):(stock/'framework'/name).write_bytes(b'our synthetic framework '+name.encode())
         patches=self.root/'input-patches';shutil.copytree(ROOT/'patches',patches)
         lines=[];wanted=[]
-        for name,tree in (('HKMC_DiPO',self.dipo),('HKMC_Navi_ExSL',self.navi)):
+        for name,tree in (('HKMC_DiPO',self.dipo),('HKMC_Navi_ExSL',self.navi),('HKMC_GPM',self.gpm)):
             original=stock/'app'/(name+'.odex');original.write_bytes(('our synthetic original '+name).encode())
             apk=stock/'app'/(name+'.apk')
             with zipfile.ZipFile(apk,'w') as z:z.writestr('AndroidManifest.xml','our synthetic app manifest')
@@ -324,7 +363,9 @@ class AdvancedTest(unittest.TestCase):
             with self.assertRaises(ValueError):advanced.build(stock,self.root/'stale',HELPERS,stale,patches,LPATCH)
             self.assertFalse((self.root/'stale').exists())
             output=self.root/'advanced';report=advanced.build(stock,output,HELPERS,plan,patches,LPATCH)
-        self.assertEqual(len(report['builds']),3);verify.validate(output/'patches',output/'ar-build.json')
+        self.assertEqual(len(report['builds']),4);verify.validate(output/'patches',output/'ar-build.json')
+        self.assertEqual(next(b for b in report['builds'] if b['name']=='HKMC_GPM')['calls'],2)
+        self.assertTrue(report['features']['android_auto_ar'])
         self.assertFalse(list(output.rglob('*.apk')));self.assertFalse(list(output.rglob('*.dex')))
         package=self.root/'advanced.zip';installer.build(output/'patches',package,True)
         with zipfile.ZipFile(package) as outer:
@@ -339,7 +380,7 @@ class AdvancedTest(unittest.TestCase):
         with zipfile.ZipFile(quiet) as outer:
             with zipfile.ZipFile(io.BytesIO(outer.read('packages/wireless.carplay.aa.zip'))) as inner:
                 self.assertNotIn('ar-trace.enabled',inner.namelist());self.assertFalse(json.loads(inner.read('AR_BUILD.json'))['trace_enabled'])
-        bad=copy.deepcopy(report);bad['builds']=bad['builds'][:2]
+        bad=copy.deepcopy(report);bad['builds']=bad['builds'][:3]
         (output/'bad.json').write_text(json.dumps(bad))
         with self.assertRaises(ValueError):verify.validate(output/'patches',output/'bad.json')
 

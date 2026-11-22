@@ -19,8 +19,8 @@ from the [latest AR pre-release](https://github.com/KSubedi/gen5w-Evergreen/rele
 The normal package builder still builds standard Evergreen; the AR installer is
 explicitly selected and gated to that EV6 firmware.
 
-Besides the AR HUD (native turn, fork and exit arrows with the phone's exact distance),
-the AR build also recovers a frozen CarPlay picture by itself (a fresh video frame, then a
+The AR HUD (native turn, fork and exit arrows with the phone's exact distance) works for
+CarPlay and, since 1.3.0.114 (first test build), for Android Auto. The AR build also recovers a frozen CarPlay picture by itself (a fresh video frame, then a
 short screen hand-back), asks the phone to resend turn-by-turn when it goes silent, and
 records the hotspot's channel changes for the freeze investigation. See the
 [development and replay notes](notes/carplay-ar.md) and

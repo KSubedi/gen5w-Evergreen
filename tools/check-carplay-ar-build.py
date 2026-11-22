@@ -30,17 +30,19 @@ def validate(patches, report):
         raise ValueError("prototype report must explicitly be untested and opted in when enabled")
     features = data.get("features", {})
     advanced = data['schema']==2
-    if features != {"icon_ar": True, "metadata_adapter": advanced, "distance_adapter": advanced, "progress_adapter": advanced}:
+    wanted_features = {"icon_ar": True, "metadata_adapter": advanced, "distance_adapter": advanced, "progress_adapter": advanced}
+    if advanced: wanted_features.update({"carplay_recovery": True, "android_auto_ar": True})
+    if features != wanted_features:
         raise ValueError("unknown AR adapter capabilities; inspect this build before packaging")
     builds = data.get("builds", [])
     wanted={(part,'HKMC_DiPO') for part in PARTS}
     if advanced:
-        wanted.add(('2_tbt','HKMC_Navi_ExSL'))
+        wanted.add(('2_tbt','HKMC_Navi_ExSL'));wanted.add(('2_tbt','HKMC_GPM'))
         api=data.get('framework_api',{})
         if variant!='ev6' or api.get('bar_index')!=11 or not data.get('framework_sha256'):
             raise ValueError('advanced AR requires the verified EV6 framework API')
     if len(builds)!=len(wanted) or {(b.get('part'),b.get('name','HKMC_DiPO')) for b in builds}!=wanted:
-        raise ValueError("AR report must cover every required DiPO/navigation build")
+        raise ValueError("AR report must cover every required DiPO/navigation/Android Auto build")
     lines = [line.split() for line in (patches / variant / "manifest").read_text().splitlines()]
     for build in builds:
         relative = Path(build["patch"])

@@ -120,6 +120,25 @@ class AnalyzeTest(unittest.TestCase):
         result=subprocess.run([sys.executable,'-I',str(ROOT/'tools/analyze-ar-log.py'),str(self.dir)],capture_output=True,text=True)
         self.assertIn("picture recovered (wall, after ms, step): [('11-16 18:28:08.500', 6500, 2)]",result.stdout)
         self.assertIn("hotspot kernel events: {'ch_switch': 1, 'deauth': 1}",result.stdout)
+    def test_android_auto_process(self):
+        rec=lambda t,seq,msg:record(t,seq,msg,pid=1080,tid=1500).replace('v107','v114')
+        lines=[rec(1000,1,'auto_turn event=4 side=2 angle=0 number=0'),rec(1001,2,'auto_distance meters=600 e3=1970000 unit=6'),
+               rec(1002,3,'auto_input icon=67 distance=1970.0 unit=3 bar=0 enabled=true advanced=true'),rec(1003,4,'auto_passed icon=67 distance=1970.0 unit=3'),
+               rec(2001,5,'auto_distance meters=180 e3=590000 unit=6'),rec(2003,6,'auto_sent type=13 dir=90 meters=180.0 exact=true bar=30 force=true'),
+               rec(2250,7,'auto_sent type=13 dir=90 meters=176.0 exact=true bar=30 force=false'),rec(9001,8,'auto_distance meters=160 e3=0 unit=6'),
+               rec(9500,9,'auto_turn event=8 side=2 angle=0 number=0'),rec(30000,10,'auto_expired input_age=310000 passed=true'),
+               rec(31000,11,'auto_status status=2'),rec(31001,12,'auto_stopped type=17'),
+               '11-16 18:28:02.000  1080  1500 W EvergreenAR: aaturn event=4 side=2 angle=0 number=0 icon=67 exact=true meters=180 result=native output=13 dir=90 bar=30 unit=3']
+        with (self.dir/'flow.log').open('a') as f:f.write('\n'.join(lines)+'\n')
+        events,turns=tool.load(self.dir);report=tool.analyze(events,turns)
+        a=report['processes']['1080']['android_auto'];self.assertEqual(report['processes']['1080']['role'],'android_auto')
+        self.assertEqual(a['maneuvers'],{'turn right':1,'off_ramp right':1});self.assertEqual(a['native_sent'],{'13':1});self.assertEqual(a['glide_sends'],1)
+        self.assertEqual(a['gpm_frames_passed'],{'67':1});self.assertEqual(a['distance_updates'],3);self.assertEqual(a['distance_silences_over_5s'],[7000])
+        self.assertEqual(a['expiries'],[{'wall':'11-16 18:28:30.000','input_age':310000,'passed':True}]);self.assertEqual(a['stops'],1)
+        self.assertEqual(report['android_auto_records'],{'turn right icon=67 result=native output=13 dir=90':1})
+        self.assertNotIn('event=4',' '.join(report['turn_records']))
+        result=subprocess.run([sys.executable,'-I',str(ROOT/'tools/analyze-ar-log.py'),str(self.dir)],capture_output=True,text=True)
+        self.assertIn("maneuvers from Android Auto: {'turn right': 1, 'off_ramp right': 1}",result.stdout)
     def test_cli(self):
         result=subprocess.run([sys.executable,'-I',str(ROOT/'tools/analyze-ar-log.py'),str(self.dir),'--json'],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr);self.assertEqual(json.loads(result.stdout)['processes']['1060']['records'],27)
