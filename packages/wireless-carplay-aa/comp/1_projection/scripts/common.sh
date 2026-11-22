@@ -319,6 +319,91 @@ restore_setting() {
     return 1
 }
 
+# The head unit's own projection settings (Settings.System). Nothing in this package
+# writes them, but with the wireless feature flags on, the head unit's Phone Projection
+# pages do, and they stay after the flags go: wired CarPlay then "only charges"
+# (Open-HMG/HMG-API#77, a Korean K8). DiPO decides on wired CarPlay from
+# phoneprojection_setting_enable_usb_cable* where ro.product.opt.stepofspec is 25-34
+# outside the US and Canada (i/e.jo()), and from carplay_information* otherwise (US/CA,
+# isCarPlayEnabled). Snapshotted once and put back on uninstall, not on an update.
+PP_SETTINGS="phoneprojection_setting_enable_usb_cable phoneprojection_setting_enable_usb_cable_dr1 phoneprojection_setting_enable_usb_cable_dr2 phoneprojection_setting_enable_wireless phoneprojection_setting_enable_wireless_dr1 phoneprojection_setting_enable_wireless_dr2 carplay_information carplay_information_dr1 carplay_information_dr2"
+PP_FILE=$BACKUP_DIR/ppsettings
+
+# 0 when the package's uninstall is the first half of an update (NEMESIS has staged the
+# new version); the package's scripts/common.sh updating() does the same check.
+pp_updating() {
+    local _s=/data/local/tmp/nemesis/stage/wireless.carplay.aa
+    [ -f "$_s/NEMESIS.data" ] && return 0
+    ls "$_s"/*/NEMESIS.data >/dev/null 2>&1
+}
+
+snap_pp_settings() {
+    local _k _v _late _late2
+    if [ -s "$PP_FILE" ] || [ -s "$PP_FILE.unknown" ]; then
+        log "snapshot exists for the projection settings - keeping original"
+        return 0
+    fi
+    # `settings` needs Android; NEMESIS also installs while Android is down
+    if ! settings get system carplay_information >/dev/null 2>&1; then
+        putline unknown > "$PP_FILE.unknown" || return 1
+        log "projection settings not readable (Android down?) - uninstall leaves them as they are"
+        return 0
+    fi
+    # An install that predates this snapshot already ran with the flags: these may not be stock.
+    _late=0
+    [ -s "$BACKUP_DIR/restored" ] || [ -s "$BACKUP_DIR/saved" ] && _late=1
+    : > "$PP_FILE.tmp" || return 1
+    for _k in $PP_SETTINGS; do
+        _v=$(settings get system "$_k" 2>/dev/null) || _v=null
+        case "$_v" in
+            null|"") putline "$_k unset" >> "$PP_FILE.tmp" || return 1 ;;
+            -[0-9]*|[0-9]*) putline "$_k ${_v%%[!0-9-]*}" >> "$PP_FILE.tmp" || return 1 ;;
+            *) putline "$_k unset" >> "$PP_FILE.tmp" || return 1 ;;
+        esac
+    done
+    putline "late $_late" >> "$PP_FILE.tmp" || return 1
+    mv -f "$PP_FILE.tmp" "$PP_FILE" || return 1
+    _v=""
+    while read -r _k _late2; do [ "$_k" = late ] || _v="$_v $_k=$_late2"; done < "$PP_FILE"
+    log "projection settings snapshot:$_v"
+    [ "$_late" = 1 ] && log "projection settings snapshotted on an existing install: they may already hold the head unit's wireless-mode values"
+    return 0
+}
+
+# Not an install failure: these are the head unit's settings, and a missing one never breaks /system.
+restore_pp_settings() {
+    local _k _v _now
+    if pp_updating; then
+        log "update: projection settings left as they are for the new version"
+        return 0
+    fi
+    if [ -s "$PP_FILE.unknown" ]; then
+        log "projection settings were not readable at install - left as they are"
+        return 0
+    fi
+    [ -s "$PP_FILE" ] || { log "no projection settings snapshot (installed before it existed) - left as they are"; return 0; }
+    if ! settings get system carplay_information >/dev/null 2>&1; then
+        log "WARN: projection settings not writable now (Android down?) - left as they are; wired CarPlay: see the README"
+        return 0
+    fi
+    while read -r _k _v; do
+        case "$_k" in ''|late) continue ;; esac
+        _now=$(settings get system "$_k" 2>/dev/null) || _now=null
+        if [ "$_v" = unset ]; then
+            [ "$_now" = null ] && continue
+            # Android 4.4's settings tool has no delete; the content tool does
+            settings delete system "$_k" >/dev/null 2>&1 \
+                || content delete --uri content://settings/system --where "name='$_k'" >/dev/null 2>&1 \
+                || { log "WARN: could not clear $_k (now $_now)"; continue; }
+            log "cleared $_k (unset at install, was $_now)"
+        elif [ "$_now" != "$_v" ]; then
+            settings put system "$_k" "$_v" >/dev/null 2>&1 || { log "WARN: could not restore $_k=$_v (now $_now)"; continue; }
+            log "restored $_k=$_v (was $_now)"
+        fi
+    done < "$PP_FILE"
+    return 0
+}
+
 find_featurexml() {
     local _f
     local _t
@@ -478,6 +563,8 @@ snapshot_all() {
     esac
     if [ -s "$BACKUP_DIR/saved" ]; then
         log "backup already exists ($BACKUP_DIR) - keeping original"
+        # snapshots older than the projection settings' get them now
+        snap_pp_settings || return 1
         return 0
     fi
     if [ ! -s "$BP" ]; then
@@ -497,6 +584,7 @@ snapshot_all() {
     snap_getprop persist.ium.support "$BACKUP_DIR/gp.persist.ium.support" || return 1
     snap_getprop persist.wifi.state "$BACKUP_DIR/gp.persist.wifi.state" || return 1
     snap_setting || return 1
+    snap_pp_settings || return 1
     _fx=$(find_featurexml) || _fx=""
     if [ -n "$_fx" ] && [ -f "$_fx" ]; then
         putline "$_fx" > "$BACKUP_DIR/featurexml.path" || return 1
@@ -626,6 +714,7 @@ restore_all() {
     if [ -f "$BACKUP_DIR/wifi_client" ]; then
         restore_getprop persist.wifi.state "$BACKUP_DIR/gp.persist.wifi.state" || _rc=1
     fi
+    restore_pp_settings
     kick_apps
     rm -f "$BACKUP_DIR/rewrite.tmp" 2>/dev/null || true
     if [ "$_rc" -ne 0 ]; then

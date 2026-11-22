@@ -52,6 +52,7 @@ Anything else gets **basic mode**: only the wireless projection part, which give
 6. **When the head unit restarts, remove the drive.** Leaving it in can stop CarPlay or Android Auto from connecting the first time. The installer renames `NEMESIS.data` to `NEMESIS.data.installed` so it can't run again by accident.
 7. **Updating Evergreen:** with NEMESIS 1.16 or newer, install the new version over the old one; there's no need to uninstall first (confirmed on a car).
 8. **Uninstall** any time from NEMESIS Manager (My Packages → Uninstall), then restart: every file goes back to stock.
+   The head unit's own Phone Projection pages also change its projection settings while the wireless flags are on, and those can switch wired CarPlay off after an uninstall (the phone only charges). Installs from this version on record those settings and put them back on uninstall. On a car that installed an earlier version, put them back by hand from a NEMESIS root script or adb: on US and Canadian cars `settings put system carplay_information 1`; elsewhere `settings put system phoneprojection_setting_enable_usb_cable 1` (and the same with `_dr1` and `_dr2` for the driver profiles). Then restart the head unit.
 
 **Coming from the original Leafia (v1.0.5 or older)?** Evergreen uses the same package id, `wireless.carplay.aa`. Until updating in place has been tested on a car, **uninstall the old version in NEMESIS Manager and restart first**, then install this one as above. Uninstalling puts back your stock files, so the new install starts from a clean unit.
 
