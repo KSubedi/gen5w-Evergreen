@@ -955,3 +955,36 @@ in `onNextTurn`'s NAVDUMP branch; the AR hooks sit next to them.
 
 Not proven on the car: everything EV on the EV6 (arrival %, preconditioning, logs), and
 both features together in one GPM.
+
+## 1.3.0.116 test build: one drive for installing and for logs
+
+Owner request: no separate log kit; the installer drive installs the first time and gathers
+logs after that.
+
+How NEMESIS handles a drive (NEMESIS source, `native/usb.c`): `type=install` runs
+`nemesis install [--update] <zip>` after a dialog; `type=execute` runs the drive's script as
+root after a dialog. While Android is down, `usb_confirm` confirms by itself. There's no
+install lock, so a drive script can run `nemesis install` itself, and the descriptor parser
+skips `#` lines.
+
+`kits/ar-combo` (the release zip's `NEMESIS.data`, `NEMESIS.sh`, `AR_VERSION`, `hotspot.sh`):
+
+- Android not up (`sys.boot_completed` != 1): exit, nothing done. This covers the boot after
+  the install's own reboot with the drive still in.
+- `AR_INSTALL.json` has another version, or none, or `EVERGREEN-INSTALL` is on the drive:
+  copy any existing AR logs to `AR-LOGS-BEFORE-UPDATE-*`, then `nemesis install` (with
+  `--update` when the package is installed). The package's post-install reboots the unit.
+  Codes 20 (compatibility risk) and 21-23 (blocked) are explained on the drive.
+- This version installed: stop the recorder service, copy every log with md5 before/after
+  and of the copy, recheck, delete the internal logs, start the recorder again (the finish
+  kit instead disables it), write the hotspot report into the folder, and create
+  `egmp-aa-ev-logs` for the EV log service. A failed check deletes nothing.
+- `EVERGREEN-STATUS.txt` and a toast say what happened and what the next plug-in does.
+- The descriptor keeps a `#` line naming `packages/wireless.carplay.aa.zip`, because the
+  package's `EVERGREEN-NO-EV` and `LEAFIA-WIFI-CLIENT` lookups grep the drive's
+  `NEMESIS.data` for it.
+
+Tests: `tools/test-ar-combo.py` (sh and mksh), the installer build test checks the release
+zip's layout. Not proven on the car: `nemesis install` started from a drive script (the same
+command NEMESIS itself runs for an install drive), and the log export with recording
+restarted.

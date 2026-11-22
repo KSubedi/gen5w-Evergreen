@@ -1,0 +1,6 @@
+[nemesis]
+version=1.0
+type=execute
+path=NEMESIS.sh
+# Evergreen EV6 AR: one drive. Installs packages/wireless.carplay.aa.zip when this version
+# isn't installed yet; once it is, the same drive collects the logs.

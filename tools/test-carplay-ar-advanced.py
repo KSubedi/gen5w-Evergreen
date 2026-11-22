@@ -312,10 +312,10 @@ class AdvancedTest(unittest.TestCase):
         script=work/'service.sh';script.write_text(source)
         subprocess.run(['sh',str(script)],timeout=10,capture_output=True)
         lines=(work/'logged').read_text().splitlines()
-        self.assertEqual(lines,['-p w -t EvergreenAR v115 wifi kernel_s=10.602161 event=ap_up',
-                                '-p w -t EvergreenAR v115 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
-                                '-p w -t EvergreenAR v115 wifi kernel_s=4121.925019 event=deauth reason=4',
-                                '-p w -t EvergreenAR v115 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
+        self.assertEqual(lines,['-p w -t EvergreenAR v116 wifi kernel_s=10.602161 event=ap_up',
+                                '-p w -t EvergreenAR v116 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
+                                '-p w -t EvergreenAR v116 wifi kernel_s=4121.925019 event=deauth reason=4',
+                                '-p w -t EvergreenAR v116 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
         self.assertNotIn(':af',(work/'logged').read_text())
         self.assertFalse((work/'logs/.wifi').exists())
 
@@ -369,6 +369,11 @@ class AdvancedTest(unittest.TestCase):
         self.assertFalse(list(output.rglob('*.apk')));self.assertFalse(list(output.rglob('*.dex')))
         package=self.root/'advanced.zip';installer.build(output/'patches',package,True)
         with zipfile.ZipFile(package) as outer:
+            # One drive: NEMESIS runs our script, which installs or collects the logs.
+            self.assertIn('type=execute',outer.read('NEMESIS.data').decode());self.assertIn('wireless.carplay.aa.zip',outer.read('NEMESIS.data').decode())
+            self.assertEqual(outer.read('AR_VERSION').decode().strip(),installer.VERSION)
+            self.assertEqual(outer.read('NEMESIS.sh'),(ROOT/'kits/ar-combo/NEMESIS.sh').read_bytes())
+            self.assertTrue((outer.getinfo('NEMESIS.sh').external_attr>>16)&0o111);self.assertIn('hotspot.sh',outer.namelist())
             with zipfile.ZipFile(io.BytesIO(outer.read('packages/wireless.carplay.aa.zip'))) as inner:
                 self.assertIn('postinstall=scripts/ar-post.sh',inner.read('NEMESIS.data').decode())
                 self.assertIn('name=ar-baseline',inner.read('NEMESIS.data').decode())

@@ -1,10 +1,30 @@
-EVERGREEN 1.3.0.115 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.3.0.116 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.116: ONE DRIVE FOR INSTALLING AND FOR LOGS
+The installer drive now also collects the logs; there's no separate log kit.
+- First time you plug it in (parked, head unit fully started, approve the
+  NEMESIS prompt): it installs this version. The head unit restarts by
+  itself when it's done.
+- Every time after that, once this version is installed: it saves the AR
+  logs to a new AR-LOGS-<date-time> folder on the drive (checksum-verified),
+  clears them on the head unit and keeps recording for the next drive. It
+  also writes the hotspot report into that folder and creates the
+  egmp-aa-ev-logs folder, so the EV logs copy too: wait about 20 s after the
+  "logs saved" message before unplugging.
+- EVERGREEN-STATUS.txt on the drive says what it did and what the next plug-in
+  will do. While the head unit is still starting (for example the restart
+  right after the install) it does nothing.
+- An older build's logs are copied to AR-LOGS-BEFORE-UPDATE-<date-time> before
+  an update. To reinstall the same version, put an empty file named
+  EVERGREEN-INSTALL on the drive. To stop recording for good, use
+  Evergreen-AR-export-stop-clean.zip from the controls zip.
+- The export kit accepts 104 to 1.3.0.116.
 
 NEW IN 1.3.0.115: EV FEATURES FOR ANDROID AUTO (first EV6 build)
 Evergreen's EV features (from egmp-aa-ev-feat by willemcvu), until now only
@@ -78,7 +98,6 @@ Numbered 1.3.0.x because it now builds on Evergreen 1.3.0; it installs over
   hotspot's channel settings (no network name, password or address) so we
   can find where the switching comes from. Please run it after a drive with
   a freeze or drop and send HOTSPOT/hotspot.txt.
-- The export kit accepts 104 to 1.3.0.115.
 What we need from a test drive: the AR logs (get-logs kit) and, for every
 freeze or drop, the clock time, whether the picture came back by itself
 (with or without a short black flash) and whether the HUD kept working.
@@ -251,9 +270,11 @@ Unknown/far/native turns pass through. The HUD must have AR mode selected.
 INSTALL
 1. Save the working Evergreen installer so you can reinstall it if needed.
 2. Extract this zip to the root of a USB drive the car already reads. Put no
-   other NEMESIS kit on that drive. It should contain NEMESIS.data and packages/.
-3. Park in a safe place, keep the car in READY, and insert USB. NEMESIS must
-   already be installed. Approve installation/update of Evergreen CarPlay AR.
+   other NEMESIS kit on that drive. It should contain NEMESIS.data, NEMESIS.sh
+   and packages/. Keep the drive: the same drive collects the logs later.
+3. Park in a safe place, keep the car in READY, wait until the head unit has
+   fully started, and insert USB. NEMESIS must already be installed. Approve
+   the NEMESIS prompt; the drive installs Evergreen CarPlay AR.
    It replaces the same wireless.carplay.aa package; NEMESIS runs the previous
    version's uninstall first. Do not separately remove working backups.
 4. Wait for the install and head-unit restart. Remove USB while it restarts,
@@ -343,15 +364,15 @@ road names are not. This gives the stock exit types and start distances to
 compare the CarPlay conversion against.
 
 AFTER THE DRIVE
-1. Park in READY. Extract the NEW Evergreen-AR-export-stop-clean.zip onto a
-   separate empty USB, so that NEMESIS.sh and NEMESIS.data are at its root.
-   This version supports 104 to 1.3.0.115.
-2. Insert it and let NEMESIS run the export. Wait for "Export and cleanup complete" before
-   removing USB. The kit flushes writes before showing completion.
-3. Zip the AR-DEBUG-FINISHED folder and send it privately, using an upload link if it is
-   too large for chat. Keep VERIFIED.txt and FINISHED.txt too. STATUS.txt
-   show whether persistent recording was available. Old files rotate; export
-   soon after the issue. Logs normally survive restart, but recent logcat may not.
+1. Park in READY, wait until the head unit has fully started, and plug in the
+   same installer drive. Approve the NEMESIS prompt.
+2. Wait for the "logs saved" message, then about 20 s more for the EV logs.
+   EVERGREEN-STATUS.txt on the drive says where everything went.
+3. Zip the newest AR-LOGS-<date-time> folder (and egmp-aa-ev-logs, if you use
+   Android Auto) and send them privately, using an upload link if too large for
+   chat. Recording continues, so you can do this after every drive.
+   (Evergreen-AR-export-stop-clean.zip, in the controls zip, also exports but
+   stops recording for good. This version supports 104 to 1.3.0.116.)
 4. Tell us the approximate time, what Apple Maps showed versus HUD, left/right
    exit and whether switching out of CarPlay and back changed it. No interaction
    with diagnostics or observation tasks are needed from the driver in motion.

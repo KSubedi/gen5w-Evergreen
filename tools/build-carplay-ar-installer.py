@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.3.0.115"
+VERSION = "1.3.0.116"
 
 
 def verifier():
@@ -116,12 +116,18 @@ def build(patches, output, enable_ar, trace=True):
         report = Path(temp) / "deployment-report.json"
         report.write_bytes(files["AR_BUILD.json"])
         verifier().validate(patches, report)
-        outer_files = {"NEMESIS.data": descriptor.encode(), "packages/wireless.carplay.aa.zip": archive(files, modes),
-                       "README-AR.txt": readme}
+        # One drive: kits/ar-combo installs this version when it isn't installed, and collects
+        # the logs once it is (NEMESIS runs its script; the package itself is unchanged).
+        combo = ROOT / "kits/ar-combo"
+        if "path=packages/wireless.carplay.aa.zip" not in descriptor:
+            raise ValueError("unexpected base install descriptor")
+        outer_files = {"NEMESIS.data": (combo / "NEMESIS.data").read_bytes(), "NEMESIS.sh": (combo / "NEMESIS.sh").read_bytes(),
+                       "AR_VERSION": (VERSION + "\n").encode(), "hotspot.sh": (ROOT / "kits/ar-control/NEMESIS.sh").read_bytes(),
+                       "packages/wireless.carplay.aa.zip": archive(files, modes), "README-AR.txt": readme}
         output.parent.mkdir(parents=True, exist_ok=True)
         # Only publish a finished zip; never clobber an earlier installer.
         with output.open("xb") as stream:
-            stream.write(archive(outer_files))
+            stream.write(archive(outer_files, {"NEMESIS.sh": 0o755, "hotspot.sh": 0o755}))
     print(str(output))
     return data
 

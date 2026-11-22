@@ -21,3 +21,5 @@ python3 "$ROOT/tools/test-analyze-ar-log.py"
 
 python3 "$ROOT/tools/build-ar-finish.py"
 python3 "$ROOT/tools/test-ar-finish.py"
+python3 "$ROOT/tools/test-ar-combo.py"
+if command -v mksh >/dev/null 2>&1; then KIT_SH=$(command -v mksh) python3 "$ROOT/tools/test-ar-combo.py"; fi
