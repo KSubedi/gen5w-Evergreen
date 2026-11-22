@@ -293,6 +293,70 @@ public final class ArHudRuntimeTest {
         } finally {file.delete();ArHudTuning.path=null;ArHudTuning.reload();}
     }
 
+    /** Owner logs (EV6 US): the picture stalls while the session continues; the phone's guidance goes quiet. */
+    private static void recovery() throws Exception {
+        File file=File.createTempFile("evergreen-ar-","-tuning");
+        try {
+            ArHudTuning.path=file.getPath();write(file,"");ArHudTuning.reload();
+            ArHudRecovery.background=false;ArHudRecovery.reset();ArHudRecovery.calls=new StringBuilder();
+            ArHudRecovery.event(1000,ArHudRecovery.SESSION_STARTED,0);ArHudRecovery.event(1100,ArHudRecovery.SCREEN_STARTED,0);
+            ArHudRecovery.tick(2000);check(ArHudRecovery.calls.length()==0,"a running picture needs nothing");
+            ArHudRecovery.event(20000,ArHudRecovery.TIMEOUT,0);ArHudRecovery.event(20020,ArHudRecovery.SCREEN_STOPPED,0);
+            check(ArHudRecovery.calls.toString().equals("forceKeyFrame;"),"step 1: a key frame at once");
+            ArHudRecovery.event(21000,ArHudRecovery.TIMEOUT,0);
+            check(ArHudRecovery.calls.toString().equals("forceKeyFrame;"),"one stall, one key frame");
+            ArHudRecovery.tick(23900);check(ArHudRecovery.calls.toString().equals("forceKeyFrame;"),"waits before taking the screen");
+            ArHudRecovery.tick(24000);check(ArHudRecovery.calls.toString().endsWith("changeModeBorrowScreen;"),"step 2: borrow the screen");
+            ArHudRecovery.tick(25000);check(!ArHudRecovery.calls.toString().contains("Unborrow"),"holds it briefly");
+            ArHudRecovery.tick(25500);check(ArHudRecovery.calls.toString().endsWith("changeModeUnborrowScreen;"),"and gives it back");
+            ArHudRecovery.tick(60000);check(!ArHudRecovery.calls.toString().contains("disconnect"),"no reconnect by default");
+            int before=android.util.Log.calls;ArHudRecovery.event(60500,ArHudRecovery.SCREEN_STARTED,0);
+            check(android.util.Log.last.contains("recover_ok after_ms=40500 step=2"),"the recovery and its step are logged");
+            ArHudRecovery.calls.setLength(0);ArHudRecovery.event(61000,ArHudRecovery.TIMEOUT,0);
+            check(ArHudRecovery.calls.toString().equals("forceKeyFrame;"),"a later stall starts again at step 1");
+            ArHudRecovery.event(61500,ArHudRecovery.SCREEN_STARTED,0);
+            // A decode failure while the picture runs: a key frame, at most every five seconds, never more.
+            ArHudRecovery.calls.setLength(0);ArHudRecovery.event(70000,ArHudRecovery.DECODE,1);ArHudRecovery.event(71000,ArHudRecovery.DECODE,1);
+            ArHudRecovery.tick(80000);check(ArHudRecovery.calls.toString().equals("forceKeyFrame;"),"decode failure: one rate-limited key frame");
+            ArHudRecovery.event(80000,ArHudRecovery.SCREEN_STOPPED,0);ArHudRecovery.calls.setLength(0);
+            ArHudRecovery.event(81000,ArHudRecovery.DECODE,3);check(ArHudRecovery.calls.length()==0,"not while the picture is stopped (driver left CarPlay)");
+            // recover=reconnect adds step 3; recover=off does nothing.
+            write(file,"recover=reconnect\n");ArHudTuning.reload();ArHudRecovery.calls.setLength(0);
+            ArHudRecovery.event(90000,ArHudRecovery.TIMEOUT,0);ArHudRecovery.tick(94000);ArHudRecovery.tick(95500);
+            ArHudRecovery.tick(105400);check(!ArHudRecovery.calls.toString().contains("disconnect"),"step 3 waits ten seconds after step 2");
+            ArHudRecovery.tick(105500);check(ArHudRecovery.calls.toString().endsWith("disconnectCarPlay;"),"step 3: end the session");
+            ArHudRecovery.tick(108500);check(ArHudRecovery.calls.toString().endsWith("restartBonjour;"),"then advertise CarPlay again");
+            ArHudRecovery.event(110000,ArHudRecovery.SESSION_ENDED,0);ArHudRecovery.event(114000,ArHudRecovery.SESSION_STARTED,0);
+            write(file,"recover=off\n");ArHudTuning.reload();ArHudRecovery.calls.setLength(0);
+            ArHudRecovery.event(120000,ArHudRecovery.TIMEOUT,0);ArHudRecovery.tick(130000);
+            check(ArHudRecovery.calls.length()==0,"recover=off: nothing");
+            ArHudRecovery.event(130500,ArHudRecovery.SCREEN_STARTED,0);
+            // Guidance: silent for 90 s while active restarts once; any update re-arms; a stop never restarts.
+            write(file,"");ArHudTuning.reload();ArHudRecovery.calls.setLength(0);
+            ArHudRecovery.guidance(1,200000);ArHudRecovery.tick(289000);check(ArHudRecovery.calls.length()==0,"60-90 s of quiet (a red light) is left alone");
+            ArHudRecovery.tick(290000);check(ArHudRecovery.calls.toString().equals("restartGuidance;"),"90 s of silent active guidance: restart");
+            ArHudRecovery.tick(400000);check(ArHudRecovery.calls.toString().equals("restartGuidance;"),"once per silence");
+            ArHudRecovery.guidance(1,410000);ArHudRecovery.tick(500000);check(ArHudRecovery.calls.toString().equals("restartGuidance;restartGuidance;"),"re-armed by the next update");
+            ArHudRecovery.calls.setLength(0);ArHudRecovery.guidance(1,600000);ArHudRecovery.guidanceStopped();ArHudRecovery.tick(800000);
+            check(ArHudRecovery.calls.length()==0,"ended guidance is never restarted");
+            ArHudRecovery.guidance(1,900000);ArHudRecovery.event(900100,ArHudRecovery.SESSION_ENDED,0);ArHudRecovery.tick(1000000);
+            check(ArHudRecovery.calls.length()==0,"no restart without a session");
+            write(file,"guidance_restart_s=0\n");ArHudTuning.reload();ArHudRecovery.event(1000100,ArHudRecovery.SESSION_STARTED,0);
+            ArHudRecovery.guidance(1,1000200);ArHudRecovery.tick(2000000);check(ArHudRecovery.calls.length()==0,"guidance_restart_s=0 turns it off");
+            float[] t=ArHudTuning.parse("recover=keyframe\nguidance_restart_s=120\n");
+            check(t[7]==ArHudTuning.RECOVER_KEYFRAME&&t[8]==120f,"recovery tuning parses");
+            t=ArHudTuning.parse("recover=maybe\nguidance_restart_s=30\n");
+            check(t[7]==ArHudTuning.RECOVER_SCREEN&&t[8]==90f,"unknown mode and out-of-range seconds keep the defaults");
+            // The real calls fail safely without DiPO: logged, never thrown.
+            // A fresh rate-limit window: the stubbed clock keeps every record above in one second.
+            ArHudRecovery.calls=null;ArHudRecovery.reset();ArHudDebug.recheck();before=android.util.Log.calls;
+            ArHudRecovery.event(3000000,ArHudRecovery.SESSION_STARTED,0);ArHudRecovery.event(3000100,ArHudRecovery.TIMEOUT,0);
+            check(android.util.Log.last.contains("recover_failed forceKeyFrame no_service"),"no DiPO service: logged and skipped");
+            write(file,"");ArHudTuning.reload();ArHudDebug.recheck();ArHudRecovery.guidance(1,3000000);ArHudRecovery.tick(3100000);
+            check(android.util.Log.last.contains("guidance_restart_failed java.lang.ClassNotFoundException"),"no DiPO classes: logged and skipped");
+        } finally {file.delete();ArHudTuning.path=null;ArHudTuning.reload();ArHudRecovery.calls=null;ArHudRecovery.reset();}
+    }
+
     /** 111 drive: a tick whose clock reading predates the phone's latest sample blanked the arrow 25 times. */
     private static void lateTick() {
         ArHudRuntime.background=false;ArHudRuntime.reset();Cluster c=new Cluster();Object owner=new Object();
@@ -357,7 +421,7 @@ public final class ArHudRuntimeTest {
 
     public static void main(String[] args) throws Exception {
         ArHudDebug.flagPath=null; // Host tests read the trace without the car's flag file.
-        motion();route();runtime();traps();ipc();tuning();glide();deferredClear();selfHeal();lateTick();
+        motion();route();runtime();traps();ipc();tuning();glide();deferredClear();selfHeal();lateTick();recovery();
         System.out.println("AR runtime, metadata, interpolation, IPC and OEM frame preservation: "+checks+" checks passed");
     }
 }

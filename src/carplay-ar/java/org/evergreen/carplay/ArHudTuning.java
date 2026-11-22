@@ -22,13 +22,19 @@ public final class ArHudTuning {
     public static final int EXIT_AUTO = 0, EXIT_RIGHT = 1, EXIT_LEFT = 2, EXIT_GENERIC = 3;
     /** How a sided exit is drawn: slight-turn arrow (stock-sendable icons, native TURN), or the native exit sign near. */
     public static final int EXIT_STYLE_SLIGHT = 0, EXIT_STYLE_SIGN = 1;
+    /** Recovery of a stalled picture (ArHudRecovery): off, key frame only, + screen return (default), + reconnect. */
+    public static final int RECOVER_OFF = 0, RECOVER_KEYFRAME = 1, RECOVER_SCREEN = 2, RECOVER_RECONNECT = 3;
+    public static final int DEFAULT_RECOVER = RECOVER_SCREEN;
+    /** Silence of the phone's active route guidance before it is restarted (s); 0 turns it off. */
+    public static final float DEFAULT_GUIDANCE_RESTART_S = 90f, MIN_GUIDANCE_RESTART_S = 60f, MAX_GUIDANCE_RESTART_S = 600f;
     public static final int MAX_BYTES = 4096;
     static String path = ArHudIpc.ROOT + "/ar-tuning";
     private static float streetArMeters = DEFAULT_STREET_AR_METERS, gain = DEFAULT_GAIN, backstepMeters = DEFAULT_BACKSTEP_METERS;
     private static float barMeters = DEFAULT_BAR_METERS, turnOffsetMeters = DEFAULT_TURN_OFFSET_METERS;
     // The sign is what the 108 drive showed correctly; its freeze was missing phone input.
     public static final int DEFAULT_EXIT_STYLE = EXIT_STYLE_SIGN;
-    private static int exitSide = EXIT_AUTO, exitStyle = DEFAULT_EXIT_STYLE;
+    private static int exitSide = EXIT_AUTO, exitStyle = DEFAULT_EXIT_STYLE, recover = DEFAULT_RECOVER;
+    private static float guidanceRestartS = DEFAULT_GUIDANCE_RESTART_S;
     private static long checkedAt = -1, seenModified = -2, seenLength = -2;
 
     private ArHudTuning() {}
@@ -48,6 +54,11 @@ public final class ArHudTuning {
     /** EXIT_STYLE_SLIGHT or EXIT_STYLE_SIGN for a sided raw exit 8. */
     public static synchronized int exitStyle(long now) { refresh(now); return exitStyle; }
 
+    /** RECOVER_OFF, RECOVER_KEYFRAME, RECOVER_SCREEN or RECOVER_RECONNECT. */
+    public static synchronized int recoverMode(long now) { refresh(now); return recover; }
+    /** Milliseconds of silent active guidance before a restart; 0: never. */
+    public static synchronized long guidanceRestartMs(long now) { refresh(now); return (long) (guidanceRestartS * 1000f); }
+
     /** Forget the cached file state so the next read looks at the file again. */
     static synchronized void reload() { checkedAt = -1; seenModified = -2; seenLength = -2; }
 
@@ -63,15 +74,16 @@ public final class ArHudTuning {
             float[] values = parse(present && length <= MAX_BYTES ? read(file) : null);
             streetArMeters = values[0]; gain = values[1]; backstepMeters = values[2];
             barMeters = values[3]; turnOffsetMeters = values[4]; exitSide = (int) values[5];
-            exitStyle = (int) values[6];
+            exitStyle = (int) values[6]; recover = (int) values[7]; guidanceRestartS = values[8];
             ArHudDebug.event("tuning present=" + present + " street_ar_meters=" + streetArMeters
                     + " gain=" + gain + " backstep_meters=" + backstepMeters + " bar_meters=" + barMeters
                     + " turn_offset_meters=" + turnOffsetMeters + " exit_side=" + exitSideName(exitSide)
-                    + " exit_style=" + exitStyleName(exitStyle));
+                    + " exit_style=" + exitStyleName(exitStyle) + " recover=" + recoverName(recover)
+                    + " guidance_restart_s=" + (int) guidanceRestartS);
         } catch (RuntimeException unavailable) {
             streetArMeters = DEFAULT_STREET_AR_METERS; gain = DEFAULT_GAIN; backstepMeters = DEFAULT_BACKSTEP_METERS;
             barMeters = DEFAULT_BAR_METERS; turnOffsetMeters = DEFAULT_TURN_OFFSET_METERS; exitSide = EXIT_AUTO;
-            exitStyle = DEFAULT_EXIT_STYLE;
+            exitStyle = DEFAULT_EXIT_STYLE; recover = DEFAULT_RECOVER; guidanceRestartS = DEFAULT_GUIDANCE_RESTART_S;
         }
     }
 
@@ -101,11 +113,22 @@ public final class ArHudTuning {
 
     public static String exitStyleName(int style) { return style == EXIT_STYLE_SIGN ? "sign" : "slight"; }
 
-    /** {street AR meters, gain, backstep meters, bar meters, turn offset meters, exit side, exit style}.
+    public static String recoverName(int mode) {
+        switch (mode) {
+            case RECOVER_OFF: return "off";
+            case RECOVER_KEYFRAME: return "keyframe";
+            case RECOVER_RECONNECT: return "reconnect";
+            default: return "screen";
+        }
+    }
+
+    /** {street AR meters, gain, backstep meters, bar meters, turn offset meters, exit side, exit style,
+     * recover mode, guidance restart seconds}.
      * Unknown keys and bad values are ignored. */
     static float[] parse(String text) {
         float[] values = {DEFAULT_STREET_AR_METERS, DEFAULT_GAIN, DEFAULT_BACKSTEP_METERS,
-                DEFAULT_BAR_METERS, DEFAULT_TURN_OFFSET_METERS, EXIT_AUTO, DEFAULT_EXIT_STYLE};
+                DEFAULT_BAR_METERS, DEFAULT_TURN_OFFSET_METERS, EXIT_AUTO, DEFAULT_EXIT_STYLE,
+                DEFAULT_RECOVER, DEFAULT_GUIDANCE_RESTART_S};
         if (text == null) return values;
         String[] lines = text.split("\n");
         for (int i = 0; i < lines.length; i++) {
@@ -119,6 +142,13 @@ public final class ArHudTuning {
                 else if (text1.equals("left")) values[5] = EXIT_LEFT;
                 else if (text1.equals("generic")) values[5] = EXIT_GENERIC;
                 else if (text1.equals("auto")) values[5] = EXIT_AUTO;
+                continue;
+            }
+            if (key.equals("recover")) {
+                if (text1.equals("off")) values[7] = RECOVER_OFF;
+                else if (text1.equals("keyframe")) values[7] = RECOVER_KEYFRAME;
+                else if (text1.equals("screen")) values[7] = RECOVER_SCREEN;
+                else if (text1.equals("reconnect")) values[7] = RECOVER_RECONNECT;
                 continue;
             }
             if (key.equals("exit_style")) {
@@ -135,6 +165,7 @@ public final class ArHudTuning {
             else if (key.equals("backstep_meters")) values[2] = accept(value, 0f, MAX_BACKSTEP_METERS, values[2]);
             else if (key.equals("bar_meters")) values[3] = accept(value, MIN_BAR_METERS, ArHudTurns.GUIDE_METERS, values[3]);
             else if (key.equals("turn_offset_meters")) values[4] = accept(value, 0f, MAX_TURN_OFFSET_METERS, values[4]);
+            else if (key.equals("guidance_restart_s")) values[8] = value == 0f ? 0f : accept(value, MIN_GUIDANCE_RESTART_S, MAX_GUIDANCE_RESTART_S, values[8]);
         }
         return values;
     }

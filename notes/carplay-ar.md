@@ -782,4 +782,103 @@ is left for DiPO as before. `bb` was already in the builder's verified field lis
 event `distance_text fixed`. Plain Evergreen's turn-by-turn DiPO patch, built with the
 maintainer's private tools, still has the stock parse.
 
-Host validation: 1,587 Java checks and 49 Python cases. Not yet in a release build.
+Host validation: 1,587 Java checks and 49 Python cases. Released in 1.3.0.113.
+
+## 1.3.0.113 test build
+
+Numbered 1.3.0.x from here: `main` now carries upstream's 1.3.0 base (merged 2026-11-19), and
+a 1.2.0.x number would look older than upstream's 1.3.0 betas to NEMESIS. The export kit
+accepts 1.2.0.104 to 1.3.0.113.
+
+### What the owner logs showed
+
+Two more owners' captures (not AR traces; Leafia kit and logcat exports, private):
+
+- **2026-11-18, US EV6, an AR build from before 105:** Apple Maps' `"1,000"` (feet) broke
+  stock DiPO's parse and sent the HUD distance 0 (see "After 1.2.0.112" above).
+- **2026-11-21, US EV6, Evergreen 1.2.0.103-beta.1 (no AR), seven captures**, each about
+  70 s of full logcat, hours of the events log, and dmesg:
+  - **No crash or ANR all day; DiPO never restarted.** "CarPlay crashed" was the wireless
+    session ending and reconnecting. Capture 3: no video for 10 s (`onScreenTimeout`), the
+    hotspot **changed channel** two seconds later, iAP2 dropped 12 s after that, session
+    ended, reconnected four seconds later and turn-by-turn came back.
+  - **The hotspot changes channel by itself** (`wl_cfg80211_ch_switch_notify`: 5180, 5785,
+    5220, 5745 MHz; none of them radar channels), and the phone dropped after some switches
+    (capture 4: deauthentication for inactivity 7 s after a switch). `hostapd` logs channel
+    interference statistics every second. Evergreen does not configure the hotspot. See
+    [hotspot-channel-debugging.md](hotspot-channel-debugging.md).
+  - **Captures 1 and 2:** the session was up (about 400 iAP2 messages a minute) and the head
+    unit still in CarPlay turn-by-turn mode (`isDiPOTurnByTurnMode` true), but no route
+    guidance at all for the whole minute.
+  - **Capture 5:** "persistent right-turn animation, fixed by force-closing ABRP": DiPO still
+    active and in turn-by-turn mode, but nothing at all from the phone for the minute. The
+    plain build never clears, so the HUD kept the last turn. The AR builds clear it (109/110
+    expiry); 113 also asks the phone to resend (below).
+  - **Capture 7:** guidance correct (slight right 22, then 21 miles ahead) while the picture
+    was frozen: the same picture as the owner's 7:11 pm freeze on the 111 drive.
+- The captures carried road and place names (navigation app lines) and a phone's Wi-Fi
+  address despite the owner's sanitising; they stay private and nothing from them is quoted.
+
+### What DiPO does about a stall (stock)
+
+`CarPlayService.onScreenTimeout()` (the library's 10 s without video) reaches
+`DipoService`'s listener (`service/q`), which only sets `mScreenTimeout`;
+`onNotifyDecodeFailure()` only logs ("CLEAR_BLACK will be skipped"). Nothing asks the phone
+for a new frame. `CarPlayService` has the calls: `forceKeyFrame()` (never called by DiPO),
+`changeModeBorrowScreen/UnborrowScreen` (what DiPO's resource manager `e/r` does when the
+driver leaves CarPlay and returns), `disconnectCarPlay()` and the private
+`restartBonjour()`. DiPO also has a "carplaymagiccode" test receiver (`service/y`:
+screen_borrow, screen_unborrow, screen_requestui, routeguidance, resetUSB …), but it is
+created and never registered in this release, so it cannot be used from outside.
+
+### Changes
+
+- **`ArHudRecovery`** (13th helper class; its own thread, so it works without navigation),
+  fed by entry hooks on `CarPlayService.onScreenTimeout/onNotifyDecodeFailure/onScreenStarted/
+  onScreenStopped/onSessionStarted/onSessionFinalized` (`screen(service, event, argument)`;
+  six new fingerprinted sites per DiPO variant, plan `advanced-plan-113`, all earlier site
+  fingerprints unchanged):
+  1. screen timeout: `forceKeyFrame()` at once;
+  2. no `onScreenStarted` 4 s later: `changeModeBorrowScreen(UserInitiated, UserInitiated,
+     "evergreen-recover")`, and `changeModeUnborrowScreen` 1.5 s after that, which makes
+     the phone restart its video stream (what the owners did by hand);
+  3. only with `recover=reconnect`: 10 s after step 2, `disconnectCarPlay()`, then
+     `restartBonjour()` 3 s later. Ends calls and audio; off by default.
+
+  A decode failure while the picture runs gets one key frame, at most every 5 s, and no
+  escalation; nothing happens while the picture is stopped (the driver is on another
+  screen). `onScreenStarted` after a stall logs `recover_ok after_ms= step=`.
+- **Guidance restart:** when the phone's route guidance was active (last state not 0) and no
+  route update has arrived for `guidance_restart_s` (default 90 s; the longest gap at a light
+  in the recorded drives was 60 s) while the session is up, DiPO's own `e/b.N()` then
+  `e/b.M()` stop and start the phone's RouteGuidance updates, once per silence (any update
+  re-arms it; DiPO's stop/reset never restarts). `e/b` is reached through the turn-by-turn
+  build's static `e/u.leafiaOwner`.
+- Both call DiPO by reflection; the build now checks every reflected member
+  (`forceKeyFrame`, the borrow/unborrow pair, `disconnectCarPlay`, `restartBonjour`,
+  `CarPlayTransferPriority/CarPlayConstraint.UserInitiated`, `e/b.M/N`,
+  `e/u.leafiaOwner`) so a different DiPO fails the build rather than the car. A failed call
+  is logged (`recover_failed <call> <exception class>`) and skipped.
+- Tuning: `recover=off|keyframe|screen|reconnect` (default `screen`),
+  `guidance_restart_s=0|60-600` (default 90). Kits: `tune-recover-keyframe`,
+  `tune-recover-reconnect`, `tune-recover-off`, `tune-guidance-restart-off`.
+- Trace (critical budget): `screen session_started|started|stopped|timeout|decode_failure`,
+  `recover step=N …`, `recover_called`, `recover_ok`, `recover_failed`, `guidance_restart`.
+- Recorder (`ar-debug.sh`): a background watcher copies the hotspot's kernel events from
+  `dmesg` every 15 s into the trace (`v113 wifi kernel_s= event=ch_switch freq=` /
+  `deauth reason=` / `deauth_by_phone` / `disassoc*` / `ap_up|ap_down`), never an address;
+  it stops with the recorder (a zombie parent counts as stopped).
+- `Evergreen-AR-hotspot.zip`: read-only hotspot report for any Evergreen build
+  (hotspot-channel-debugging.md).
+- Analyser: hotspot events and channels, screen events, recovery steps and results, guidance
+  restarts and failures, and for each stall any channel switch within 60 s.
+- Includes the `"1,000"` distance fix and the projection-settings uninstall fix.
+
+Not proven on the car: everything in this section. Specifically whether `forceKeyFrame` or the
+borrow/unborrow pair brings a stalled picture back (and how the phone reacts to a borrow in
+the middle of a stall), whether restarting route guidance helps when the phone's app has hung,
+and whether `dmesg` is readable from the recorder (root) on every unit.
+
+Host validation: 1,614 Java checks and 53 Python cases; the 111 export replays through the
+helper; mock install/uninstall (Android up and down, update, projection settings) return to
+stock; the shipped DiPO patches carry all six screen hooks on both variants.

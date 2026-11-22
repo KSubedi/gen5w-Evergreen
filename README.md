@@ -14,11 +14,17 @@ Wireless **CarPlay** and **Android Auto** for Hyundai, Kia and Genesis **Gen5W**
 ## EV6 CarPlay AR fork
 
 This fork includes experimental CarPlay AR HUD support for **Kia EV6 GT-Line USA,
-firmware 260507**. Download the installer, controls and installation instructions
-from the [AR prerelease](https://github.com/KSubedi/gen5w-Evergreen/releases/tag/v1.2.0.103-beta.1).
+firmware 260507**. Download the installer, controls, log kit and test instructions
+from the [latest AR pre-release](https://github.com/KSubedi/gen5w-Evergreen/releases/tag/v1.3.0.113-beta.1).
 The normal package builder still builds standard Evergreen; the AR installer is
-explicitly selected and gated to that EV6 firmware. Highway-exit AR remains under
-investigation. See [development and replay notes](notes/carplay-ar.md).
+explicitly selected and gated to that EV6 firmware.
+
+Besides the AR HUD (native turn, fork and exit arrows with the phone's exact distance),
+the AR build also recovers a frozen CarPlay picture by itself (a fresh video frame, then a
+short screen hand-back), asks the phone to resend turn-by-turn when it goes silent, and
+records the hotspot's channel changes for the freeze investigation. See the
+[development and replay notes](notes/carplay-ar.md) and
+[debugging the hotspot's channel switching](notes/hotspot-channel-debugging.md).
 
 ## How it works
 
@@ -74,6 +80,9 @@ Anything else gets **basic mode**: only the wireless projection part, which give
 - **12 V battery during long sessions.** On an EV the 12 V battery is only charged while the car is in Ready. Installing and testing for a long time with the car on but not in Ready drains it; keep the car in Ready.
 - **"Activate" or Kia Connect prompts in the navigation** come from the car's connected services, not from this package.
 - **The Leafia kit only sees the last minute or so of the Android log.** When reporting a problem, run it right after the problem happens.
+- **CarPlay freezes or drops while driving, the HUD keeps working, and leaving CarPlay and coming back fixes it.** Owner logs show the head unit's own hotspot changing Wi-Fi channel by itself during drives, and the phone dropping right after some of those changes; the picture can also stop while the session and turn-by-turn continue. Evergreen doesn't configure the hotspot, so the cause is in the head unit's own Wi-Fi; we're still finding where the switching comes from ([how to help](notes/hotspot-channel-debugging.md)). The EV6 AR build (1.3.0.113 and later) recovers a frozen picture by itself.
+- **The HUD keeps showing an old turn, or a first turn that never updates.** The phone's navigation app stopped sending turn-by-turn while CarPlay stayed connected (seen with ABRP); force-closing the app on the phone fixes it. The EV6 AR build clears the stale turn and asks the phone to resend.
+- **Sharing logs:** Leafia kit and logcat exports contain road and place names from the car's navigation app and the phone's Wi-Fi address. Send them privately; if you clean them up with a tool, check those are gone.
 
 Something wrong? Open an issue with the [problem form](../../issues/new?template=problem.yml); it walks you through the Leafia kit.
 

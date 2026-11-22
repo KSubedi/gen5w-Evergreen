@@ -61,6 +61,7 @@ public final class ArHudRuntime implements Runnable {
     static void prepare(Object owner,Integer component,Object route,boolean advanced) {
         ArHudRoute.prepare(owner, component, route);
         int current=ArHudRoute.identity(route), state=ArHudRoute.state(route);
+        ArHudRecovery.guidance(state, SystemClock.elapsedRealtime());
         if(ArHudDebug.on())ArHudDebug.event("sender_prepare component="+component+" current="+current+" state="+state);
         ArHudDebug.watch();
         synchronized(ArHudRuntime.class) {
@@ -185,6 +186,7 @@ public final class ArHudRuntime implements Runnable {
 
     public static synchronized void reset() {
         ArHudDebug.event("reset");
+        ArHudRecovery.guidanceStopped();
         active = false; sample = null; cluster = null; motion.reset();
         seenOwner=null;seenComponent=-1;seenManeuver=-1;
         acceptedExactAt = -1; sentMeters = -1f; traceKey = null; traceAt = -1; hudKey = Integer.MIN_VALUE;

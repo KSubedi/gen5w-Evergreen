@@ -6,20 +6,23 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 MODES = ("enable", "disable", "status", "basic", "advanced", "diagnostics",
-         "trace-on", "trace-off", "tune-reset", "baseline")
+         "trace-on", "trace-off", "tune-reset", "baseline", "hotspot")
 RANGES = {"street_ar_meters": (30, 457), "gain": (0.5, 1.0), "backstep_meters": (0, 50),
-          "bar_meters": (30, 457), "turn_offset_meters": (0, 60)}
+          "bar_meters": (30, 457), "turn_offset_meters": (0, 60), "guidance_restart_s": (0, 600)}
 EXIT_SIDES = ("auto", "right", "left", "generic")
 EXIT_STYLES = ("slight", "sign")
+RECOVER = ("off", "keyframe", "screen", "reconnect")
 README = ("Unzip to an empty USB drive and run through NEMESIS while parked.\n"
           "Controls change AR flags, tracing, road-test tuning or a baseline request only.\n"
           "Diagnostics exports bounded EvergreenAR logs, any cluster baseline and build metadata to AR-DEBUG/.\n"
+          "Hotspot writes HOTSPOT/hotspot.txt (the hotspot's channel settings and history; no network name,\n"
+          "password or hardware address) and works with any Evergreen build.\n"
           "No /system writes, no reboot. Run diagnostics parked after a drive. Wait for Export complete, then zip AR-DEBUG/ and share privately.\n"
           "Enable/status require a generated US EV6 260507 AR build; disable works even without one.\n"
           "The normal Evergreen package has no AR prototype to enable.\n")
 
 
-def tuning(values, exit_side=None, exit_style=None):
+def tuning(values, exit_side=None, exit_style=None, recover=None):
     lines = []
     for key, value in values.items():
         low, high = RANGES[key]
@@ -36,6 +39,12 @@ def tuning(values, exit_side=None, exit_style=None):
         if exit_style not in EXIT_STYLES:
             raise ValueError("exit_style must be one of " + ", ".join(EXIT_STYLES))
         lines.append("exit_style=" + exit_style)
+    if recover is not None:
+        if recover not in RECOVER:
+            raise ValueError("recover must be one of " + ", ".join(RECOVER))
+        lines.append("recover=" + recover)
+    if values.get("guidance_restart_s") not in (None, 0) and values["guidance_restart_s"] < 60:
+        raise ValueError("guidance_restart_s must be 0 (off) or between 60 and 600")
     if not lines:
         raise ValueError("no tuning values given")
     return "\n".join(lines) + "\n"
@@ -62,6 +71,8 @@ def main():
     p.add_argument("--turn-offset-meters", type=float, help="added to the large AR arrow's distance only (0-60)")
     p.add_argument("--exit-side", choices=EXIT_SIDES, help="side for the phone's direction-unspecified exit (raw 8)")
     p.add_argument("--exit-style", choices=EXIT_STYLES, help="exits as a slight-turn arrow or the native exit sign (default)")
+    p.add_argument("--recover", choices=RECOVER, help="stalled CarPlay picture: off, key frame, + screen return (default), + reconnect")
+    p.add_argument("--guidance-restart-s", type=float, help="restart silent phone guidance after this many seconds (60-600, 0 off; default 90)")
     p.add_argument("--tune-name", help="suffix for the tuning kit file name: Evergreen-AR-tune-<name>.zip")
     p.add_argument("--baseline-minutes", type=int, default=20, help="stock-navigation cluster capture length (1-60)")
     a = p.parse_args()
@@ -72,10 +83,11 @@ def main():
         extra = {"AR_BASELINE_MINUTES": "%d\n" % a.baseline_minutes} if mode == "baseline" else None
         kit(a.directory / ("Evergreen-AR-" + mode + ".zip"), mode, extra)
     values = {"street_ar_meters": a.street_ar_meters, "gain": a.gain, "backstep_meters": a.backstep_meters,
-              "bar_meters": a.bar_meters, "turn_offset_meters": a.turn_offset_meters}
-    if any(v is not None for v in values.values()) or a.exit_side is not None or a.exit_style is not None:
+              "bar_meters": a.bar_meters, "turn_offset_meters": a.turn_offset_meters,
+              "guidance_restart_s": a.guidance_restart_s}
+    if any(v is not None for v in values.values()) or a.exit_side is not None or a.exit_style is not None or a.recover is not None:
         try:
-            text = tuning(values, a.exit_side, a.exit_style)
+            text = tuning(values, a.exit_side, a.exit_style, a.recover)
         except ValueError as error:
             p.exit(1, str(error) + "\n")
         name = "Evergreen-AR-tune" + ("-" + a.tune_name if a.tune_name else "") + ".zip"

@@ -18,6 +18,8 @@ THREADTIME = re.compile(r"^(?P<wall>\d\d-\d\d \d\d:\d\d:\d\d\.\d+)\s+(?P<pid>\d+
 BRIEF = re.compile(r"^W/(?P<rest>EvergreenAR\(\s*(?P<pid>\d+)\): .*)$")
 TURN = re.compile(r"EvergreenAR(?:\(\s*\d+\))?: turn (?P<msg>icon=.*)$")
 # 109 records outside the event stream: a crash of the projection app, or where its sender thread is while input is quiet.
+# 113: the recorder's copy of the hotspot's kernel events (channel switch, disconnects).
+WIFI = re.compile(r"EvergreenAR(?:\(\s*\d+\))?: v\d+ wifi kernel_s=(?P<kernel>[0-9.]+) event=(?P<event>[a-z_]+)(?: (?P<key>[a-z]+)=(?P<value>\d+))?\s*$")
 THREAD = re.compile(r"EvergreenAR(?:\(\s*\d+\))?: v\d+ (?P<msg>(?:uncaught|input_quiet) thread=.*)$")
 
 
@@ -40,6 +42,59 @@ def parse_file(path, events, turns):
         u = TURN.search(rest)
         if u:
             turns.append({"pid": int(m.group("pid")), "msg": u.group("msg")})
+
+
+def wifi_records(source):
+    """The hotspot's kernel events, once each (rotated files and recent-logcat overlap)."""
+    seen, found = set(), []
+    for path in files_of(source):
+        for line in path.read_text(errors="replace").splitlines():
+            m = THREADTIME.match(line) or BRIEF.match(line)
+            w = m and WIFI.search(m.group("rest"))
+            if not w or (w.group("kernel"), w.group("event")) in seen: continue
+            seen.add((w.group("kernel"), w.group("event")))
+            found.append({"wall": m.groupdict().get("wall"), "kernel_s": float(w.group("kernel")), "event": w.group("event"),
+                          w.group("key") or "detail": int(w.group("value")) if w.group("value") else None})
+    return sorted(found, key=lambda x: x["kernel_s"])
+
+
+def wall_seconds(wall):
+    """Seconds within the year from a threadtime stamp (MM-DD HH:MM:SS.mmm), for nearness only."""
+    try:
+        day, clock = wall.split(); month, mday = (int(x) for x in day.split("-")); h, m, sec = clock.split(":")
+        return ((month * 31 + mday) * 24 + int(h)) * 3600 + int(m) * 60 + float(sec)
+    except (AttributeError, ValueError):
+        return None
+
+
+def analyze_screen(events, wifi):
+    """113: CarPlay picture events, the recovery steps taken and what brought the picture back."""
+    kinds = collections.Counter()
+    recovered, restarts, failures, stalls = [], [], [], []
+    for e in events:
+        msg = e["msg"]; k = msg.split()[0]
+        if k == "screen":
+            what = msg.split()[1] if len(msg.split()) > 1 else "?"
+            kinds[what] += 1
+            if what == "timeout": stalls.append(e)
+        elif k == "recover":
+            kinds["step " + kv(msg).get("step", "?") + " " + msg.split()[2]] += 1
+        elif k == "recover_ok":
+            d = kv(msg); recovered.append({"wall": e["wall"], "after_ms": int(d.get("after_ms", -1)), "step": int(d.get("step", -1))})
+        elif k in ("recover_failed", "guidance_restart_failed"):
+            failures.append(msg)
+        elif k == "guidance_restart":
+            restarts.append({"wall": e["wall"], "silent_ms": int(kv(msg).get("silent_ms", -1))})
+    if not kinds and not restarts and not failures: return None
+    switches = [w for w in wifi if w["event"] == "ch_switch"]
+    near = []
+    for e in stalls:
+        t = wall_seconds(e["wall"])
+        if t is None: continue
+        close = [w for w in switches if w["wall"] and wall_seconds(w["wall"]) is not None and -60 <= t - wall_seconds(w["wall"]) <= 60]
+        near.append({"wall": e["wall"], "channel_switch_within_60s": [(w["wall"], w.get("freq")) for w in close]})
+    return {"events": dict(kinds.most_common()), "recovered": recovered, "guidance_restarts": restarts,
+            "failures": sorted(set(failures)), "stalls": near}
 
 
 def files_of(source):
@@ -250,7 +305,7 @@ def analyze_process(events):
     return out
 
 
-def analyze(events, turns, threads=None):
+def analyze(events, turns, threads=None, wifi=None):
     def label(t):
         f = kv("x " + t["msg"])
         text = "icon=%s raw=%s result=%s output=%s" % (f.get("icon"), f.get("raw"), f.get("result"), f.get("output"))
@@ -263,12 +318,19 @@ def analyze(events, turns, threads=None):
     report = {"processes": {}, "turn_records": dict(collections.Counter(label(t) for t in turns).most_common(40))}
     if threads:
         report["thread_records"] = threads
+    if wifi:
+        report["wifi"] = {"events": dict(collections.Counter(w["event"] for w in wifi).most_common()),
+                          "channels": dict(collections.Counter(w.get("freq") for w in wifi if w["event"] == "ch_switch").most_common()),
+                          "records": [(w["wall"], w["kernel_s"], w["event"], w.get("freq", w.get("reason"))) for w in wifi][-60:]}
     for name, L in sessions(events).items():
         kinds = collections.Counter(e["msg"].split()[0] for e in L)
-        role = "dipo" if "sender_prepare" in kinds or "exact" in kinds else "navigation" if "trap_input" in kinds else "unknown"
+        role = ("dipo" if "sender_prepare" in kinds or "exact" in kinds or "screen" in kinds else
+                "navigation" if "trap_input" in kinds else "unknown")
         walls = [e["wall"] for e in L if e["wall"]]
         report["processes"][name] = dict(role=role, version="v%d" % L[0]["v"], wall_first=walls[0] if walls else None, wall_last=walls[-1] if walls else None,
                                          **(analyze_process(L) if role == "dipo" else {"records": len(L), "events": dict(kinds.most_common())}))
+        if role == "dipo":
+            report["processes"][name]["screen"] = analyze_screen(L, wifi or [])
     return report
 
 
@@ -325,7 +387,7 @@ def main():
     events, turns = load(a.source)
     if not events:
         p.exit(1, "no EvergreenAR records found\n")
-    report = analyze(events, turns, thread_records(a.source))
+    report = analyze(events, turns, thread_records(a.source), wifi_records(a.source))
     if a.json:
         print(json.dumps(report, indent=2))
     else:
@@ -341,6 +403,13 @@ def main():
             print("  expiries (meters before, after, silent s, lost while moving):", [(x["meters_before"], x["meters_after"], x["silent_s"], x["moving"]) for x in r["expiries"]])
             print("  replacement -> next send ms:", r["replacement_to_next_send_ms"], "clears:", r["clears"])
             if r["tuning"]: print("  tuning:", r["tuning"])
+            sc = r.get("screen")
+            if sc:
+                print("  screen events:", sc["events"])
+                print("  picture recovered (wall, after ms, step):", [(x["wall"], x["after_ms"], x["step"]) for x in sc["recovered"]])
+                if sc["guidance_restarts"]: print("  guidance restarts (wall, silent ms):", [(x["wall"], x["silent_ms"]) for x in sc["guidance_restarts"]])
+                if sc["failures"]: print("  recovery failures:", sc["failures"])
+                for x in sc["stalls"]: print("  stall %s: channel switches within 60 s: %s" % (x["wall"], x["channel_switch_within_60s"]))
             h = r["health"]
             if h:
                 print("  health: %d samples; CPU busy %% p50/p95/max %s; load %s; this process ticks/s %s; least free memory %s kB" % (
@@ -358,6 +427,10 @@ def main():
             print("turn records:")
             for k, n in report["turn_records"].items(): print("  %5d  %s" % (n, k))
         for k, n in report.get("thread_records", {}).items(): print("thread record x%d: %s" % (n, k))
+        if report.get("wifi"):
+            w = report["wifi"]
+            print("hotspot kernel events:", w["events"], "channels switched to (MHz):", w["channels"])
+            for x in w["records"]: print("  %s kernel %.3f s %s %s" % (x[0], x[1], x[2], "" if x[3] is None else x[3]))
     if a.replay:
         for path in write_replays(events, a.replay): print("wrote", path)
 

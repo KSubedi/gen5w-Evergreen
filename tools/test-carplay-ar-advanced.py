@@ -39,6 +39,7 @@ def dipo(tree):
 .super Ljava/lang/Object;
 .field private Am:Ljava/util/LinkedHashMap;
 .field private Al:Ljava/util/LinkedHashMap;
+.field public static leafiaOwner:Lcom/daudio/app/dipo/e/b;
 .method private a(Ljava/lang/Integer;Ljava/lang/Object;)V
     .registers 15
     check-cast p2, Lcom/daudio/app/dipo/e/c;
@@ -104,6 +105,23 @@ def dipo(tree):
     return-void
 .end method
 ''')
+    tel='Lcom/daudio/app/dipo/telechips/'
+    write(tree/adapter.B,'.class public Lcom/daudio/app/dipo/e/b;\n.super Ljava/lang/Object;\n'+
+          ''.join('.method public final %s()V\n    .registers 1\n    return-void\n.end method\n'%m for m in ('M','N')))
+    for name in ('CarPlayTransferPriority','CarPlayConstraint'):
+        write(tree/('com/daudio/app/dipo/telechips/%s.smali'%name),'.class public L%s;\n.super Ljava/lang/Object;\n'
+              '.field public static UserInitiated:%s%s;\n'%(tel[1:]+name,tel,name))
+    callbacks=''.join('.method public %s\n    .registers %d\n    const/4 v0, 0x0\n    return-void\n.end method\n'%(m,r)
+                      for m,r in (('onScreenTimeout()V',4),('onNotifyDecodeFailure(I)V',5),('onScreenStarted()V',4),
+                                  ('onScreenStopped()V',4),('onSessionStarted(I)V',5),('onSessionFinalized(I)V',6)))
+    controls=''.join('.method %s %s\n    .registers 4\n    const/4 v0, 0x0\n    %s\n.end method\n'%(kind,m,ret) for kind,m,ret in (
+        ('public','forceKeyFrame()'+tel+'CarPlayReturn;','return-object v0'),
+        ('public','changeModeBorrowScreen('+tel+'CarPlayTransferPriority;'+tel+'CarPlayConstraint;Ljava/lang/String;)V','return-void'),
+        ('public','changeModeUnborrowScreen(Ljava/lang/String;)V','return-void'),
+        ('public','disconnectCarPlay()'+tel+'CarPlayReturn;','return-object v0'),
+        ('private','restartBonjour()'+tel+'CarPlayReturn;','return-object v0')))
+    write(tree/adapter.CPS,'.class public '+tel+'CarPlayService;\n.super Ljava/lang/Object;\n'+callbacks+controls)
+    write(tree/'com/daudio/app/dipo/telechips/CarPlayReturn.smali','.class public '+tel+'CarPlayReturn;\n.super Ljava/lang/Object;\n')
     write(tree/adapter.V,'.class public Lcom/daudio/app/dipo/e/v;\n.super Ljava/lang/Object;\n'+
           ''.join('.field private '+x+':I\n' for x in ('DM','DR','DS','DU','DV'))+'.field private DT:[I\n')
 
@@ -147,7 +165,7 @@ class AdvancedTest(unittest.TestCase):
         dipo(self.dipo);navi(self.navi);framework(self.fw)
 
     def test_adapter_hooks_assemble_and_reject_repeat(self):
-        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),10)
+        plan=adapter.inspect_dipo(self.dipo);self.assertEqual(len(plan),16)
         adapter.patch_dipo(self.dipo,plan)
         simple.patch(self.dipo,HELPERS,1)
         base.run('smali','a','-j','1','--api','18','-o',self.root/'patched.dex',self.dipo)
@@ -156,6 +174,21 @@ class AdvancedTest(unittest.TestCase):
         with self.assertRaises(ValueError):adapter.patch_dipo(self.dipo,plan)
         hud=adapter.method((self.dipo/adapter.U).read_text(),'sendHudDist(FI)V')[0]
         self.assertIn('->hudDistance(FI)F\n\n    move-result p1',hud)
+        service=(self.dipo/adapter.CPS).read_text()
+        self.assertEqual(service.count('ArHudRecovery;->screen(Ljava/lang/Object;II)V'),6)
+        decode=adapter.method(service,'onNotifyDecodeFailure(I)V')[0]
+        self.assertIn('const/4 v0, 0x2\n\n    invoke-static {p0, v0, p1}, Lorg/evergreen/carplay/ArHudRecovery;->screen',decode)
+        timeout=adapter.method(service,'onScreenTimeout()V')[0]
+        self.assertIn('const/4 v0, 0x1\n\n    const/4 v1, 0x0\n\n    invoke-static {p0, v0, v1}',timeout)
+
+    def test_recovery_needs_every_reflected_dipo_member(self):
+        for path,old,new in ((adapter.CPS,'restartBonjour()','restartBonjourX()'),(adapter.B,'final M()V','final Q()V'),
+                             (adapter.U,'static leafiaOwner','static leafiaOther'),
+                             ('com/daudio/app/dipo/telechips/CarPlayConstraint.smali','UserInitiated','Never')):
+            dipo(self.dipo);f=self.dipo/path;f.write_text(f.read_text().replace(old,new))
+            with self.assertRaises(ValueError,msg=path):adapter.inspect_dipo(self.dipo)
+        dipo(self.dipo);f=self.dipo/adapter.CPS;f.write_text(f.read_text().replace('    .registers 4\n    const/4 v0, 0x0\n    return-void\n.end method\n.method public onNotify','    .registers 1\n    return-void\n.end method\n.method public onNotify',1))
+        with self.assertRaises(ValueError):adapter.inspect_dipo(self.dipo)
 
     def test_stale_or_unknown_metadata_fails_before_edits(self):
         plan=adapter.inspect_dipo(self.dipo)
@@ -218,6 +251,34 @@ class AdvancedTest(unittest.TestCase):
         self.assertIn('-r 1024 -n 31 -s EvergreenAR:W *:S',args)
         self.assertEqual((work/'logs').stat().st_mode & 0o777,0o700)
         self.assertIn('bounded 32x1MiB',(work/'logs/STATUS.txt').read_text())
+
+    def test_debug_service_copies_hotspot_events_without_addresses(self):
+        self.maxDiff=None
+        work=self.root/'wifi';work.mkdir();stub=work/'bin';stub.mkdir()
+        def tool(name,body):(stub/name).write_text('#!/bin/sh\n'+body);(stub/name).chmod(0o755)
+        tool('dmesg','cat "'+str(work/'kernel')+'"\n')
+        tool('log','echo "$*" >> "'+str(work/'logged')+'"\n')
+        tool('logcat','sleep 2; kill -TERM "$PPID"\n')
+        (work/'kernel').write_text(
+            '<6>[   10.552688] CFG80211-ERROR) wl_cfg80211_del_station : Disconnect STA : c6:2b:cc:2e:b0:af scb_val.val 3\n'
+            '<6>[   10.602161] CFG80211-ERROR) wl_notify_connect_status_ap : ** AP/GO Link up event **\n'
+            '<4>[  415.307040] dhd_module_init in\n'
+            '<6>[ 3977.580579] CFG80211-ERROR) wl_cfg80211_ch_switch_notify : Channel switch notification for freq: 5785 chanspec: 0xd89f\n'
+            '<6>[ 4121.925019] CFG80211-ERROR) wl_notify_connect_status_ap : event WLC_E_DEAUTH(5) status 0 reason 4\n'
+            '<6>[ 4121.925019] CFG80211-ERROR) wl_notify_connect_status_ap : event WLC_E_DEAUTH(5) status 0 reason 4\n'
+            '<6>[18015.159439] CFG80211-ERROR) wl_notify_connect_status_ap : event WLC_E_DEAUTH_IND(6) status 0 reason 8\n')
+        source=(ROOT/'kits/ar-installer/ar-debug.sh').read_text()
+        source=source.replace('/data/nemesis/wireless.carplay.aa-ar-debug',str(work/'logs'))
+        source='\n'.join('export PATH='+str(stub)+':/usr/bin:/bin' if x.startswith('export PATH=') else x for x in source.splitlines())+'\n'
+        script=work/'service.sh';script.write_text(source)
+        subprocess.run(['sh',str(script)],timeout=10,capture_output=True)
+        lines=(work/'logged').read_text().splitlines()
+        self.assertEqual(lines,['-p w -t EvergreenAR v113 wifi kernel_s=10.602161 event=ap_up',
+                                '-p w -t EvergreenAR v113 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
+                                '-p w -t EvergreenAR v113 wifi kernel_s=4121.925019 event=deauth reason=4',
+                                '-p w -t EvergreenAR v113 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
+        self.assertNotIn(':af',(work/'logged').read_text())
+        self.assertFalse((work/'logs/.wifi').exists())
 
     def test_baseline_service_waits_for_a_request_and_keeps_only_frame_lines(self):
         work=self.root/'baseline';(work/'pkg').mkdir(parents=True);stub=work/'bin';stub.mkdir()

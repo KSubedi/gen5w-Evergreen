@@ -1,10 +1,43 @@
-EVERGREEN 1.2.0.112 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.3.0.113 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.113 (from two more owners' logs)
+Numbered 1.3.0.x because it now builds on Evergreen 1.3.0; it installs over
+1.2.0.112 and earlier test builds like any update.
+- CarPlay picture freezes are recovered automatically. When no video has
+  arrived for 10 seconds, the head unit's own CarPlay app noticed but did
+  nothing; leaving CarPlay and coming back was the only fix. Now: at once,
+  the phone is asked for a fresh video frame; if the picture has not come
+  back 4 seconds later, the head unit takes the screen and hands it back
+  1.5 seconds later (a short black flash), which makes the phone restart its
+  video stream. An optional third step (tune-recover-reconnect) ends the
+  session so the phone reconnects; it drops calls and audio, so it is off
+  by default. Nothing happens while you are on another screen.
+- If the phone stops sending turn-by-turn while a route is active (seen
+  with ABRP and on a plain Evergreen car: the HUD keeps the last turn or
+  shows nothing), the head unit asks the phone to resend route guidance
+  after 90 seconds of silence (stops at lights were at most 60 seconds).
+- "1,000 ft": Apple Maps sends that distance with a comma, which the head
+  unit's CarPlay app could not read, so the HUD showed 0 for a moment about
+  300 m before a turn. Fixed.
+- Uninstall puts the head unit's projection settings back (wired CarPlay
+  could stay off after removing a wireless package; reported on a Korean K8).
+- The hotspot: another owner's logs show the head unit's own Wi-Fi hotspot
+  changing channel by itself while driving, and CarPlay dropping right after
+  some of those changes. The recorder now logs every channel change and
+  Wi-Fi disconnect (no addresses), and Evergreen-AR-hotspot.zip collects the
+  hotspot's channel settings (no network name, password or address) so we
+  can find where the switching comes from. Please run it after a drive with
+  a freeze or drop and send HOTSPOT/hotspot.txt.
+- The export kit accepts 104 to 1.3.0.113.
+What we need from a test drive: the AR logs (get-logs kit) and, for every
+freeze or drop, the clock time, whether the picture came back by itself
+(with or without a short black flash) and whether the HUD kept working.
 
 NEW IN 1.2.0.112 (from the recorded 111 drive)
 What the 111 logs show (two drives, 50 and 39 minutes; the owner: AR went
@@ -33,7 +66,6 @@ caught both freezes and a third one.
   arrived and took the sample for a future one). The 5-second health sample
   now runs after the tick and off its clock, and a sample from the near
   future is treated as fresh.
-- The export kit accepts 104 to 112.
 Things to try against the freezes, independent of this build: keep the head
 unit's own Wi-Fi client off (it is known to drop projection), and note
 whether the phone was warm or charging wirelessly when it happened.
@@ -227,7 +259,9 @@ main cluster calls, small HUD calls/distance, progress IPC and OEM bar overlay,
 resets, worker heartbeat, the phone's route and maneuver states, the
 tuning in effect, and every five seconds a health record (CPU share, load,
 free memory, busiest projection-app thread names, bytes per network
-interface, Wi-Fi link level and retry counters, TCP retransmissions). API return is not physical HUD acknowledgement.
+interface, Wi-Fi link level and retry counters, TCP retransmissions), the
+CarPlay picture's timeouts and every recovery step, and the hotspot's
+channel changes and disconnects copied from the kernel log (no addresses). API return is not physical HUD acknowledgement.
 It does not capture raw CarPlay video, arbitrary phone packets, Wi-Fi passwords,
 road names, coordinates, phone identifiers or general app logs.
 
@@ -236,15 +270,21 @@ Evergreen-AR-tune.zip (built with tools/build-carplay-ar-controls.py and values
 such as --street-ar-meters 90 --gain 0.7 --backstep-meters 10) writes a small
 ar-tuning file next to the AR flags. Allowed ranges: street_ar_meters 30-457,
 gain 0.5-1, backstep_meters 0-50, bar_meters 30-457, turn_offset_meters 0-60,
-exit_side auto|right|left|generic, exit_style slight|sign; anything else keeps
-the built-in default (200 m, 0.8, 15 m, 457 m, 0 m, auto, sign). Values apply
+exit_side auto|right|left|generic, exit_style slight|sign,
+recover off|keyframe|screen|reconnect, guidance_restart_s 0 or 60-600;
+anything else keeps the built-in default (200 m, 0.8, 15 m, 457 m, 0 m,
+auto, sign, screen, 90). Values apply
 within two seconds; start a fresh route. A tune kit replaces the whole file, so
-one kit is in effect at a time. The 112 kits zip has ready-made variants:
+one kit is in effect at a time. The 1.3.0.113 kits zip has ready-made variants:
 tune-street-125 (the 110 start distance), tune-street-300, tune-bar-300 and
 tune-bar-200 (the bar runs 60 to 10 or 90 to 10 inside the 200 m window),
 tune-offset-15/-30 (arrow placed 15/30 m further), tune-exit-slight (the 109
-exit arrow), tune-exit-generic (the 107 exit icon), tune-exit-left and
-tune-reset.
+exit arrow), tune-exit-generic (the 107 exit icon), tune-exit-left,
+tune-recover-keyframe (key frame only), tune-recover-reconnect (adds the
+session restart), tune-recover-off, tune-guidance-restart-off and tune-reset.
+Evergreen-AR-hotspot.zip writes HOTSPOT/hotspot.txt with the hotspot's
+channel settings and history (read-only; works with any Evergreen build;
+see notes/hotspot-channel-debugging.md in the repository).
 Evergreen-AR-tune-reset.zip removes the file. Evergreen-AR-status.zip shows it.
 Evergreen-AR-trace-off.zip stops the detailed per-event trace (the once-per-
 second turn records stay); Evergreen-AR-trace-on.zip restores it.
@@ -259,7 +299,7 @@ compare the CarPlay conversion against.
 AFTER THE DRIVE
 1. Park in READY. Extract the NEW Evergreen-AR-export-stop-clean.zip onto a
    separate empty USB, so that NEMESIS.sh and NEMESIS.data are at its root.
-   This version supports 104 to 112.
+   This version supports 104 to 1.3.0.113.
 2. Insert it and let NEMESIS run the export. Wait for "Export and cleanup complete" before
    removing USB. The kit flushes writes before showing completion.
 3. Zip the AR-DEBUG-FINISHED folder and send it privately, using an upload link if it is

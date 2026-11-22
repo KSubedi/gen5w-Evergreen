@@ -13,11 +13,33 @@ NC = "Lcom/hkmc/cluster/NavigationCluster;"
 RUNTIME = "Lorg/evergreen/carplay/ArHudRuntime;"
 TRAP = "Lorg/evergreen/carplay/ArHudTrap;"
 DEBUG = "Lorg/evergreen/carplay/ArHudDebug;"
+RECOVERY = "Lorg/evergreen/carplay/ArHudRecovery;"
 ZERO_GATE = re.compile(r"(?m)^    if-eqz v0, (:[A-Za-z0-9_]+)\n\n    if-eqz v1, \1$")
 U = "com/daudio/app/dipo/e/u.smali"
 C = "com/daudio/app/dipo/e/c.smali"
 V = "com/daudio/app/dipo/e/v.smali"
 CT = "Lcom/daudio/app/dipo/e/c;"
+CPS = "com/daudio/app/dipo/telechips/CarPlayService.smali"
+B = "com/daudio/app/dipo/e/b.smali"
+TEL = "Lcom/daudio/app/dipo/telechips/"
+# CarPlayService callbacks that report to ArHudRecovery.screen(service, event, argument): event codes
+# as in ArHudRecovery; the decode failure passes its type.
+SCREEN_SITES = (("onScreenTimeout()V", 1, None), ("onNotifyDecodeFailure(I)V", 2, "p1"),
+                ("onScreenStarted()V", 3, None), ("onScreenStopped()V", 4, None),
+                ("onSessionStarted(I)V", 5, None), ("onSessionFinalized(I)V", 6, None))
+# What ArHudRecovery calls by reflection; checked so a different DiPO fails the build, not the car.
+REFLECTED = {
+    CPS: ("forceKeyFrame()"+TEL+"CarPlayReturn;",
+          "changeModeBorrowScreen("+TEL+"CarPlayTransferPriority;"+TEL+"CarPlayConstraint;Ljava/lang/String;)V",
+          "changeModeUnborrowScreen(Ljava/lang/String;)V", "disconnectCarPlay()"+TEL+"CarPlayReturn;",
+          "restartBonjour()"+TEL+"CarPlayReturn;"),
+    B: ("M()V", "N()V"),
+}
+REFLECTED_FIELDS = {
+    U: "leafiaOwner:Lcom/daudio/app/dipo/e/b;",
+    "com/daudio/app/dipo/telechips/CarPlayTransferPriority.smali": "UserInitiated:"+TEL+"CarPlayTransferPriority;",
+    "com/daudio/app/dipo/telechips/CarPlayConstraint.smali": "UserInitiated:"+TEL+"CarPlayConstraint;",
+}
 FIELDS = {
     U: {"Am": "Ljava/util/LinkedHashMap;", "Al": "Ljava/util/LinkedHashMap;"},
     C: {"aR": "I", "aS": "I", "ba": "I", "bd": "[I", "bb":"Ljava/lang/String;"},
@@ -80,6 +102,21 @@ def inspect_dipo(tree):
             if len(re.findall(r"iput-object v\d+, p0, "+re.escape(CT+"->bb:Ljava/lang/String;"),text))!=1:
                 raise ValueError("missing unique display-distance write")
         sites.append({"file":path,"method":signature,"sha256":hashlib.sha256(text.encode()).hexdigest(),"registers":registers})
+    for path, signatures in REFLECTED.items():
+        text = (tree/path).read_text()
+        for signature in signatures: method(text, signature)
+    for path, field in REFLECTED_FIELDS.items():
+        if len(re.findall(r"(?m)^\.field public static [^\n]*\b"+re.escape(field)+r"$", (tree/path).read_text())) != 1:
+            raise ValueError("unexpected field layout: " + path + ":" + field)
+    for signature, _, _ in SCREEN_SITES:
+        text = method((tree/CPS).read_text(), signature)[0]
+        if RECOVERY in text:
+            raise ValueError("recovery adapter already present")
+        registers = int(re.search(r"\.registers (\d+)", text)[1])
+        params = 2 if "(I)" in signature else 1
+        if registers - params < 2 or text.count("    return-void") != 1:
+            raise ValueError("recovery hook needs two free locals and one return: " + signature)
+        sites.append({"file":CPS,"method":signature,"sha256":hashlib.sha256(text.encode()).hexdigest(),"registers":registers})
     return sites
 
 
@@ -119,6 +156,10 @@ def patch_dipo(tree, plan):
         "invoke-static {p0}, "+RUNTIME+"->begin(Ljava/lang/Object;)V").replace(
         "    return-void","    invoke-static {p0}, "+RUNTIME+"->finish(Ljava/lang/Object;)V\n\n    return-void"))
     replace_method(tree/C, "ad()V", lambda t: insert_entry(t,"invoke-static {p0}, "+RUNTIME+"->forget(Ljava/lang/Object;)V"))
+    for signature, code, argument in SCREEN_SITES:
+        replace_method(tree/CPS, signature, lambda t, code=code, argument=argument: insert_entry(t,
+            "const/4 v0, 0x%x\n\n    " % code + ("" if argument else "const/4 v1, 0x0\n\n    ") +
+            "invoke-static {p0, v0, " + (argument or "v1") + "}, " + RECOVERY + "->screen(Ljava/lang/Object;II)V"))
 
 
 NEW_SIG = "(Lcom/hkmc/cluster/NavigationCluster$NaviTbtTrapInfo;)V"

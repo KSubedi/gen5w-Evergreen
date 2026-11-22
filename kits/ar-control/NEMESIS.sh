@@ -5,9 +5,79 @@ if [ -z "$SOURCE" ]; then
     export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 fi
 read -r MODE < AR_MODE || exit 1
-case "$MODE" in enable|disable|status|basic|advanced|diagnostics|trace-on|trace-off|tune|tune-reset|baseline) ;; *) echo "Unknown AR control mode"; exit 1 ;; esac
+case "$MODE" in enable|disable|status|basic|advanced|diagnostics|trace-on|trace-off|tune|tune-reset|baseline|hotspot) ;; *) echo "Unknown AR control mode"; exit 1 ;; esac
 PKG=$SOURCE/data/nemesis/apps/wireless.carplay.aa
 MARKER=$PKG/ar-hud.enabled
+# Hotspot channel debugging (notes/hotspot-channel-debugging.md): read-only, any Evergreen build.
+# Never copies a network name, password or hardware address.
+redact() {
+    # key=value lines: keep the key, drop values that name or unlock the network or a device.
+    while IFS= read -r _l; do
+        case "$_l" in
+            '#'*|'') continue ;;
+            *ssid*|*SSID*|*pass*|*PASS*|*psk*|*PSK*|*key*|*KEY*|*bssid*|*BSSID*|*addr*|*ADDR*|*mac*|*MAC*|*serial*|*uuid*|*device_name*|*pin*)
+                echo "${_l%%[=:]*}=<removed>" ;;
+            *) echo "$_l" ;;
+        esac
+    done
+}
+nomac() {
+    # Hardware addresses out of free text; without sed, lines that carry one are dropped.
+    if command -v sed >/dev/null 2>&1; then
+        sed -e 's/[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]/<mac>/g'
+    else
+        while IFS= read -r _l; do case "$_l" in *:??:??:??:??:*) ;; *) echo "$_l" ;; esac; done
+    fi
+}
+if [ "$MODE" = hotspot ]; then
+    OUT=HOTSPOT; mkdir -p "$OUT" || exit 1; F=$OUT/hotspot.txt
+    {
+        echo "hotspot report $(date)"; echo "product $(getprop ro.build.product)"; echo "uptime $(cat /proc/uptime)"
+        [ -f "$PKG/AR_INSTALL.json" ] && grep '"version"' "$PKG/AR_INSTALL.json"
+        [ -f "$PKG/BUILD" ] && echo "build $(cat "$PKG/BUILD")"
+        echo; echo "===== hostapd processes"
+        CONFS=""
+        for P in /proc/[0-9]*; do
+            [ -r "$P/cmdline" ] || continue
+            if command -v tr >/dev/null 2>&1; then CMD=$(tr '\000' ' ' < "$P/cmdline" 2>/dev/null); else CMD=$(cat "$P/cmdline" 2>/dev/null); fi
+            case "$CMD" in *hostapd*|*wpa_supplicant*|*dnsmasq*)
+                # Flags and file paths only: an argument could carry a network name.
+                SAFE=""; for A in $CMD; do case "$A" in -*|/*) SAFE="$SAFE $A" ;; *) SAFE="$SAFE <arg>" ;; esac
+                    case "$A" in *.conf) CONFS="$CONFS $A" ;; esac; done
+                echo "${P#/proc/}:$SAFE" ;; esac
+        done
+        echo; echo "===== configuration (values that name or unlock the network removed)"
+        for C in $CONFS "$SOURCE"/data/misc/wifi/hostapd.conf "$SOURCE"/data/misc/wifi/*.conf "$SOURCE"/system/etc/wifi/*.conf "$SOURCE"/system/etc/hostapd/*.conf; do
+            [ -f "$C" ] || continue
+            case " $DONE " in *" $C "*) continue ;; esac; DONE="$DONE $C"
+            echo "--- $C"; redact < "$C"
+        done
+        echo; echo "===== files"; ls -l "$SOURCE"/data/misc/wifi "$SOURCE"/system/etc/wifi 2>&1
+        echo; echo "===== properties"; getprop | grep -i -e wifi -e wlan -e hostapd -e softap -e country -e channel -e ap_ | redact
+        WL=""; for T in wl wlx dhdutil; do command -v "$T" >/dev/null 2>&1 && { WL=$T; break; }; done
+        echo; echo "===== Wi-Fi chip (${WL:-no wl tool on this unit})"
+        if [ -n "$WL" ]; then
+            for Q in ver chanspec channel band bw_cap country autocountry chanim_mode chanim_stats chanim_sample_period \
+                     obss_coex spect radar dfs_status interference interference_override mpc ap apsta mchan_algo; do
+                echo "--- $WL $Q"; "$WL" -i wlan0 $Q 2>&1 | nomac
+            done
+            echo "--- associated phones: $("$WL" -i wlan0 assoclist 2>/dev/null | grep -c assoclist)"
+        fi
+        if command -v hostapd_cli >/dev/null 2>&1; then
+            echo; echo "===== hostapd_cli status"; hostapd_cli -i wlan0 status 2>&1 | redact
+        fi
+        echo; echo "===== /proc/net/wireless"; cat /proc/net/wireless 2>&1
+        echo; echo "===== kernel: channel switches, disconnects, access point, radar"
+        dmesg 2>/dev/null | grep -e ch_switch -e WLC_E_ -e 'AP/GO' -e chanspec -e radar -e DFS -e CSA -e start_ap | nomac
+        echo; echo "===== hostapd interference statistics and channel messages (last 400)"
+        logcat -d -v time -s hostapd:V 2>/dev/null | grep -i -e chanspec -e channel -e csa -e acs -e interference | nomac | tail -400
+        echo; echo "===== projection: screen timeouts, session ends (last 200)"
+        logcat -d -v time 2>/dev/null | grep -e onScreenTimeout -e onSessionFinalized -e onSessionStarted -e onNotifyDecodeFailure -e 'wifi kernel_s' | nomac | tail -200
+    } > "$F" 2>&1
+    sync
+    echo "Saved HOTSPOT/hotspot.txt to the USB (no network name, password or hardware address). Export complete."
+    exit 0
+fi
 if [ "$MODE" = disable ]; then
     rm -f "$MARKER" || exit 1
     echo "CarPlay AR disabled. Start a fresh route to refresh the HUD."
@@ -62,11 +132,13 @@ elif [ "$MODE" = tune ]; then
         case "$LINE" in ''|'#'*) continue ;; esac
         KEY=${LINE%%=*}
         VALUE=${LINE#*=}
-        case "$KEY" in street_ar_meters|gain|backstep_meters|bar_meters|turn_offset_meters) ;; exit_side|exit_style) ;; *) echo "Unknown tuning key: $KEY"; exit 1 ;; esac
+        case "$KEY" in street_ar_meters|gain|backstep_meters|bar_meters|turn_offset_meters|guidance_restart_s) ;; exit_side|exit_style|recover) ;; *) echo "Unknown tuning key: $KEY"; exit 1 ;; esac
         if [ "$KEY" = exit_side ]; then
             case "$VALUE" in auto|right|left|generic) ;; *) echo "Bad tuning value for $KEY"; exit 1 ;; esac
         elif [ "$KEY" = exit_style ]; then
             case "$VALUE" in slight|sign) ;; *) echo "Bad tuning value for $KEY"; exit 1 ;; esac
+        elif [ "$KEY" = recover ]; then
+            case "$VALUE" in off|keyframe|screen|reconnect) ;; *) echo "Bad tuning value for $KEY"; exit 1 ;; esac
         else
             case "$VALUE" in ''|*[!0-9.]*|*.*.*) echo "Bad tuning value for $KEY"; exit 1 ;; esac
         fi

@@ -10,7 +10,7 @@ import com.hkmc.cluster.NavigationCluster;
  * five seconds), so a general release does not log at navigation cadence.
  */
 public final class ArHudDebug implements Thread.UncaughtExceptionHandler {
-    public static final String VERSION="v112";
+    public static final String VERSION="v113";
     private static long window=-1, sequence, flagCheckedAt=-1;
     private static int count, criticalCount, chatterCount, dropped, criticalDropped;
     private static boolean flagged;
@@ -242,7 +242,8 @@ public final class ArHudDebug implements Thread.UncaughtExceptionHandler {
         boolean critical=message.startsWith("icon_gate") || message.startsWith("maneuver_replaced") ||
                 message.startsWith("hud_list") || message.startsWith("hud_blank") || message.startsWith("reset") ||
                 message.startsWith("sender_prepare") || message.startsWith("tuning") || message.startsWith("rerouting") ||
-                message.startsWith("clear_") || message.startsWith("timer_expired") || message.startsWith("health");
+                message.startsWith("clear_") || message.startsWith("timer_expired") || message.startsWith("health") ||
+                message.startsWith("screen") || message.startsWith("recover") || message.startsWith("guidance_restart");
         // Routine 4 Hz chatter gets its own small budget so it cannot crowd out transitions.
         boolean chatter=message.startsWith("ipc_") || message.startsWith("worker_alive") || message.startsWith("hud_distance");
         if(critical ? criticalCount++>=100 : chatter ? chatterCount++>=20 : count++>=50){dropped++;if(critical)criticalDropped++;return;}
