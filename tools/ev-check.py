@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Does the EV build fit a car? Compares a Leafia kit report (LEAFIA-REPORT.txt, or an
-issue body with one pasted in) with ev/car-reference, the Ioniq 5 US 260507 files the
-EV build was made and checked on.
+issue body with one pasted in) with ev/car-reference, the files of each car the EV build
+was made and checked on (Ioniq 5 US 260507, Kia EV6 US 260507).
 
   tools/ev-check.py LEAFIA-REPORT.txt      (or - for stdin)
 
@@ -20,21 +20,28 @@ JAVA = os.path.join(ROOT, 'ev', 'gpm-ev', 'src', 'com', 'google', 'android', 'pr
 
 
 def reference():
-    ref = []
+    """{car: [(kind, path, md5)]}, in file order."""
+    cars, car = {}, None
     for l in open(REF):
+        if l.startswith('car '):
+            car = l[4:].strip(); cars[car] = []
+            continue
         p = l.split()
         if len(p) == 3 and not p[0].startswith('#'):
-            ref.append(tuple(p))
-    return ref
+            if car is None:
+                sys.exit('ev/car-reference: a file line before the first "car" line')
+            cars[car].append(tuple(p))
+    return cars
 
 
-def check_reference(ref):
-    """the hcan md5 here must be the one the EV code checks"""
-    m = re.search(r'HCAN_MD5\s*=\s*"([0-9a-f]{32})"', open(JAVA).read())
-    hcan = [h for k, f, h in ref if f.endswith('com.hkmc.ext.hcan.odex')]
-    if not m or hcan != [m.group(1)]:
-        sys.exit('ev/car-reference: hcan md5 %s does not match EvCar.HCAN_MD5 %s'
-                 % (hcan, m and m.group(1)))
+def check_reference(cars):
+    """every car's hcan md5 must be one the EV code accepts"""
+    m = re.search(r'HCAN_MD5S\s*=\s*\{([^}]*)\}', open(JAVA).read())
+    accepted = re.findall(r'"([0-9a-f]{32})"', m.group(1)) if m else []
+    for car, ref in cars.items():
+        hcan = [h for k, f, h in ref if f.endswith('com.hkmc.ext.hcan.odex')]
+        if len(hcan) != 1 or hcan[0] not in accepted:
+            sys.exit('ev/car-reference: %s hcan md5 %s is not in EvCar.HCAN_MD5S %s' % (car, hcan, accepted))
 
 
 def parse(text):
@@ -60,14 +67,20 @@ WHAT = {
 def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
-    ref = reference()
-    check_reference(ref)
+    cars = reference()
+    check_reference(cars)
     text = sys.stdin.read() if sys.argv[1] == '-' else open(sys.argv[1], encoding='utf-8', errors='replace').read()
     product, files, codes = parse(text)
     if not product:
         print('no "prop ro.build.product=" line: not a Leafia kit report')
         return 2
     print('car: %s' % product)
+    # The verified car this report matches best (fewest differing files).
+    def differing(ref):
+        return sum(1 for kind, path, want in ref if (codes if kind == 'code' else files).get(path) != want)
+    name = min(cars, key=lambda c: differing(cars[c]))
+    ref = cars[name]
+    print('closest verified car: %s' % name)
     bad = {'framework': [], 'code': [], 'file': []}
     old_kit = False
     for kind, path, want in ref:
@@ -86,8 +99,8 @@ def main():
         return 1
     if not any(bad.values()):
         print('EV build fits: the same framework, GPM code and Android Auto library as the '
-              'Ioniq 5 US 260507. No new vehicle-command review is needed; the car still needs '
-              'its own energy model if it isn\'t an Ioniq 5 with the same battery, and a car test.')
+              '%s. No new vehicle-command review is needed; the car still needs its own energy '
+              'model if its battery and efficiency differ, and a car test.' % name)
         return 0
     if bad['framework']:
         print('The vehicle framework differs: the EV code would stay off (it reads and sends '

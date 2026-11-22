@@ -8,6 +8,21 @@ package com.google.android.projection.protocol;
 public final class TxTest {
     public static void main(String[] a) {
         int pass = 0;
+        // Verified firmware profiles: commands only on these exact framework files.
+        check("Ioniq 5 US 260507".equals(Precond.HkmcVehicle.profile(
+                "dd72e04bce0a2b4bda1506308ac21f91002c1436553b8156c345cc4313661338",
+                "3cf40fb00854c63afa49abea1dad18a0afcbc0dd68b17de9ed7ea3f5aeab4222")), "Ioniq 5 profile");
+        pass++;
+        check("Kia EV6 US 260507".equals(Precond.HkmcVehicle.profile(
+                "b9e7e02b81e1a8cfcf767c6b8bbb28bcf1d2c411a208fbf6a465e7f0c662774a",
+                "8af745b41aa28f490953d61531215cd94e059f104b31f6236a8f6c7af23b8062")), "EV6 profile");
+        pass++;
+        check(Precond.HkmcVehicle.profile(
+                "b9e7e02b81e1a8cfcf767c6b8bbb28bcf1d2c411a208fbf6a465e7f0c662774a",
+                "3cf40fb00854c63afa49abea1dad18a0afcbc0dd68b17de9ed7ea3f5aeab4222") == null, "mixed files: no profile");
+        pass++;
+        check(EvCar.HCAN_MD5S.length == 2, "two verified telematics libraries");
+        pass++;
         check(EvCar.tx("com.hkmc.hev.IHEVService", "getHEVStatus") == 3, "found by name");
         pass++;
         check(EvCar.tx("com.hkmc.hev.IHEVService", "noSuchMethod") == -1, "missing method");

@@ -38,6 +38,9 @@ def validate(patches, report):
     wanted={(part,'HKMC_DiPO') for part in PARTS}
     if advanced:
         wanted.add(('2_tbt','HKMC_Navi_ExSL'));wanted.add(('2_tbt','HKMC_GPM'))
+        # The EV build of GPM, where the car has one, needs its AR build too.
+        if any(l.split()[:3]==['2_tbt+ev','app','HKMC_GPM'] for l in (patches/variant/'manifest').read_text().splitlines()):
+            wanted.add(('2_tbt+ev','HKMC_GPM'))
         api=data.get('framework_api',{})
         if variant!='ev6' or api.get('bar_index')!=11 or not data.get('framework_sha256'):
             raise ValueError('advanced AR requires the verified EV6 framework API')
@@ -47,7 +50,8 @@ def validate(patches, report):
     for build in builds:
         relative = Path(build["patch"])
         name=build.get('name','HKMC_DiPO')
-        expected = variant + "/"+name+"." + build["part"].split("_", 1)[1] + (".advanced-ar.lpd" if advanced else ".ar.lpd")
+        suffix = "ev" if build["part"] == "2_tbt+ev" else build["part"].split("_", 1)[1]
+        expected = variant + "/"+name+"." + suffix + (".advanced-ar.lpd" if advanced else ".ar.lpd")
         if str(relative) != expected or not isinstance(build.get("calls"), int) or build["calls"] < 1:
             raise ValueError("unexpected AR patch entry")
         if digest(patches / relative) != build.get("patch_sha256"):

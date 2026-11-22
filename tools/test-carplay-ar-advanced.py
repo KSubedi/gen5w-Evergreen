@@ -312,10 +312,10 @@ class AdvancedTest(unittest.TestCase):
         script=work/'service.sh';script.write_text(source)
         subprocess.run(['sh',str(script)],timeout=10,capture_output=True)
         lines=(work/'logged').read_text().splitlines()
-        self.assertEqual(lines,['-p w -t EvergreenAR v114 wifi kernel_s=10.602161 event=ap_up',
-                                '-p w -t EvergreenAR v114 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
-                                '-p w -t EvergreenAR v114 wifi kernel_s=4121.925019 event=deauth reason=4',
-                                '-p w -t EvergreenAR v114 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
+        self.assertEqual(lines,['-p w -t EvergreenAR v115 wifi kernel_s=10.602161 event=ap_up',
+                                '-p w -t EvergreenAR v115 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
+                                '-p w -t EvergreenAR v115 wifi kernel_s=4121.925019 event=deauth reason=4',
+                                '-p w -t EvergreenAR v115 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
         self.assertNotIn(':af',(work/'logged').read_text())
         self.assertFalse((work/'logs/.wifi').exists())
 
@@ -380,6 +380,10 @@ class AdvancedTest(unittest.TestCase):
         with zipfile.ZipFile(quiet) as outer:
             with zipfile.ZipFile(io.BytesIO(outer.read('packages/wireless.carplay.aa.zip'))) as inner:
                 self.assertNotIn('ar-trace.enabled',inner.namelist());self.assertFalse(json.loads(inner.read('AR_BUILD.json'))['trace_enabled'])
+        # A car with an EV build of GPM needs its AR build too.
+        evpatches=self.root/'ev-patches';shutil.copytree(output/'patches',evpatches)
+        with (evpatches/'ev6/manifest').open('a') as m:m.write('2_tbt+ev app HKMC_GPM ev6/HKMC_GPM.ev.lpd 0123456789abcdef0123456789abcdef\n')
+        with self.assertRaises(ValueError):verify.validate(evpatches,output/'ar-build.json')
         bad=copy.deepcopy(report);bad['builds']=bad['builds'][:3]
         (output/'bad.json').write_text(json.dumps(bad))
         with self.assertRaises(ValueError):verify.validate(output/'patches',output/'bad.json')

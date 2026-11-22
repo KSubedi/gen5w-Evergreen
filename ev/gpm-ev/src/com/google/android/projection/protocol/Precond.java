@@ -344,13 +344,23 @@ public final class Precond {
         // The binder transaction numbers we send (HEV 3/62/65/66, BCM 109)
         // are defined by the car framework's method order, so commands are
         // only sent when the framework is byte-for-byte the one they were
-        // verified on (Ioniq 5 US 260507, as in gen5w-preconditioning's
-        // profile and our private/car-neev-260507). No device-name check:
-        // identical framework files mean identical numbers.
-        static final String FRAMEWORK_SHA256 =
-                "dd72e04bce0a2b4bda1506308ac21f91002c1436553b8156c345cc4313661338";
-        static final String SERVICE_SHA256 =
-                "3cf40fb00854c63afa49abea1dad18a0afcbc0dd68b17de9ed7ea3f5aeab4222";
+        // verified on. No device-name check: identical framework files mean
+        // identical numbers. Each profile: {car, automotive.odex sha256,
+        // automotive-service.odex sha256}.
+        //  - Ioniq 5 US 260507: gen5w-preconditioning's profile and our
+        //    private/car-neev-260507.
+        //  - Kia EV6 US 260507: deodexed 2026-11-22; the same transaction
+        //    numbers (HEV 3/62/65/66, BCM 1/109) and the same HEVService
+        //    implementation (MICOM 0xc68/0xc66/0xc65, the 120 ms station reset);
+        //    notes/ev-vehicle-commands.md.
+        static final String[][] PROFILES = {
+            {"Ioniq 5 US 260507",
+                "dd72e04bce0a2b4bda1506308ac21f91002c1436553b8156c345cc4313661338",
+                "3cf40fb00854c63afa49abea1dad18a0afcbc0dd68b17de9ed7ea3f5aeab4222"},
+            {"Kia EV6 US 260507",
+                "b9e7e02b81e1a8cfcf767c6b8bbb28bcf1d2c411a208fbf6a465e7f0c662774a",
+                "8af745b41aa28f490953d61531215cd94e059f104b31f6236a8f6c7af23b8062"},
+        };
 
         private Boolean compatible;  // null = not checked yet
 
@@ -359,21 +369,31 @@ public final class Precond {
             if (compatible != null) {
                 return compatible.booleanValue();
             }
-            boolean ok;
+            String profile = null;
             try {
-                ok = Build.VERSION.SDK_INT == 19
-                        && FRAMEWORK_SHA256.equals(
-                                sha256("/system/framework/automotive.odex"))
-                        && SERVICE_SHA256.equals(
-                                sha256("/system/framework/automotive-service.odex"));
+                if (Build.VERSION.SDK_INT == 19) {
+                    profile = profile(sha256("/system/framework/automotive.odex"),
+                            sha256("/system/framework/automotive-service.odex"));
+                }
             } catch (Throwable t) {
                 Log.w(TAG, "firmware check failed: " + t);
                 return false;  // retried next time
             }
+            boolean ok = profile != null;
             compatible = Boolean.valueOf(ok);
-            Log.i(TAG, "firmware profile " + (ok ? "matches" : "DOES NOT match")
+            Log.i(TAG, "firmware profile " + (ok ? "matches " + profile : "DOES NOT match")
                     + " (device " + Build.DEVICE + ")");
             return ok;
+        }
+
+        /** The verified car these framework files are, or null. */
+        static String profile(String framework, String service) {
+            for (String[] p : PROFILES) {
+                if (p[1].equals(framework) && p[2].equals(service)) {
+                    return p[0];
+                }
+            }
+            return null;
         }
 
         @Override

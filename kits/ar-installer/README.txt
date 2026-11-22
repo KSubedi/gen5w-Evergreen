@@ -1,10 +1,31 @@
-EVERGREEN 1.3.0.114 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.3.0.115 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.115: EV FEATURES FOR ANDROID AUTO (first EV6 build)
+Evergreen's EV features (from egmp-aa-ev-feat by willemcvu), until now only
+for the Ioniq 5, are built for the EV6 and on by default:
+- EV routing in Google Maps on Android Auto: the head unit sends Maps an
+  energy model with the battery's live energy, so Maps shows battery % on
+  arrival and plans charging stops with realistic charge times.
+- Battery preconditioning: when the next stop is a fast charger (over 50 kW)
+  within an hour, the car is asked to warm the battery, the same request the
+  car's own navigation makes. The car's own battery conditioning setting is
+  the off switch.
+- EV logs (driving and charging, no location): copied to any USB drive that
+  has a folder named egmp-aa-ev-logs at its top level, within about 20 s.
+- The energy model is the Ioniq 5's for now (same battery); expect arrival %
+  to be slightly low. Your EV logs are what makes an EV6 model.
+- Android Auto AR keeps working: the EV build of the Android Auto app gets
+  the AR changes too. An empty file named EVERGREEN-NO-EV next to NEMESIS.data
+  on the install drive installs without the EV features.
+What we need: does Maps show arrival %, does a route to a fast charger start
+preconditioning (the car shows it), and the EV logs (folder above) plus the
+AR logs (get-logs kit). This doesn't affect CarPlay.
 
 NEW IN 1.3.0.114: ANDROID AUTO AR (first test build)
 Android Auto's turns already reached the HUD and its turn list, but as
@@ -57,7 +78,7 @@ Numbered 1.3.0.x because it now builds on Evergreen 1.3.0; it installs over
   hotspot's channel settings (no network name, password or address) so we
   can find where the switching comes from. Please run it after a drive with
   a freeze or drop and send HOTSPOT/hotspot.txt.
-- The export kit accepts 104 to 1.3.0.114.
+- The export kit accepts 104 to 1.3.0.115.
 What we need from a test drive: the AR logs (get-logs kit) and, for every
 freeze or drop, the clock time, whether the picture came back by itself
 (with or without a short black flash) and whether the HUD kept working.
@@ -299,7 +320,7 @@ android_auto on|off; anything else keeps the built-in default (200 m, 0.8,
 15 m, 457 m, 0 m, auto, sign, screen, 90, on). The distance and exit
 settings apply to Android Auto as well. Values apply
 within two seconds; start a fresh route. A tune kit replaces the whole file, so
-one kit is in effect at a time. The 1.3.0.114 kits zip has ready-made variants:
+one kit is in effect at a time. The 1.3.0.115 kits zip has ready-made variants:
 tune-street-125 (the 110 start distance), tune-street-300, tune-bar-300 and
 tune-bar-200 (the bar runs 60 to 10 or 90 to 10 inside the 200 m window),
 tune-offset-15/-30 (arrow placed 15/30 m further), tune-exit-slight (the 109
@@ -324,7 +345,7 @@ compare the CarPlay conversion against.
 AFTER THE DRIVE
 1. Park in READY. Extract the NEW Evergreen-AR-export-stop-clean.zip onto a
    separate empty USB, so that NEMESIS.sh and NEMESIS.data are at its root.
-   This version supports 104 to 1.3.0.114.
+   This version supports 104 to 1.3.0.115.
 2. Insert it and let NEMESIS run the export. Wait for "Export and cleanup complete" before
    removing USB. The kit flushes writes before showing completion.
 3. Zip the AR-DEBUG-FINISHED folder and send it privately, using an upload link if it is

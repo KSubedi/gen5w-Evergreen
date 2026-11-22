@@ -43,7 +43,8 @@
           "4d7452a71fc2c120032ef1734d15f0fb"
         ],
         "/system/app/HKMC_GPM.apk": [
-          "7c6df0f570677157326b105b6b87bfc2"
+          "7c6df0f570677157326b105b6b87bfc2",
+          "efd717fc989c1181a9f253f0d08dfda8"
         ],
         "/system/app/HKMC_Navi_ExSL.apk": [
           "b1fc88d42954c41e7944e9247647e9ad"
@@ -53,6 +54,7 @@
           "7e90fa7d8a161ade71e11dc15e56c410"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
+          "37cbe6bfe7462444ca1f6d88013383d9",
           "c08410a8d32a615b1aa805cd8a243d52"
         ]
       }

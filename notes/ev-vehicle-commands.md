@@ -125,3 +125,32 @@ All three are done on branch `ev-import` (2026-11-04); details after each.
   model to Google Maps over Android Auto (sensor 23). That isn't a car command.
   It carries battery capacity, energy and outside temperature, which Maps uses
   for EV routing.
+
+## Kia EV6 US 260507 (review 2026-11-22)
+
+The same three preconditioning commands and the same reads, on a second car. Checked
+against the EV6's own framework, deodexed from the stock files (`tools/port.py`, the same
+path the AR build uses), not assumed from the Ioniq 5:
+
+| What | Ioniq 5 US 260507 | Kia EV6 US 260507 |
+|---|---|---|
+| `IHEVService.getHEVStatus` / `setBattCondEvStation` / `setBattCondRouteDis` / `setBattCondRemainTime` | 3 / 0x3e / 0x41 / 0x42 | same |
+| `HEVService.setBattCondEvStation` | MICOM 0xc68, two bytes `& 0xf`, reset to (7,7) after 120 ms | same (0xc68, `& 0xf`, `Timer` 0x78 ms) |
+| `setBattCondRouteDis` / `setBattCondRemainTime` | MICOM 0xc66 / 0xc65 | same |
+| `IBCMService.registerBCMListener`, BCM 109 | 1, `getBattCondIndSta` (a getter) | same |
+| `IBCMListener.onDriveModeChanged` | 0x11 | same |
+| `IDATCService.isUnitCelsius` / `getVRClimateStatus` | 6 / 0x29 | same |
+| hscan `getCarSpeed` / `getXEV_Bms_GDS_SOH` | 0x0b / 0xd6 | same |
+| GPM app code (dex inside the odex) | `fcd92857…` | same |
+| Android Auto library | `48ee793a…` | same file |
+
+The framework files themselves differ (as every car's odex files do), so the EV code's
+gates now hold a list of verified profiles instead of one: `Precond.HkmcVehicle.PROFILES`
+(automotive.odex and automotive-service.odex sha256) and `EvCar.HCAN_MD5S`. On any other
+file set the EV code still reads and sends nothing. The EV6's `automotive.odex` is the same
+file on two owners' cars (2026-11-18 and 2026-11-21 reports).
+
+**Approved as they are for the EV6**, the same commands with the same arguments as on the
+Ioniq 5; the car's own *battery conditioning* setting stays the off switch. egmp-aa-ev-feat's
+original field tests of these commands (off, active, off) were on an EV6 of the same
+260507 family (docs/PRECONDITIONING.md).

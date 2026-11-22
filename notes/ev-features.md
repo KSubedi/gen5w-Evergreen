@@ -1,6 +1,6 @@
 # Initiative: EV features in Evergreen (from egmp-aa-ev-feat)
 
-Status: **released in 1.2.0, confirmed on a car** (EV routing, preconditioning, drive log). The EV GPM and library for the Ioniq 5 US 260507 (`neev` set, so the 2022, 2023 and 2024 SE on 260507) were built from the maintainer's stock files on 2026-11-04 and are in `patches/neev/manifest` as `+ev` lines; package-version 1.2.0. Off-car: the mock head unit installs the EV build by default and the plain one with `EVERGREEN-NO-EV`, and both uninstall to byte-identical stock (mksh). Every other car builds as before.
+Status: **released in 1.2.0, confirmed on a car** (EV routing, preconditioning, drive log). **Kia EV6 US 260507 built 2026-11-22** (first in the EV6 AR test build 1.3.0.115; not yet confirmed on a car); see "Kia EV6" below. The EV GPM and library for the Ioniq 5 US 260507 (`neev` set, so the 2022, 2023 and 2024 SE on 260507) were built from the maintainer's stock files on 2026-11-04 and are in `patches/neev/manifest` as `+ev` lines; package-version 1.2.0. Off-car: the mock head unit installs the EV build by default and the plain one with `EVERGREEN-NO-EV`, and both uninstall to byte-identical stock (mksh). Every other car builds as before.
 
 ## Goal
 
@@ -171,7 +171,33 @@ the Ioniq 5 US 260507 on 2026-11-04; to redo it (or for another car):
   **Re-verify the HEV/BCM transaction numbers on that firmware first.** Better
   still, look them up by name, the way Battery Watchdog's `TxnResolver` does,
   instead of hard-coding them.
-- **Kia EV6:** needs its own energy model (`build_model_template.py` has a
-  generic path), a check that its data sources match, and its own testing.
+- **Kia EV6:** done 2026-11-22, see below. Still open: its own energy model.
+
+## Kia EV6 US 260507
+
+- **Data sources match** (notes/ev-vehicle-commands.md, "Kia EV6"): the GPM app code is the
+  Ioniq 5's (`fcd92857…`), the Android Auto library is the same file, and every transaction
+  number the EV code uses is the same. The gates (`Precond.HkmcVehicle.PROFILES`,
+  `EvCar.HCAN_MD5S`) list both cars; `ev/car-reference` has a section per car and
+  `tools/ev-check.py` names the closest verified car.
+- **Build** (the steps above, with the EV6 stock files and the toolchain in
+  `/work/toolchains/ev-env.sh`: Google's `android-19_r04.zip`, SHA-1 as above, and d8 from
+  R8): base = `patches/ev6/HKMC_GPM.tbt.lpd` (APK `7c6df0f5…`, matches the manifest); EV dex
+  824 classes (792 + 32 EV), no `getVIN`; two builds give the same dex; delta
+  `patches/ev6/HKMC_GPM.ev.lpd` (313 KB) round-trips; APK `efd717fc…`. The library is the
+  shared `common/libautoreceiver_infobank.ev.lpd` (result `37cbe6bf…` from the EV6's library).
+  Manifest: `2_tbt+ev` lines in `patches/ev6/manifest`.
+- **Mock head unit** (EV6 stock tree): installs the EV build by default, the turn-by-turn
+  build with `EVERGREEN-NO-EV`, and uninstalls to stock either way (Android up and down).
+- **Energy model:** the Ioniq 5's for now. Long-range EV6s have the same 77.4 kWh pack and
+  similar weight; the EV6 is a little more efficient, so Maps' arrival % should err low.
+  Usable capacity is learned from the BMS, so the 58 kWh standard-range pack is measured, not
+  assumed. A proper EV6 profile comes from EV6 logs (`egmp-aa-ev-logs`).
+- **AR build:** the EV6 AR installer also builds the AR version of the EV GPM
+  (`ev6/HKMC_GPM.ev.advanced-ar.lpd`, its own fingerprinted plan entry), so Android Auto AR
+  and the EV features work together; `EVERGREEN-NO-EV` gives the AR turn-by-turn GPM.
+- The Ioniq 5's shipped EV GPM (`neev/HKMC_GPM.ev.lpd`) was built before the gates became
+  a list; its single-profile gate is equivalent for that car. It picks up the list at its
+  next rebuild (needs the Ioniq 5 stock files).
 - **Model improvements:** egmp-aa-ev-feat's roadmap (log analysis, a model that
   adjusts itself) moves to Evergreen issues.

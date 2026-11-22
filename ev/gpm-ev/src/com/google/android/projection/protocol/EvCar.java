@@ -27,7 +27,7 @@ import com.hkmc.cluster.NavigationClusterListener;
  * read to another method. A name that isn't found makes that read "unknown".
  * The telematics interface (hscan) is in com.hkmc.ext.hcan, which GPM may not
  * load: then the numbers verified on the Ioniq 5 US 260507 (0x0b, 0xd6) are
- * used only if that library is byte for byte the 260507 one (HCAN_MD5).
+ * used only if that library is byte for byte a verified 260507 one (HCAN_MD5S).
  * No VIN is read (Evergreen collects no per-car identity).
  *
  * Sources (numbers as on the Ioniq 5 US 260507):
@@ -63,7 +63,8 @@ final class EvCar {
     private static final String HCAN_GET_SOH = "getXEV_Bms_GDS_SOH";       // ()I, 0xd6 on 260507
     // com.hkmc.ext.hcan.odex of the Ioniq 5 US 260507, where 0x0b and 0xd6 were verified
     static final String HCAN_ODEX = "/system/framework/com.hkmc.ext.hcan.odex";
-    static final String HCAN_MD5 = "c4638b2befbabce418d2664f4e7ec304";
+    // Ioniq 5 US 260507, and the Kia EV6 US 260507's (same 0x0b and 0xd6, deodexed 2026-11-22)
+    static final String[] HCAN_MD5S = {"c4638b2befbabce418d2664f4e7ec304", "b9ed02d077649b7c2a589d665f33e2e0"};
 
     private static final String DATC_SERVICE = "com.hkmc.micom.datc";
     private static final String DATC_TOKEN = "com.hkmc.datc.IDATCService";
@@ -653,10 +654,12 @@ final class EvCar {
         }
         Boolean known = sHcanKnown;
         if (known == null) {
-            boolean ok = HCAN_MD5.equals(md5(HCAN_ODEX));
+            String md5 = md5(HCAN_ODEX);
+            boolean ok = false;
+            for (String known1 : HCAN_MD5S) ok |= known1.equals(md5);
             known = Boolean.valueOf(ok);
             sHcanKnown = known;
-            Log.i(TAG, "telematics library " + (ok ? "is" : "isn't") + " the Ioniq 5 US 260507 one");
+            Log.i(TAG, "telematics library " + (ok ? "is" : "isn't") + " a verified 260507 one");
         }
         return known.booleanValue() ? verified260507 : -1;
     }

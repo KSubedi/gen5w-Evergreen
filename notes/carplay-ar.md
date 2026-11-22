@@ -941,3 +941,17 @@ Maps and Waze send distance updates, and how GPM's own HUD list and ahead list l
 the native types.
 
 Host validation: 1,660 Java checks and 56 Python cases.
+
+## 1.3.0.115 test build: EV features in the EV6 AR build
+
+Evergreen's EV features (egmp-aa-ev-feat) are built for the EV6 (notes/ev-features.md, "Kia
+EV6 US 260507"; command review in notes/ev-vehicle-commands.md). The EV6 patch set gains
+`2_tbt+ev` lines (EV GPM and the shared EV library), and the AR build now also builds the AR
+version of the EV GPM: `build-carplay-ar-advanced.py` takes the `2_tbt+ev` GPM line as a
+fifth build (`ev6/HKMC_GPM.ev.advanced-ar.lpd`, plan `advanced-plan-115`, the other four
+builds unchanged), and `check-carplay-ar-build.py` requires it whenever the manifest has an
+EV GPM. The EV patch adds its own calls at the entry of `GpmNaviTBTManager.onStatus` and
+in `onNextTurn`'s NAVDUMP branch; the AR hooks sit next to them.
+
+Not proven on the car: everything EV on the EV6 (arrival %, preconditioning, logs), and
+both features together in one GPM.

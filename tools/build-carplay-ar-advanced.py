@@ -36,9 +36,9 @@ def inputs(stock,patches):
     navi=[line.split() for line in lines if line.split()[:3]==['2_tbt','app','HKMC_Navi_ExSL']]
     if len(navi)!=1:raise ValueError('expected one navigation build')
     entries+=navi
-    # Android Auto (GPM): one turn-by-turn build on the EV6.
-    gpm=[line.split() for line in lines if line.split()[:3]==['2_tbt','app','HKMC_GPM']]
-    if len(gpm)!=1:raise ValueError('expected one Android Auto build')
+    # Android Auto (GPM): the turn-by-turn build, and the EV build (2_tbt+ev) where the car has one.
+    gpm=[line.split() for line in lines if line.split()[1:3]==['app','HKMC_GPM'] and line.split()[0] in ('2_tbt','2_tbt+ev')]
+    if [e[0] for e in gpm].count('2_tbt')!=1 or len(gpm)>2:raise ValueError('expected one Android Auto build, and at most one EV build')
     entries+=gpm
     framework={p.name:base.sha256(p) for p in sorted((stock/'framework').iterdir()) if p.suffix in ('.jar','.odex')}
     if not all(n in framework for n in ('core.odex','automotive.jar','automotive.odex')):
@@ -67,6 +67,11 @@ def reconstruct(stock,patches,entry,temp,lpatch):
             'base_dex_sha256':base.sha256(dex),'sites':sites}
     if name=='HKMC_Navi_ExSL':report['native_turn_sites']=simple.inspect(tree)
     return tree,report
+
+
+def advanced_suffix(part):
+    """tbt, bridge, or ev for the EV build (part 2_tbt+ev)."""
+    return 'ev' if part=='2_tbt+ev' else part.split('_',1)[1]
 
 
 def inspect(stock,patches=None,lpatch=None):
@@ -126,7 +131,7 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
                 sites=adapter.inspect_navi(checked)
                 if len(sites)!=3 or any(p['file']!='org/evergreen/carplay/ArHudTrap.smali' for p in sites):
                     raise ValueError('unwrapped navigation trap call')
-            delta='ev6/'+name+'.'+part.split('_',1)[1]+'.advanced-ar.lpd'
+            delta='ev6/'+name+'.'+advanced_suffix(part)+'.advanced-ar.lpd'
             base.run('python3',ROOT/'tools/mkdelta.py',stock/'app'/(name+'.odex'),dex,staged/delta)
             roundtrip=temp/(key+'-roundtrip.dex');base.run(lpatch,'delta',staged/delta,stock/'app'/(name+'.odex'),roundtrip)
             if dex.read_bytes()!=roundtrip.read_bytes():raise ValueError('delta round trip mismatch')
