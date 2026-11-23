@@ -2,7 +2,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: Browse feature ideas
-    url: https://github.com/zpoon/gen5w-Evergreen/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement
+    url: https://github.com/KSubedi/gen5w-Evergreen/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement
     about: See what others have suggested and add a thumbs-up to the ones you'd use.
   - name: Check if your car is supported
     url: https://zpoon.github.io/gen5w-Evergreen/

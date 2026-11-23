@@ -1,5 +1,9 @@
 # Notices
 
+## Ultimate Wireless Projection
+
+Ultimate Wireless Projection (https://github.com/KSubedi/gen5w-Evergreen), maintained by KSubedi, is a fork of Evergreen by zpoon (https://github.com/zpoon/gen5w-Evergreen), GPL-3.0, and keeps the same licences. Its AR HUD code (`src/carplay-ar/`) is new GPL-3.0 work; it follows the AR HUD protocol and cluster turn formats documented by Open-HMG (https://github.com/Open-HMG/hmgapi-wireless-cp-aa) and imports no HMG-API code. The sections below describe Evergreen and HMG Leafia Plus as they were forked.
+
 ## Evergreen
 
 Evergreen is a community fork of HMG Leafia Plus by VysseCodes (https://github.com/VysseCodes/HMG-Leafia-Plus), GPL-3.0, maintained by zpoon. Everything below describes HMG Leafia Plus as it was forked; Evergreen keeps the same licences.

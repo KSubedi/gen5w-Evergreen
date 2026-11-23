@@ -1,12 +1,31 @@
-# Contributing
+# Contributing to Ultimate Wireless Projection
 
-Thanks for helping! You don't need to write code to contribute:
+Thanks for helping! Contributions are encouraged, and good ones will be accepted.
 
-- **Report your car.** Run the Leafia kit and drop its report on the
-  [compatibility page](https://zpoon.github.io/gen5w-Evergreen/); it files the issue for you. Cars in the
-  page's "Help add your car" list are the most wanted.
-- **Test a build** on your car and tell us how it went, especially for cars marked *testing*.
-- **Report a problem** with the issue form: it walks you through the Leafia kit.
+## Contribution policy
+
+- **Maintainer-gated.** The project is maintained by [KSubedi](https://github.com/KSubedi). Every outside change
+  arrives as a pull request, and the maintainer reviews and merges it. This keeps what reaches people's cars
+  safe and consistent; it isn't a sign that contributions are unwelcome.
+- **What's accepted.** Bug fixes, ports to new cars and firmware, AR HUD and EV improvements, new features,
+  tests, tools and documentation are all in scope. A change is merged when it follows the [rules](#rules)
+  below, is tested (on the mock head unit, and on a real car where it touches the car), and fits the project.
+- **Talk first for big changes.** For a new feature or a large refactor, open an issue first, so we can agree
+  on the approach before you spend the time.
+- **Feedback, not silence.** If a pull request can't be merged as it is, the maintainer will say what it
+  needs. The maintainer has the final say on what is merged and released.
+- **Credit.** Contributors are credited in the README and in [NOTICE.md](NOTICE.md) where their work is used.
+- **Licence.** By contributing you agree your work is licensed under the project's [GPL-3.0](LICENSE).
+
+## Ways to help
+
+You don't need to write code to contribute:
+
+- **Drive reports.** After a drive, attach your logs to an issue with the **EV6 AR drive report** form; the
+  [README](README.md#report-a-problem) explains how the install drive collects them.
+- **Port to your car.** Owners of other Hyundai, Kia and Genesis Gen5W cars, especially with an AR HUD, are the
+  most wanted. Open an issue; porting starts with the read-only Leafia kit (see [Adding a car](#adding-a-car)).
+- **Test a build** on your car and say how it went.
 - **Code:** read on.
 
 Security problems go through [SECURITY.md](SECURITY.md), not public issues.
@@ -100,7 +119,7 @@ These keep cars safe and the project legal:
 
 ## Pull requests
 
-- Branch from `main`; `main` only changes through pull requests.
+- Branch from `main` and open a pull request against it; the maintainer reviews and merges.
 - Describe the change in plain words, and say what you tested: which cars, mock or real.
 - CI must pass. For a first-time contributor, a maintainer approves the workflow run.
 - CI only runs the checks for what you changed (lpatch, `libev6aac.so`, the kit, the package); a docs-only change runs none. Changing a workflow runs them all.
@@ -119,5 +138,3 @@ git tag -a v1.2.0 -m "v1.2.0" && git push origin v1.2.0
 `.github/workflows/release.yml` then runs all of CI and, only if everything passes, publishes a GitHub
 Release with the package, the four Leafia kit sizes and `SHA256SUMS`, built from exactly that commit (the package's
 build stamp names the version). Tags not on `main` are refused.
-
-By contributing you agree your work is licensed under the project's [GPL-3.0](LICENSE).
