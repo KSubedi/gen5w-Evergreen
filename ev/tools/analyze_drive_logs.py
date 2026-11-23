@@ -281,6 +281,9 @@ def cmd_drive(files, km, vmin, a_try, c_try):
     print("\n%d stretches at >= %.0f km/h: model / real energy = %.3f" % (len(data), vmin, model / used))
     # Road load fit: A with C fixed (highway data can't separate them), the
     # model's drivetrain loss and spin, measured climate, plus a climb term.
+    if len(data) < 2:
+        print("road load fit: needs at least 2 stretches (it fits A and the climb together)")
+        return
     print("road load fit (climate measured, model losses):")
     for c in (0.493, 0.45, 0.40, 0.35):
         x = [[s["d"] * (1 + M.DL_FRACTION), s["alt"]] for s in data]

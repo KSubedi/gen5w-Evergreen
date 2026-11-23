@@ -7,7 +7,7 @@ Ultimate Wireless Projection is a [NEMESIS](https://github.com/xwtk/hmg_nemesis)
 > [!IMPORTANT]
 > **Tested car:** 2022 Kia EV6 GT-Line, USA, Gen5W head-unit firmware **260507**, with the factory AR HUD. The installer only installs on that firmware. Want it on your Hyundai, Kia or Genesis? See [Help port it to your car](#help-port-it-to-your-car).
 
-**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.121-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
+**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.124-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
 
 ## Features
 
@@ -82,7 +82,7 @@ This isn't just "wireless on". The AR HUD was tuned over about 20 test builds, e
 
 You need [NEMESIS](https://github.com/xwtk/hmg_nemesis) 1.15 or newer on the head unit.
 
-1. Download `UltimateWirelessProjection_EV6_US_260507_<version>.zip` (`Evergreen_EV6_US_260507_AR_<version>.zip` for 1.3.0.121 and earlier) from the [latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.121-beta.1).
+1. Download `UltimateWirelessProjection_EV6_US_260507_<version>.zip` (`Evergreen_EV6_US_260507_AR_<version>.zip` for 1.3.0.121 and earlier) from the [latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.124-beta.1).
 2. Unzip it onto an empty USB drive (exFAT or FAT32). The top of the drive should show `NEMESIS.data`, `NEMESIS.sh` and `packages`. **Keep this drive**: it also collects the logs.
 3. Park with the car in READY and wait until the head unit has fully started. Plug in the drive and approve the NEMESIS prompt.
 4. The head unit restarts by itself when the install is done. Remove the drive while it restarts.

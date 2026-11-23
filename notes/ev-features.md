@@ -230,3 +230,9 @@ Build (steps 3-6 above, EV6 stock): the HEAD sources rebuilt the shipped EV GPM 
 base hashes. The owner's four EV6 logs (city, 0-2 km) have no highway stretch, so
 `RoadLearn` stays at 1.0 on them. Their SOC spans only 88.5-91.5%, too narrow for
 `analyze_drive_logs.py capacity` to say anything about the pack.
+
+On the car (1.3.0.124, 2026-11-23): the log header carries `road_scale`/`charge_scale`; one
+10 km stretch at 81 km/h (15 C, +47 m, climate ~1 kW) used 235 Wh/km against the EV6 model's
+163, so `RoadLearn` moved the scale to 1.026 after it (the prior counts as several stretches).
+One uphill stretch is no basis for recalibrating; more highway logs are. `analyze_drive_logs.py
+drive` no longer crashes on a log with a single stretch.

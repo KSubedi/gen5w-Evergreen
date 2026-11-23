@@ -67,7 +67,13 @@ egmp-carplay-ev-routing's EV6 profile (a copy of its Ioniq 5 values, which it re
 on an EV6), with the DC power at 53% and 80% (41,022 and 61,920 Wh) lowered from 160 to 135 kW,
 from a 2022 EV6's DC stops (egmp-aa-ev-hmg-api 0.8.0, issue #13). 77.4 kWh only, as upstream.
 
-## Not proven on the car
+## On the car (2026-11-23, owner's EV6, 1.3.0.124)
 
-All of it: the iPhone must be re-paired after installing (upstream's instruction), then the car
-added in Apple Maps > profile > Vehicles. Logs: `cpev` lines in `AR-LOGS`.
+Owner: CarPlay and Android Auto both flawless, state of charge right. The export: identity armed
+at the iAP2 app's start (12:05:11), Apple Maps subscribed 40 s later, every send `send=0`, SOC
+90 -> 88% with energy 69,660 -> 68,112 Wh (77.4 kWh x SOC), range 407 -> 399 km, auxiliary
+power from the one-minute average (800-1,300 W with climate on). A CarPlay -> Android Auto
+switch at 12:24: the phone left without the head unit ending the session; the link watchdog
+ended it after 30 s (`link_dead`, `end_session`, re-advertise) and the EV sender stopped with
+the subscription. The iPhone is re-paired once after installing (upstream's instruction), then
+the car is added in Apple Maps > profile > Vehicles. Released as 1.3.0.124.
