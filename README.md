@@ -11,6 +11,17 @@ Ultimate Wireless Projection is a [NEMESIS](https://github.com/xwtk/hmg_nemesis)
 
 ## Features
 
+| | Android Auto | CarPlay |
+|---|:---:|:---:|
+| **Wireless connection** | ✅ | ✅ |
+| **AR navigation on the HUD** | ✅ | ✅ |
+| **Dashboard navigation** (turn-by-turn on the cluster and HUD) | ✅ | ✅ |
+| **EV routing** (charging stops, battery on arrival) | ✅ Google Maps | ✅ Apple Maps |
+| **Automatic battery preconditioning** | ✅ | ❌ not yet¹ |
+| **Live EV battery state** in the maps app | ✅ | ✅ |
+
+¹ Preconditioning starts when the maps app tells the head unit the next stop is a fast charger. Google Maps does this over Android Auto; we haven't yet found an equivalent signal from Apple Maps over CarPlay.
+
 ### Wireless CarPlay and Android Auto
 - Wireless CarPlay and wireless Android Auto through the head unit's own Wi-Fi hotspot, started over Bluetooth like a factory wireless unit.
 - Good-quality CarPlay audio over Wi-Fi: music as AAC, and Siri, calls and the microphone as Opus, decoded by the head unit's own codecs.
