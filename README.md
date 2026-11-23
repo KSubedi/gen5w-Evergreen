@@ -11,22 +11,80 @@ Wireless **CarPlay** and **Android Auto** for Hyundai, Kia and Genesis **Gen5W**
 
 **Compatibility checker:** https://zpoon.github.io/gen5w-Evergreen/
 
-## EV6 CarPlay AR fork
+## EV6 AR fork: wireless CarPlay and Android Auto with the AR HUD
 
-This fork includes experimental CarPlay AR HUD support for **Kia EV6 GT-Line USA,
-firmware 260507**. Download the installer, controls, log kit and test instructions
-from the [latest AR pre-release](https://github.com/KSubedi/gen5w-Evergreen/releases/tag/v1.3.0.121-beta.1).
-One drive does both jobs: plugged in the first time it installs the build, and every time after that it collects
-the logs. Please report problems as an [issue](https://github.com/KSubedi/gen5w-Evergreen/issues/new/choose)
-with the newest `AR-LOGS-…` folder zipped and attached.
-The normal package builder still builds standard Evergreen; the AR installer is
-explicitly selected and gated to that EV6 firmware.
+This fork builds a version of Evergreen for the **Kia EV6 (US), head-unit firmware 260507, with
+the factory AR HUD** (tested on an EV6 GT-Line). It needs [NEMESIS](https://github.com/xwtk/hmg_nemesis)
+1.15 or newer. Download the installer, the control kits and the install steps from the
+[latest EV6 AR release](https://github.com/KSubedi/gen5w-Evergreen/releases/tag/v1.3.0.121-beta.1).
+The normal package builder still builds standard Evergreen; the AR installer is selected
+explicitly and only installs on that EV6 firmware.
 
-The AR HUD (native turn, fork and exit arrows with the phone's exact distance) works for
-CarPlay and, since 1.3.0.114 (first test build), for Android Auto. The AR build also recovers a frozen CarPlay picture by itself (a fresh video frame, then a
-short screen hand-back), asks the phone to resend turn-by-turn when it goes silent, and
-records the hotspot's channel changes for the freeze investigation. See the
-[development and replay notes](notes/carplay-ar.md) and
+### Wireless CarPlay and Android Auto
+- Wireless CarPlay and wireless Android Auto through the head unit's own Wi-Fi hotspot,
+  started over Bluetooth like a factory wireless unit.
+- CarPlay audio over Wi-Fi in good quality: music as AAC, and Siri, calls and the microphone
+  as Opus, decoded by the head unit's own codecs.
+- Settings > Phone Projection still opens the stock Device Connections screen.
+- Turn-by-turn from the phone on the instrument cluster and the HUD, for both.
+
+### AR HUD for CarPlay and Android Auto
+- Near a maneuver, the HUD shows the car's own AR graphics instead of a flat icon:
+  - **Street turns:** the large rotating AR arrow (left, right, slight, sharp, straight).
+  - **Highway exits:** the native left/right exit sign from about 457 m (1,500 ft).
+  - **Other maneuvers:** forks, U-turns and roundabouts.
+- The arrow uses the phone's exact distance and moves smoothly between the phone's
+  once-a-second updates; the progress bar and the HUD's distance number count down with it.
+- On Android Auto, street-turn arrows start about 15 seconds ahead at speed (200-457 m), and
+  only once the phone has given the turn a real distance.
+- No blank HUD between consecutive turns; waiting at a light keeps the arrow; while the
+  phone reroutes, the plain icon is shown instead of an outdated arrow.
+- Works with Apple Maps, Google Maps and Waze. The HUD must be set to AR mode.
+
+### EV features for Android Auto
+From [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat) by willemcvu:
+- **EV routing in Google Maps:** the head unit sends Maps the battery's live energy, so Maps
+  shows battery % on arrival and plans charging stops with realistic charge times.
+- **Battery preconditioning:** when the next stop is a fast charger (over 50 kW) within an
+  hour, the car is asked to warm the battery, the same request its own navigation makes.
+- **EV logs** (driving and charging, no location) are saved with the AR logs.
+- The energy model is currently the Ioniq 5's (same battery), so arrival % may read slightly
+  low. An empty `EVERGREEN-NO-EV` file next to `NEMESIS.data` installs without these.
+
+### Recovery from freezes and drops
+- **Frozen CarPlay picture:** the phone is asked for a fresh frame after 10 seconds without
+  video; if that doesn't help, the head unit briefly takes the screen back (a short black
+  flash), which restarts the phone's video.
+- **Phone gone from Wi-Fi without the head unit noticing:** after 30 seconds without contact,
+  the HUD arrow is cleared and CarPlay restarts so the phone can reconnect.
+- **Silent route guidance:** after 90 seconds without turn-by-turn during a route, the head
+  unit asks the phone to resend it. Guidance lost while driving clears the arrow once the
+  turn is behind you.
+- Apple Maps' "1,000 ft" (with a comma) is read correctly.
+
+### Install, logs and uninstall
+- **One USB drive does everything:** the first time you plug it in it installs; every time
+  after that it saves the logs.
+- **Safe updates:** a failed install leaves the system files untouched and saves an
+  `INSTALL-LOG` folder to the drive. Updating over a version whose install failed works.
+- **Clean uninstall** through NEMESIS restores the original files, including the projection
+  settings.
+- **Control kits:** AR on/off, basic or advanced AR, tuning, a hotspot report, and stop
+  recording.
+- **Privacy:** the logs hold no road names, locations, Wi-Fi names, passwords or phone
+  identifiers.
+- Keep the head unit's own Wi-Fi client (Settings > Wi-Fi) off: with it on, wireless CarPlay
+  and Android Auto drop every minute or two.
+
+### Reporting problems
+After a drive, park in READY, plug in the same drive you installed from, approve the NEMESIS
+prompt and wait for "logs saved" plus about 20 seconds. Zip the newest `AR-LOGS-<date-time>`
+folder (and `egmp-aa-ev-logs` for Android Auto) and attach it to an
+[EV6 AR drive report](https://github.com/KSubedi/gen5w-Evergreen/issues/new/choose), with the
+clock time of anything odd and what the phone and HUD showed.
+
+Developer notes: [development and replay notes](notes/carplay-ar.md),
+[EV features](notes/ev-features.md),
 [debugging the hotspot's channel switching](notes/hotspot-channel-debugging.md).
 
 ## How it works
