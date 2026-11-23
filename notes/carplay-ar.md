@@ -1097,3 +1097,19 @@ was not showing below".
   it and the export doesn't record it. Possibly the 0 m straight arrow above GPM's real next
   turn; not shown by the log. Logging its numbers (not the road) needs one more GPM hook.
 - `tools/analyze-ar-log.py` crashed at the end of the text report (`a` reused); fixed.
+
+## 1.3.0.122: Ultimate Wireless Projection
+
+Rebrand only; no change to CarPlay, Android Auto, HUD or install behaviour. The repository is now
+`KSubedi/ultimate-wireless-projection` (GitHub redirects the old name). User-facing names: release
+files `UltimateWirelessProjection_EV6_*`, control kits `UWP-AR-*.zip`, drive files
+`UWP-STATUS.txt`, `UWP-INSTALL` and `UWP-NO-EV`; `EVERGREEN-INSTALL` and `EVERGREEN-NO-EV` still
+work, and an old `EVERGREEN-STATUS.txt` on the drive is removed. Internal names stay: the
+`EvergreenAR` log tag (the analyser and recorders read it), the `org.evergreen.carplay` classes and
+the package id `wireless.carplay.aa` (so updates install over earlier versions).
+
+Porting kit: the Leafia kit's new `porting` level (`tools/build-kit.sh porting` ->
+`UWP-Porting-Kit.zip`) writes `UWP-PORT/attach-to-issue` (the public report) and
+`UWP-PORT/send-privately/stock` (stock files), never logs or key files, plus `NEXT-STEPS.txt`
+with the port-request form link. `tools/test-leafia-kit.py` runs the kit against a fake head unit.
+See [PORTING.md](../PORTING.md).

@@ -9,7 +9,7 @@
 # EV features: a manifest line whose part ends in "+ev" (e.g. "2_tbt+ev app
 # HKMC_GPM neev/HKMC_GPM.ev.lpd <md5>") is the EV build of that file (turn-by-turn
 # plus egmp-aa-ev-feat's EV routing, preconditioning and logging). It replaces the
-# plain line for the same part and file, unless an empty EVERGREEN-NO-EV file sits
+# plain line for the same part and file, unless an empty UWP-NO-EV (or EVERGREEN-NO-EV) file sits
 # next to our NEMESIS.data on the install drive. A car with no +ev lines builds as
 # before. $BUILD_DIR/ev records which way it went (1 or 0) for the install log.
 BUILD_DIR=/data/nemesis/build/wireless.carplay.aa
@@ -84,11 +84,11 @@ build_one() {
     return 0
 }
 
-# EV builds wanted? Yes unless EVERGREEN-NO-EV is on the install drive.
+# EV builds wanted? Yes unless UWP-NO-EV (or the older EVERGREEN-NO-EV) is on the install drive.
 ev_wanted() {
     local _d
     for _d in /storage/usb0 /storage/usb1 /storage/usb2 /mnt/media_rw/usb0 /mnt/media_rw/usb1 /mnt/media_rw/usb2; do
-        [ -f "$_d/EVERGREEN-NO-EV" ] || continue
+        [ -f "$_d/UWP-NO-EV" ] || [ -f "$_d/EVERGREEN-NO-EV" ] || continue
         grep -q 'wireless\.carplay\.aa\.zip' "$_d/NEMESIS.data" 2>/dev/null && return 1
     done
     return 0
@@ -121,7 +121,7 @@ build_payloads() {
         if ev_wanted; then
             _ev=1
         else
-            log "EVERGREEN-NO-EV on the install drive: turn-by-turn build without the EV features"
+            log "UWP-NO-EV on the install drive: turn-by-turn build without the EV features"
         fi
     fi
     while read -r _part _kind _name _patch _want; do

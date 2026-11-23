@@ -17,10 +17,10 @@ README = ("Unzip to an empty USB drive and run through NEMESIS while parked.\n"
           "Controls change AR flags, tracing, road-test tuning or a baseline request only.\n"
           "Diagnostics exports bounded EvergreenAR logs, any cluster baseline and build metadata to AR-DEBUG/.\n"
           "Hotspot writes HOTSPOT/hotspot.txt (the hotspot's channel settings and history; no network name,\n"
-          "password or hardware address) and works with any Evergreen build.\n"
-          "No /system writes, no reboot. Run diagnostics parked after a drive. Wait for Export complete, then zip AR-DEBUG/ and share privately.\n"
+          "password or hardware address) and works with any build of this package.\n"
+          "No /system writes, no reboot. Run diagnostics parked after a drive. Wait for Export complete, then zip AR-DEBUG/ and attach it to a GitHub issue.\n"
           "Enable/status require a generated US EV6 260507 AR build; disable works even without one.\n"
-          "The normal Evergreen package has no AR prototype to enable.\n")
+          "The standard package has no AR to enable.\n")
 
 
 def tuning(values, exit_side=None, exit_style=None, recover=None, android_auto=None):
@@ -82,7 +82,7 @@ def main():
     p.add_argument("--guidance-restart-s", type=float, help="restart silent phone guidance after this many seconds (60-600, 0 off; default 90)")
     p.add_argument("--street-ar-seconds", type=float, help="Android Auto street turns start this many seconds ahead at speed (5-30, 0 off; default 15)")
     p.add_argument("--android-auto", choices=("on", "off"), help="Android Auto turns as AR (on, default) or GPM's icons only")
-    p.add_argument("--tune-name", help="suffix for the tuning kit file name: Evergreen-AR-tune-<name>.zip")
+    p.add_argument("--tune-name", help="suffix for the tuning kit file name: UWP-AR-tune-<name>.zip")
     p.add_argument("--baseline-minutes", type=int, default=20, help="stock-navigation cluster capture length (1-60)")
     a = p.parse_args()
     a.directory.mkdir(parents=True, exist_ok=True)
@@ -90,7 +90,7 @@ def main():
         p.exit(1, "baseline minutes must be between 1 and 60\n")
     for mode in MODES:
         extra = {"AR_BASELINE_MINUTES": "%d\n" % a.baseline_minutes} if mode == "baseline" else None
-        kit(a.directory / ("Evergreen-AR-" + mode + ".zip"), mode, extra)
+        kit(a.directory / ("UWP-AR-" + mode + ".zip"), mode, extra)
     values = {"street_ar_meters": a.street_ar_meters, "gain": a.gain, "backstep_meters": a.backstep_meters,
               "bar_meters": a.bar_meters, "turn_offset_meters": a.turn_offset_meters,
               "guidance_restart_s": a.guidance_restart_s, "street_ar_seconds": a.street_ar_seconds}
@@ -99,7 +99,7 @@ def main():
             text = tuning(values, a.exit_side, a.exit_style, a.recover, a.android_auto)
         except ValueError as error:
             p.exit(1, str(error) + "\n")
-        name = "Evergreen-AR-tune" + ("-" + a.tune_name if a.tune_name else "") + ".zip"
+        name = "UWP-AR-tune" + ("-" + a.tune_name if a.tune_name else "") + ".zip"
         kit(a.directory / name, "tune", {"AR_TUNING": text})
 
 

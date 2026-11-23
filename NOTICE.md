@@ -2,7 +2,7 @@
 
 ## Ultimate Wireless Projection
 
-Ultimate Wireless Projection (https://github.com/KSubedi/gen5w-Evergreen), maintained by KSubedi, is a fork of Evergreen by zpoon (https://github.com/zpoon/gen5w-Evergreen), GPL-3.0, and keeps the same licences. Its AR HUD code (`src/carplay-ar/`) is new GPL-3.0 work; it follows the AR HUD protocol and cluster turn formats documented by Open-HMG (https://github.com/Open-HMG/hmgapi-wireless-cp-aa) and imports no HMG-API code. The sections below describe Evergreen and HMG Leafia Plus as they were forked.
+Ultimate Wireless Projection (https://github.com/KSubedi/ultimate-wireless-projection), maintained by KSubedi, is a fork of Evergreen by zpoon (https://github.com/zpoon/gen5w-Evergreen), GPL-3.0, and keeps the same licences. Its AR HUD code (`src/carplay-ar/`) is new GPL-3.0 work; it follows the AR HUD protocol and cluster turn formats documented by Open-HMG (https://github.com/Open-HMG/hmgapi-wireless-cp-aa) and imports no HMG-API code. The sections below describe Evergreen and HMG Leafia Plus as they were forked.
 
 ## Evergreen
 
@@ -34,6 +34,7 @@ The Wireless CarPlay/AA package builds on these NEMESIS community packages. Thei
 
 ## Community contributions
 
+- **AR HUD refinement and calibration**: devilscent (NEMESIS community Discord), who helped refine and calibrate the AR HUD behaviour.
 - **CarPlay turn-by-turn maneuver fix** (DiPO route-guidance parser wrote maneuver indexes into a copy of the index array, so every maneuver read as -1 and CarPlay guidance never reached the cluster). Contributed by [Isaac Wisdom](https://github.com/isaacwisdom); applied to the EV6, Ioniq 5 and K5 builds.
 
 ## Thanks

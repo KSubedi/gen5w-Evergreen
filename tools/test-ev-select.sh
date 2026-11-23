@@ -1,7 +1,7 @@
 #!/bin/sh
 # Off-car test of the EV build selection in packages/wireless-carplay-aa/scripts/build.sh:
 # +ev manifest lines replace the plain line for the same part and file unless
-# EVERGREEN-NO-EV is next to our NEMESIS.data on the install drive; a set with no
+# UWP-NO-EV (or the older EVERGREEN-NO-EV) is next to our NEMESIS.data on the install drive; a set with no
 # +ev lines builds as before. build_one is stubbed (it records what would be built).
 #   tools/test-ev-select.sh [shell]   (default sh; CI also runs mksh)
 set -e
@@ -41,18 +41,23 @@ check "EV by default: the +ev builds replace the plain GPM and library" \
     "2_tbt HKMC_DiPO car/HKMC_DiPO.tbt.lpd|3_bridge HKMC_DiPO car/HKMC_DiPO.bridge.lpd|2_tbt HKMC_GPM car/HKMC_GPM.ev.lpd|2_tbt libautoreceiver_infobank.so common/lib.ev.lpd|" "$(built)"
 check "EV choice recorded" "1" "$(cat "$T/build/ev")"
 
-: > "$T/drive/EVERGREEN-NO-EV"
+: > "$T/drive/UWP-NO-EV"
 printf '[nemesis]\ntype=install\npath=packages/wireless.carplay.aa.zip\n' > "$T/drive/NEMESIS.data"
 run
-check "EVERGREEN-NO-EV: plain builds only" \
+check "UWP-NO-EV: plain builds only" \
     "2_tbt HKMC_GPM car/HKMC_GPM.tbt.lpd|2_tbt HKMC_DiPO car/HKMC_DiPO.tbt.lpd|3_bridge HKMC_DiPO car/HKMC_DiPO.bridge.lpd|2_tbt libautoreceiver_infobank.so common/lib.tbt.lpd|" "$(built)"
 check "plain choice recorded" "0" "$(cat "$T/build/ev")"
-grep -q "EVERGREEN-NO-EV on the install drive" "$T/log" && echo "ok    the opt-out is logged" || { echo "FAIL  the opt-out isn't logged"; fail=1; }
+grep -q "UWP-NO-EV on the install drive" "$T/log" && echo "ok    the opt-out is logged" || { echo "FAIL  the opt-out isn't logged"; fail=1; }
 
 printf '[nemesis]\ntype=install\npath=packages/other.package.zip\n' > "$T/drive/NEMESIS.data"
 run
-check "EVERGREEN-NO-EV for another package's drive is ignored" "1" "$(cat "$T/build/ev")"
+check "UWP-NO-EV for another package's drive is ignored" "1" "$(cat "$T/build/ev")"
 
+rm -f "$T/drive/UWP-NO-EV"
+: > "$T/drive/EVERGREEN-NO-EV"
+printf '[nemesis]\ntype=install\npath=packages/wireless.carplay.aa.zip\n' > "$T/drive/NEMESIS.data"
+run
+check "the older EVERGREEN-NO-EV still opts out" "0" "$(cat "$T/build/ev")"
 rm -f "$T/drive/EVERGREEN-NO-EV"
 grep -v '+ev' "$T/pkg/patches/car/manifest" > "$T/m" && mv "$T/m" "$T/pkg/patches/car/manifest"
 run

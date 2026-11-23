@@ -13,7 +13,7 @@ class FinishTest(unittest.TestCase):
         (self.pkg/'ar-hud.enabled').touch()
         shutil.copy2(ROOT/'kits/ar-installer/ar-debug.sh',self.pkg/'svc/ar-debug.sh')
         import zipfile
-        with zipfile.ZipFile(ROOT/'dist/Evergreen-AR-export-stop-clean.zip') as z:z.extractall(self.usb)
+        with zipfile.ZipFile(ROOT/'dist/UWP-AR-export-stop-clean.zip') as z:z.extractall(self.usb)
         bin=self.root/'bin';bin.mkdir()
         scripts={
             'md5':'md5sum "$@"',
@@ -70,13 +70,13 @@ class FinishTest(unittest.TestCase):
         self.assertEqual(self.runkit().returncode,0)
         (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.3.0.116'}))
         self.assertEqual(self.runkit().returncode,0)
-        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.3.0.121'}))
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.3.0.122'}))
         self.assertEqual(self.runkit().returncode,0)
         self.assertFalse((self.usb/'AR-EXPORT-ERROR.txt').exists());self.assertFalse((self.usb/'AR-DEBUG-SNAPSHOT').exists())
     def test_unsupported_version_leaves_the_reason_and_a_plain_copy_on_the_usb(self):
-        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.3.0.122'}))
+        (self.pkg/'AR_INSTALL.json').write_text(json.dumps({'version':'1.3.0.123'}))
         self.assertNotEqual(self.runkit().returncode,0)
-        self.assertIn('requires AR 1.2.0.104 to 1.3.0.121',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
+        self.assertIn('requires AR 1.2.0.104 to 1.3.0.122',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
         self.assertIn('AR-DEBUG-SNAPSHOT',(self.usb/'AR-EXPORT-ERROR.txt').read_text())
         for n in ('flow.log','flow.log.1','STATUS.txt'):
             self.assertEqual((self.usb/'AR-DEBUG-SNAPSHOT'/n).read_text(),'trace '+n)

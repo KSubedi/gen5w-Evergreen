@@ -3,7 +3,7 @@ Experimental CarPlay AR HUD for **Kia EV6 GT-Line, USA, Gen5W firmware 260507**,
 <!-- ar-demo:start -->
 ## Demo video
 
-[Watch or download the EV6 CarPlay AR video](https://github.com/KSubedi/gen5w-Evergreen/releases/download/v1.2.0.103-beta.1/EV6-CarPlay-AR-demo.mov). Mirrored as a release asset so it remains available independently of the Discord link.
+[Watch or download the EV6 CarPlay AR video](https://github.com/KSubedi/ultimate-wireless-projection/releases/download/v1.2.0.103-beta.1/EV6-CarPlay-AR-demo.mov). Mirrored as a release asset so it remains available independently of the Discord link.
 <!-- ar-demo:end -->
 
 ## Download
@@ -50,4 +50,4 @@ If highway AR is missing, park and run **Evergreen-AR-diagnostics.zip before res
 
 The repository and release contain our code, hashes and delta patches, **no complete manufacturer apps or private vehicle dumps**. The installer rebuilds apps from the car's own checksum-matched stock files.
 
-Verify downloads with `sha256sum -c SHA256SUMS` (macOS: `shasum -a 256 -c SHA256SUMS`). Source and replay documentation: [CarPlay AR notes](https://github.com/KSubedi/gen5w-Evergreen/blob/main/notes/carplay-ar.md).
+Verify downloads with `sha256sum -c SHA256SUMS` (macOS: `shasum -a 256 -c SHA256SUMS`). Source and replay documentation: [CarPlay AR notes](https://github.com/KSubedi/ultimate-wireless-projection/blob/main/notes/carplay-ar.md).

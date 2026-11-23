@@ -152,6 +152,11 @@ jobs:
         run: |
           ./tools/check-downloads.sh
 
+      - name: Kit levels collect only what they should (porting kit included)
+        run: |
+          python3 tools/test-leafia-kit.py
+          ./tools/build-kit.sh porting
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name == 'push'
         with:

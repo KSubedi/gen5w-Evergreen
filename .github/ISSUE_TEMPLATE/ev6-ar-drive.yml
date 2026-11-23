@@ -10,7 +10,7 @@ body:
 
         1. After the drive, park with the car in **READY** and wait until the head unit has fully started.
         2. Plug in the same USB drive you installed from and approve the NEMESIS prompt.
-        3. Wait for **"logs saved"**, then about 20 seconds more (for the EV logs). `EVERGREEN-STATUS.txt` on the drive says what it did.
+        3. Wait for **"logs saved"**, then about 20 seconds more (for the EV logs). `UWP-STATUS.txt` on the drive says what it did.
         4. Zip the newest `AR-LOGS-<date-time>` folder (and `egmp-aa-ev-logs` if you use Android Auto) and attach the zip below.
 
         The logs contain no road names, locations, Wi-Fi names, passwords or phone identifiers. They do contain timings, turn distances, speeds and battery data.

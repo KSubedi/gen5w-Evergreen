@@ -110,7 +110,7 @@ jobs:
           python3 tools/prepare-carplay-ar-release.py --version "$AR_VERSION" --out dist/ar-release-input
           mkdir -p release
           python3 tools/build-carplay-ar-installer.py --patches dist/ar-release-input/patches --enable-ar \
-            --out "release/Evergreen_EV6_US_260507_AR_$AR_VERSION.zip"
+            --out "release/UltimateWirelessProjection_EV6_US_260507_$AR_VERSION.zip"
           python3 tools/build-carplay-ar-controls.py release
           (cd release && sha256sum -- *.zip > SHA256SUMS)
 
@@ -123,7 +123,7 @@ jobs:
           title="Evergreen $GITHUB_REF_NAME"
           if [ -n "$AR_VERSION" ]; then
             cp "releases/carplay-ar/$AR_VERSION/NOTES.md" notes.md
-            title="Evergreen EV6 CarPlay AR $AR_VERSION (experimental)"
+            title="Ultimate Wireless Projection EV6 AR $AR_VERSION"
           else
           cat > notes.md <<EOF
           ## Install

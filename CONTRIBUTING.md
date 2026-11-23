@@ -24,7 +24,7 @@ You don't need to write code to contribute:
 - **Drive reports.** After a drive, attach your logs to an issue with the **EV6 AR drive report** form; the
   [README](README.md#report-a-problem) explains how the install drive collects them.
 - **Port to your car.** Owners of other Hyundai, Kia and Genesis Gen5W cars, especially with an AR HUD, are the
-  most wanted. Open an issue; porting starts with the read-only Leafia kit (see [Adding a car](#adding-a-car)).
+  most wanted. Run the read-only porting kit and file a port request: see the [porting guide](PORTING.md).
 - **Test a build** on your car and say how it went.
 - **Code:** read on.
 
@@ -91,9 +91,12 @@ unit's shell lacks commands your desktop shell has (`printf`, `tail`, ...).
 
 ## Adding a car
 
+The full walkthrough is in [PORTING.md](PORTING.md).
+
 Only a car's **newest firmware** is supported for its region (currently 260507 in the US, 260206 in Canada). A report from older firmware gets a request to update the head unit, not a port.
 
-1. The owner runs the **port** kit (`leafia-kit-port.zip`) and sends its `LEAFIA/private` folder privately.
+1. The owner runs the porting kit (`UWP-Porting-Kit.zip`), files a port request with its `attach-to-issue`
+   report, and sends its `send-privately` folder privately when asked ([porting guide](PORTING.md)).
 2. `tools/port.py` ports the app changes to it and writes `patches/<car>/` plus its `cars` line
    (`tools/port.py --help`).
 3. Mock-test it with the owner's `share/` folder.

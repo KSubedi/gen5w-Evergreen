@@ -1,10 +1,22 @@
-EVERGREEN 1.3.0.121 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+ULTIMATE WIRELESS PROJECTION 1.3.0.122 -- EV6 AR HUD (TEST BUILD)
+Wireless CarPlay and Android Auto, with navigation on the factory AR HUD.
+https://github.com/KSubedi/ultimate-wireless-projection
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.122: ULTIMATE WIRELESS PROJECTION
+This project is now maintained on its own as Ultimate Wireless Projection
+(it started as a fork of Evergreen). Nothing changes in the car's behaviour.
+- New names: the drive's status file is UWP-STATUS.txt, and the opt-in files
+  are UWP-INSTALL (reinstall this version) and UWP-NO-EV (no EV features).
+  The old EVERGREEN-INSTALL and EVERGREEN-NO-EV names still work.
+- Control kits are named UWP-AR-*.zip.
+- Porting to another car: UWP-Porting-Kit.zip (read-only) collects what a port
+  needs and says how to file a port request.
 
 NEW IN 1.3.0.121: ANDROID AUTO AR TIMING
 From the first 1.3.0.120 drive with Android Auto:
@@ -81,16 +93,16 @@ The installer drive now also collects the logs; there's no separate log kit.
   also writes the hotspot report into that folder and creates the
   egmp-aa-ev-logs folder, so the EV logs copy too: wait about 20 s after the
   "logs saved" message before unplugging.
-- EVERGREEN-STATUS.txt on the drive says what it did and what the next plug-in
+- UWP-STATUS.txt on the drive says what it did and what the next plug-in
   will do. While the head unit is still starting (for example the restart
   right after the install) it does nothing.
 - An older build's logs are copied to AR-LOGS-BEFORE-UPDATE-<date-time> before
   an update. To reinstall the same version, put an empty file named
-  EVERGREEN-INSTALL on the drive. To stop recording for good, use
-  Evergreen-AR-export-stop-clean.zip from the controls zip.
+  UWP-INSTALL on the drive. To stop recording for good, use
+  UWP-AR-export-stop-clean.zip from the controls zip.
 
 NEW IN 1.3.0.115: EV FEATURES FOR ANDROID AUTO (first EV6 build)
-Evergreen's EV features (from egmp-aa-ev-feat by willemcvu), until now only
+The EV features (from egmp-aa-ev-feat by willemcvu), until now only
 for the Ioniq 5, are built for the EV6 and on by default:
 - EV routing in Google Maps on Android Auto: the head unit sends Maps an
   energy model with the battery's live energy, so Maps shows battery % on
@@ -104,7 +116,7 @@ for the Ioniq 5, are built for the EV6 and on by default:
 - The energy model is the Ioniq 5's for now (same battery); expect arrival %
   to be slightly low. Your EV logs are what makes an EV6 model.
 - Android Auto AR keeps working: the EV build of the Android Auto app gets
-  the AR changes too. An empty file named EVERGREEN-NO-EV next to NEMESIS.data
+  the AR changes too. An empty file named UWP-NO-EV next to NEMESIS.data
   on the install drive installs without the EV features.
 What we need: does Maps show arrival %, does a route to a fast charger start
 preconditioning (the car shows it), and the EV logs (folder above) plus the
@@ -157,7 +169,7 @@ Numbered 1.3.0.x because it now builds on Evergreen 1.3.0; it installs over
 - The hotspot: another owner's logs show the head unit's own Wi-Fi hotspot
   changing channel by itself while driving, and CarPlay dropping right after
   some of those changes. The recorder now logs every channel change and
-  Wi-Fi disconnect (no addresses), and Evergreen-AR-hotspot.zip collects the
+  Wi-Fi disconnect (no addresses), and UWP-AR-hotspot.zip collects the
   hotspot's channel settings (no network name, password or address) so we
   can find where the switching comes from. Please run it after a drive with
   a freeze or drop and send HOTSPOT/hotspot.txt.
@@ -208,7 +220,7 @@ seconds, with the bar at 20 and then 10.
   the kits zip has tune-bar-300 and tune-bar-200 (bar runs 60 to 10 or 90 to
   10 while the arrow is shown), tune-street-300 (even earlier) and
   tune-street-125 (the 110 behaviour) to compare. A short drive on the car's
-  own navigation with Evergreen-AR-baseline.zip would show what the stock
+  own navigation with UWP-AR-baseline.zip would show what the stock
   sends, which is the scale to copy.
 - CarPlay freezing: the owner saw the CarPlay picture stick during the 110
   drive until leaving and reopening CarPlay. Our records for that drive show
@@ -240,7 +252,7 @@ Why the phone's guidance stopped is not visible in those logs.
   stops the phone always reported the car below 2 m/s first.
 - The native exit sign is the default again (exit_style=sign): it was drawn
   correctly on the 108 drive. Far away and in the small HUD an exit is the
-  slight-right/left icon 66/71. Evergreen-AR-tune-exit-slight.zip gives the
+  slight-right/left icon 66/71. UWP-AR-tune-exit-slight.zip gives the
   109 arrow instead.
 
 NEW IN 1.2.0.109 (after the failed 108 drive, before its logs were available)
@@ -251,7 +263,7 @@ support that; see 110 above. What 109 changed and 110 keeps:
 - exit_style=slight|sign. Slight is a large AR arrow at 45 degrees within
   457 m (the 109 default); sign is the native exit sign (the 110 default),
   with an explicit clear before the next maneuver.
-  Evergreen-AR-tune-exit-generic.zip is the 107 behaviour (icon 86, no AR).
+  UWP-AR-tune-exit-generic.zip is the 107 behaviour (icon 86, no AR).
 - If the phone sends nothing for five minutes during a maneuver, the turn and
   the small HUD entry are cleared instead of staying on the last frame.
 - Diagnostics: a crash of the projection app is recorded (thread, exception
@@ -309,7 +321,8 @@ than mislabeled unmapped.
 Refreshes the existing main-turn and small-HUD paths after maneuver details
 arrive, without waiting for the next distance/route-state update. Missing
 current-maneuver data and stopped routes do not produce a synthetic turn.
-Keeps Evergreen's wireless CarPlay/Android Auto and audio implementation.
+Keeps Evergreen's wireless CarPlay/Android Auto and audio implementation
+(the base this project started from).
 Large ordinary street-turn AR begins within 200 m (about 650 ft) unless tuned.
 Small direction cues remain available earlier. Highway/fork/roundabout native
 conversion retains its 457 m (1,500 ft) window; far exit cues use projection icons.
@@ -331,17 +344,17 @@ Both AR and advanced features are enabled by this selected experimental installe
 Unknown/far/native turns pass through. The HUD must have AR mode selected.
 
 INSTALL
-1. Save the working Evergreen installer so you can reinstall it if needed.
+1. Save your current installer zip so you can reinstall it if needed.
 2. Extract this zip to the root of a USB drive the car already reads. Put no
    other NEMESIS kit on that drive. It should contain NEMESIS.data, NEMESIS.sh
    and packages/. Keep the drive: the same drive collects the logs later.
 3. Park in a safe place, keep the car in READY, wait until the head unit has
    fully started, and insert USB. NEMESIS must already be installed. Approve
-   the NEMESIS prompt; the drive installs Evergreen CarPlay AR.
+   the NEMESIS prompt; the drive installs Ultimate Wireless Projection.
    It replaces the same wireless.carplay.aa package; NEMESIS runs the previous
    version's uninstall first. Do not separately remove working backups.
 4. Wait for the install and head-unit restart. Remove USB while it restarts,
-   as Evergreen's install message instructs. Do not interrupt an active install.
+   as the install message instructs. Do not interrupt an active install.
 5. Select the car's AR HUD navigation mode, reconnect CarPlay, and start a new
    navigation route. Native-format arrows are expected near supported maneuvers,
    not continuously along the road or at all distances. Evaluate while parked
@@ -349,19 +362,19 @@ INSTALL
 
 TURN AR OFF / ROLLBACK
 For a quick return to BASIC AR while keeping the new package installed, use
-Evergreen-AR-basic.zip on a separate USB. It disables the new interpolation,
+UWP-AR-basic.zip on a separate USB. It disables the new interpolation,
 metadata and progress overlay, while retaining the confirmed icon-based AR.
-Start a fresh route after switching. Evergreen-AR-advanced.zip restores advanced
+Start a fresh route after switching. UWP-AR-advanced.zip restores advanced
 mode when the new adapters are installed. If AR was globally disabled, use the
 enable kit too. The previous 1.2.0.101 installer remains a full rollback option.
 
-Use the separately supplied Evergreen-AR-disable.zip kit on an otherwise empty
+Use the separately supplied UWP-AR-disable.zip kit on an otherwise empty
 USB. It removes only the AR flag and keeps wireless projection installed. Start
-a fresh navigation route after toggling. Evergreen-AR-enable.zip re-enables it.
+a fresh navigation route after toggling. UWP-AR-enable.zip re-enables it.
 With an existing ADB connection the equivalent disable command is:
   adb shell "nemesis root -c 'rm -f /data/nemesis/apps/wireless.carplay.aa/ar-hud.enabled'"
 
-To restore your previous Evergreen build, install its known-working zip through
+To restore your previous build, install its known-working zip through
 NEMESIS as an update. To return to stock, uninstall wireless.carplay.aa through
 NEMESIS; its original backups are restored. If an install reports failed rollback
 or says not to reboot, follow that message and collect the NEMESIS logs first.
@@ -394,7 +407,7 @@ It does not capture raw CarPlay video, arbitrary phone packets, Wi-Fi passwords,
 road names, coordinates, phone identifiers or general app logs.
 
 TUNING AND BASELINE
-Evergreen-AR-tune.zip (built with tools/build-carplay-ar-controls.py and values
+UWP-AR-tune.zip (built with tools/build-carplay-ar-controls.py and values
 such as --street-ar-meters 90 --gain 0.7 --backstep-meters 10) writes a small
 ar-tuning file next to the AR flags. Allowed ranges: street_ar_meters 30-457,
 gain 0.5-1, backstep_meters 0-50, bar_meters 30-457, turn_offset_meters 0-60,
@@ -413,13 +426,13 @@ exit arrow), tune-exit-generic (the 107 exit icon), tune-exit-left,
 tune-recover-keyframe (key frame only), tune-recover-reconnect (adds the
 session restart), tune-recover-off, tune-guidance-restart-off,
 tune-android-auto-off and tune-reset.
-Evergreen-AR-hotspot.zip writes HOTSPOT/hotspot.txt with the hotspot's
-channel settings and history (read-only; works with any Evergreen build;
+UWP-AR-hotspot.zip writes HOTSPOT/hotspot.txt with the hotspot's
+channel settings and history (read-only; works with any build of this package;
 see notes/hotspot-channel-debugging.md in the repository).
-Evergreen-AR-tune-reset.zip removes the file. Evergreen-AR-status.zip shows it.
-Evergreen-AR-trace-off.zip stops the detailed per-event trace (the once-per-
-second turn records stay); Evergreen-AR-trace-on.zip restores it.
-Evergreen-AR-baseline.zip asks the head unit to record, once a second for the
+UWP-AR-tune-reset.zip removes the file. UWP-AR-status.zip shows it.
+UWP-AR-trace-off.zip stops the detailed per-event trace (the once-per-
+second turn records stay); UWP-AR-trace-on.zip restores it.
+UWP-AR-baseline.zip asks the head unit to record, once a second for the
 requested minutes (default 20), what the cluster service last received from the
 car's own navigation: turn type, direction, distance and bar. Insert it parked,
 remove the USB, drive a route with the car's navigation, then export with the
@@ -431,15 +444,15 @@ AFTER THE DRIVE
 1. Park in READY, wait until the head unit has fully started, and plug in the
    same installer drive. Approve the NEMESIS prompt.
 2. Wait for the "logs saved" message, then about 20 s more for the EV logs.
-   EVERGREEN-STATUS.txt on the drive says where everything went.
+   UWP-STATUS.txt on the drive says where everything went.
 3. Zip the newest AR-LOGS-<date-time> folder (and egmp-aa-ev-logs, if you use
    Android Auto) and open an issue at
-   https://github.com/KSubedi/gen5w-Evergreen/issues with the zip attached.
+   https://github.com/KSubedi/ultimate-wireless-projection/issues with the zip attached.
    The logs hold no road names, locations, network names, passwords or phone
    identifiers; they do hold timings, distances, speeds and battery data.
    Recording continues, so you can do this after every drive.
-   (Evergreen-AR-export-stop-clean.zip, in the controls zip, also exports but
-   stops recording for good. This version supports 104 to 1.3.0.121.)
+   (UWP-AR-export-stop-clean.zip, in the controls zip, also exports but
+   stops recording for good. This version supports 104 to 1.3.0.122.)
 4. In the issue, give the approximate clock time of anything odd, the app
    (Apple Maps, Google Maps, Waze...), what the phone showed versus the HUD,
    and whether leaving CarPlay or Android Auto and coming back changed it. No interaction

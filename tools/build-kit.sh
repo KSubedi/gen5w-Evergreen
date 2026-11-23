@@ -6,6 +6,8 @@
 #   standard  + private logs and key files (default)   -> leafia-kit.zip
 #   port      + private stock system files (~90 MB)    -> leafia-kit-port.zip
 #   full      + every crash record                     -> leafia-kit-full.zip
+#   porting   public report + stock files, no logs or keys,
+#             with the porting readme                  -> UWP-Porting-Kit.zip
 # Default output: dist/<name above>.
 #
 # The website publishes all four in docs/downloads/; rebuild them with:
@@ -13,16 +15,22 @@
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 LEVEL=standard
-case "$1" in quick|standard|port|full) LEVEL=$1; shift ;; esac
+case "$1" in quick|standard|port|full|porting) LEVEL=$1; shift ;; esac
 case "$LEVEL" in
     standard) NAME=leafia-kit ;;
+    porting) NAME=UWP-Porting-Kit ;;
     *) NAME=leafia-kit-$LEVEL ;;
 esac
 OUT=${1:-$ROOT/dist/$NAME.zip}
 case "$OUT" in /*) ;; *) OUT=$(pwd)/$OUT ;; esac
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
-cp "$ROOT/kits/leafia/NEMESIS.data" "$ROOT/kits/leafia/NEMESIS.sh" "$ROOT/kits/leafia/README.txt" "$STAGE/"
+cp "$ROOT/kits/leafia/NEMESIS.data" "$ROOT/kits/leafia/NEMESIS.sh" "$STAGE/"
+if [ "$LEVEL" = porting ]; then
+    cp "$ROOT/kits/leafia/PORTING-README.txt" "$STAGE/README.txt"
+else
+    cp "$ROOT/kits/leafia/README.txt" "$STAGE/README.txt"
+fi
 echo "$LEVEL" > "$STAGE/LEAFIA-LEVEL"
 cp "$ROOT/tools/lpatch/lpatch" "$STAGE/lpatch"
 mkdir "$STAGE/recipes" && cp "$ROOT"/recipes/*.recipe "$STAGE/recipes/"

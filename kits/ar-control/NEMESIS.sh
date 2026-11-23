@@ -8,7 +8,7 @@ read -r MODE < AR_MODE || exit 1
 case "$MODE" in enable|disable|status|basic|advanced|diagnostics|trace-on|trace-off|tune|tune-reset|baseline|hotspot) ;; *) echo "Unknown AR control mode"; exit 1 ;; esac
 PKG=$SOURCE/data/nemesis/apps/wireless.carplay.aa
 MARKER=$PKG/ar-hud.enabled
-# Hotspot channel debugging (notes/hotspot-channel-debugging.md): read-only, any Evergreen build.
+# Hotspot channel debugging (notes/hotspot-channel-debugging.md): read-only, any build of this package.
 # Never copies a network name, password or hardware address.
 redact() {
     # key=value lines: keep the key, drop values that name or unlock the network or a device.

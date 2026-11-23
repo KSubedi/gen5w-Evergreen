@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.3.0.121"
+VERSION = "1.3.0.122"
 
 
 def verifier():
@@ -65,16 +65,15 @@ def build(patches, output, enable_ar, trace=True):
                 files = {name: inner.read(name) for name in inner.namelist() if not name.endswith("/")}
                 modes = {name: (inner.getinfo(name).external_attr >> 16) & 0o777 for name in files}
         original = files["NEMESIS.data"].decode()
-        original = field(original, "name", "Evergreen - CarPlay AR HUD (experimental)")
+        original = field(original, "name", "Ultimate Wireless Projection (EV6 AR)")
         original = field(original, "package-version", VERSION)
-        original = field(original, "short-desc", '"Experimental CarPlay AR HUD; EV6 USA 260507 only"')
-        original = field(original, "detailed-desc", '"Evergreen wireless projection with experimental CarPlay native AR turns. Opted in by this installer. Uninstall restores stock. See README-AR.txt."')
+        original = field(original, "short-desc", '"Wireless CarPlay/AA with the AR HUD; EV6 USA 260507 only"')
+        original = field(original, "detailed-desc", '"Ultimate Wireless Projection: wireless CarPlay and Android Auto with navigation on the factory AR HUD, and EV routing for Android Auto. Uninstall restores stock. See README-AR.txt."')
         original = field(original, "os", '"CVEV.USA.*.260507"')
         original = field(original, "preinstall", "scripts/ar-pre.sh")
-        original = field(original, "repository", "https://github.com/KSubedi/gen5w-Evergreen")
+        original = field(original, "repository", "https://github.com/KSubedi/ultimate-wireless-projection")
         if data['schema']==2:
             original=field(original,'postinstall','scripts/ar-post.sh')
-            original=field(original,'short-desc','"Experimental smooth CarPlay AR; EV6 USA 260507 only"')
         if data['schema']==2:
             original += "\n[service.2]\nname=ar-debug\nkind=sh\npath=svc/ar-debug.sh\nuid=root\nmode=restart\n"
             original += "\n[service.3]\nname=ar-baseline\nkind=sh\npath=svc/ar-baseline.sh\nuid=root\nmode=restart\n"
@@ -135,7 +134,7 @@ def build(patches, output, enable_ar, trace=True):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--patches", type=Path, required=True)
-    p.add_argument("--out", type=Path, default=ROOT / "dist" / ("Evergreen_EV6_US_260507_AR_"+VERSION+".zip"))
+    p.add_argument("--out", type=Path, default=ROOT / "dist" / ("UltimateWirelessProjection_EV6_US_260507_"+VERSION+".zip"))
     p.add_argument("--enable-ar", action="store_true")
     p.add_argument("--no-trace", action="store_true", help="omit ar-trace.enabled (release candidates)")
     a = p.parse_args()

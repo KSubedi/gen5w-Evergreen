@@ -477,20 +477,20 @@ class ControlTest(unittest.TestCase):
         out=self.root/'kits'
         result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--street-ar-meters','90','--gain','0.7'],capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr)
-        with zipfile.ZipFile(out/'Evergreen-AR-tune.zip') as z:
+        with zipfile.ZipFile(out/'UWP-AR-tune.zip') as z:
             self.assertEqual(z.read('AR_TUNING').decode(),'street_ar_meters=90\ngain=0.7\n');self.assertEqual(z.read('AR_MODE'),b'tune\n')
-        with zipfile.ZipFile(out/'Evergreen-AR-baseline.zip') as z:self.assertEqual(z.read('AR_BASELINE_MINUTES'),b'20\n')
-        for mode in ('trace-on','trace-off','tune-reset'):self.assertTrue((out/('Evergreen-AR-'+mode+'.zip')).is_file())
+        with zipfile.ZipFile(out/'UWP-AR-baseline.zip') as z:self.assertEqual(z.read('AR_BASELINE_MINUTES'),b'20\n')
+        for mode in ('trace-on','trace-off','tune-reset'):self.assertTrue((out/('UWP-AR-'+mode+'.zip')).is_file())
         result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--gain','1.5'],capture_output=True)
         self.assertNotEqual(result.returncode,0)
         result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--bar-meters','125',
                                '--turn-offset-meters','20','--exit-side','left','--exit-style','sign','--tune-name','test'],capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr)
-        with zipfile.ZipFile(out/'Evergreen-AR-tune-test.zip') as z:
+        with zipfile.ZipFile(out/'UWP-AR-tune-test.zip') as z:
             self.assertEqual(z.read('AR_TUNING').decode(),'bar_meters=125\nturn_offset_meters=20\nexit_side=left\nexit_style=sign\n')
         result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--exit-style','sign','--tune-name','exit-sign'],capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr)
-        with zipfile.ZipFile(out/'Evergreen-AR-tune-exit-sign.zip') as z:self.assertEqual(z.read('AR_TUNING').decode(),'exit_style=sign\n')
+        with zipfile.ZipFile(out/'UWP-AR-tune-exit-sign.zip') as z:self.assertEqual(z.read('AR_TUNING').decode(),'exit_style=sign\n')
         result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--turn-offset-meters','61'],capture_output=True)
         self.assertNotEqual(result.returncode,0)
 

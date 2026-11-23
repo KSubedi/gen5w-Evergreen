@@ -48,13 +48,13 @@ class ComboTest(unittest.TestCase):
     def test_nothing_while_android_is_starting(self):
         self.installed('1.3.0.116')
         r = self.run_kit(BOOT='0'); self.assertEqual(r.returncode, 0)
-        self.assertEqual(self.calls_text(), ''); self.assertFalse((self.usb/'EVERGREEN-STATUS.txt').exists())
+        self.assertEqual(self.calls_text(), ''); self.assertFalse((self.usb/'UWP-STATUS.txt').exists())
         self.assertTrue((self.debug/'flow.log').exists())
 
     def test_first_plug_in_installs(self):
         r = self.run_kit(); self.assertEqual(r.returncode, 0, r.stdout)
         self.assertIn('install packages/%s.zip' % ID, self.calls_text()); self.assertNotIn('--update', self.calls_text())
-        self.assertIn('collects the logs', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        self.assertIn('collects the logs', (self.usb/'UWP-STATUS.txt').read_text())
         self.assertIn('installing 1.3.0.116', self.toasts.read_text())
 
     def test_older_build_updates_and_keeps_its_logs(self):
@@ -77,7 +77,7 @@ class ComboTest(unittest.TestCase):
         self.assertLess(calls.index('service stop %s/ar-debug' % ID), calls.index('service start %s/ar-debug' % ID))
         self.assertTrue((self.usb/'egmp-aa-ev-logs').is_dir())
         self.assertTrue((out/'hotspot.txt').is_file()); self.assertFalse((self.usb/'AR_MODE').exists())
-        self.assertIn('Recording continues', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        self.assertIn('Recording continues', (self.usb/'UWP-STATUS.txt').read_text())
         self.assertIn((out/'AR_INSTALL.json').read_text(), (self.pkg/'AR_INSTALL.json').read_text())
         self.assertFalse((out/'install-logs').exists())
 
@@ -86,26 +86,33 @@ class ComboTest(unittest.TestCase):
         r = self.run_kit(INSTALLED='1', BAD_COPY='1'); self.assertEqual(r.returncode, 1)
         self.assertTrue((self.debug/'flow.log').exists()); self.assertTrue((self.debug/'flow.log.1').exists())
         self.assertIn('service start %s/ar-debug' % ID, self.calls_text())
-        self.assertIn('Nothing on the head unit was deleted', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        self.assertIn('Nothing on the head unit was deleted', (self.usb/'UWP-STATUS.txt').read_text())
 
-    def test_evergreen_install_file_reinstalls_the_same_version(self):
-        self.installed('1.3.0.116'); (self.usb/'EVERGREEN-INSTALL').write_text('')
-        r = self.run_kit(INSTALLED='1'); self.assertEqual(r.returncode, 0)
-        self.assertIn('install --update', self.calls_text()); self.assertFalse((self.usb/'EVERGREEN-INSTALL').exists())
+    def test_install_file_reinstalls_the_same_version(self):
+        for name in ('UWP-INSTALL', 'EVERGREEN-INSTALL'):
+            self.calls.write_text('') if self.calls.exists() else None
+            self.installed('1.3.0.116'); (self.usb/name).write_text('')
+            r = self.run_kit(INSTALLED='1'); self.assertEqual(r.returncode, 0)
+            self.assertIn('install --update', self.calls_text(), name); self.assertFalse((self.usb/name).exists())
+
+    def test_old_status_file_is_replaced(self):
+        (self.usb/'EVERGREEN-STATUS.txt').write_text('old')
+        self.installed('1.3.0.116'); self.run_kit(INSTALLED='1')
+        self.assertFalse((self.usb/'EVERGREEN-STATUS.txt').exists()); self.assertTrue((self.usb/'UWP-STATUS.txt').is_file())
 
     def test_nemesis_refusals_are_explained(self):
         r = self.run_kit(INSTALL_RC='20'); self.assertEqual(r.returncode, 1)
-        self.assertIn('compatibility risk', (self.usb/'EVERGREEN-STATUS.txt').read_text())
-        r = self.run_kit(INSTALL_RC='22'); self.assertIn('blocked', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        self.assertIn('compatibility risk', (self.usb/'UWP-STATUS.txt').read_text())
+        r = self.run_kit(INSTALL_RC='22'); self.assertIn('blocked', (self.usb/'UWP-STATUS.txt').read_text())
         (self.car/'data/nemesis').mkdir(parents=True, exist_ok=True); (self.car/'data/nemesis'/(ID+'.log')).write_text('install steps')
-        r = self.run_kit(INSTALL_RC='1'); self.assertIn('code 1', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        r = self.run_kit(INSTALL_RC='1'); self.assertIn('code 1', (self.usb/'UWP-STATUS.txt').read_text())
         (self.car/'data/nemesis/wireless.projection.log').write_text('part steps')
         r = self.run_kit(INSTALL_RC='1')
         self.assertEqual((self.usb/'INSTALL-LOG'/(ID+'.log')).read_text(), 'install steps')
         self.assertEqual((self.usb/'INSTALL-LOG/wireless.projection.log').read_text(), 'part steps')
         self.assertIn('parts installed: none', (self.usb/'INSTALL-LOG/state.txt').read_text())
         self.assertIn('nemesis log line', (self.usb/'INSTALL-LOG/nemesis.log').read_text())
-        self.assertIn('INSTALL-LOG folder', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        self.assertIn('INSTALL-LOG folder', (self.usb/'UWP-STATUS.txt').read_text())
 
     def test_old_version_with_no_parts_is_replaced_past_its_failed_uninstall(self):
         self.installed('1.3.0.115')
@@ -113,19 +120,19 @@ class ComboTest(unittest.TestCase):
         self.assertIn('install --update --force packages/%s.zip' % ID, self.calls_text())
         self.assertTrue((self.usb/'INSTALL-LOG-FIRST-TRY').is_dir())
         r = self.run_kit(INSTALLED='1', INSTALL_RC='5', FORCE_RC='1'); self.assertEqual(r.returncode, 1)
-        self.assertIn('code 1', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        self.assertIn('code 1', (self.usb/'UWP-STATUS.txt').read_text())
 
     def test_installed_parts_are_never_forced(self):
         self.installed('1.3.0.115')
         (self.car/'data/nemesis'/(ID+'.parts')).write_text('1_projection 2_tbt\n')
         r = self.run_kit(INSTALLED='1', INSTALL_RC='5'); self.assertEqual(r.returncode, 1)
-        self.assertNotIn('--force', self.calls_text()); self.assertIn('code 5', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        self.assertNotIn('--force', self.calls_text()); self.assertIn('code 5', (self.usb/'UWP-STATUS.txt').read_text())
 
     def test_other_cars_and_incomplete_drives_are_refused(self):
         r = self.run_kit(PRODUCT='NEEV.USA.0000.V015.012.260507'); self.assertEqual(r.returncode, 1)
         self.assertNotIn('install', self.calls_text())
         (self.usb/'packages'/(ID+'.zip')).unlink()
-        r = self.run_kit(); self.assertEqual(r.returncode, 1); self.assertIn('incomplete', (self.usb/'EVERGREEN-STATUS.txt').read_text())
+        r = self.run_kit(); self.assertEqual(r.returncode, 1); self.assertIn('incomplete', (self.usb/'UWP-STATUS.txt').read_text())
 
 
 if __name__ == '__main__':

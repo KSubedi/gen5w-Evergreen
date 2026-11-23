@@ -1,0 +1,68 @@
+name: Port request (bring it to my car)
+description: Ask for Ultimate Wireless Projection on your Hyundai, Kia or Genesis, with the porting kit's report attached.
+title: "[Port] <year> <make> <model>, <country>"
+labels: ["port-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping bring this to more cars! It takes about five minutes:
+
+        1. Download **UWP-Porting-Kit.zip** from the [latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases) and unzip it onto an empty USB drive (exFAT or FAT32, 200 MB free).
+        2. With NEMESIS 1.15+ installed, park with the car on and wait until the head unit has fully started. Plug in the drive and approve the prompt.
+        3. Wait for **"Porting data saved"**, then unplug the drive.
+        4. Zip the `UWP-PORT/attach-to-issue` folder and attach it below. It holds firmware ids, checksums and feature flags only.
+
+        **Don't attach `UWP-PORT/send-privately`.** It holds Hyundai/Kia system files. We'll reply here with how to send it privately, or tell you it isn't needed if your firmware is already known.
+  - type: input
+    id: car
+    attributes:
+      label: Car
+      description: Year, make, model, trim and country.
+      placeholder: 2024 Hyundai Ioniq 6 Limited, USA
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Head-unit firmware
+      description: "`ro.build.product` from `attach-to-issue/LEAFIA-REPORT.txt`."
+      placeholder: RSEV.USA.0000.V020.012.260903
+  - type: dropdown
+    id: hud
+    attributes:
+      label: Head-up display
+      options:
+        - "AR HUD (the HUD settings offer an AR mode)"
+        - "Regular HUD (no AR mode)"
+        - "No HUD"
+        - "Not sure"
+    validations:
+      required: true
+  - type: checkboxes
+    id: wanted
+    attributes:
+      label: What you'd like
+      options:
+        - label: Wireless CarPlay
+        - label: Wireless Android Auto
+        - label: AR HUD navigation
+        - label: EV features (EV routing and preconditioning in Google Maps)
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Testing
+      options:
+        - label: I can install test builds and send logs after drives
+  - type: textarea
+    id: report
+    attributes:
+      label: Porting report
+      description: Drag the zipped `attach-to-issue` folder here.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Other packages installed (Leafia, Evergreen, HMG-API mods), problems you've seen, questions.

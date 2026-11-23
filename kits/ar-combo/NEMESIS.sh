@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # One drive for the EV6 AR build. Parked, with Android running:
-#   - this version not installed (or EVERGREEN-INSTALL on the drive): install it (the head
+#   - this version not installed (or UWP-INSTALL on the drive): install it (the head
 #     unit restarts by itself at the end);
 #   - this version installed: export the AR logs (checksum-verified), clear them, keep
 #     recording for the next drive, write the hotspot report and let the EV logs copy.
@@ -15,7 +15,9 @@ PKG=$SOURCE/data/nemesis/apps/$ID
 DEBUG=$SOURCE/data/nemesis/$ID-ar-debug
 SERVICE=$ID/ar-debug
 ZIP=packages/$ID.zip
-STATUS=EVERGREEN-STATUS.txt
+STATUS=UWP-STATUS.txt
+# Drives from before the rename may still hold the old status file: drop it, it would mislead.
+rm -f EVERGREEN-STATUS.txt 2>/dev/null
 # The package's install logs: its own and one per part (steps, checksums and settings
 # values; no names or passwords).
 NDATA=$SOURCE/data/nemesis
@@ -36,7 +38,7 @@ status() {
 fail() {
     echo "ERROR: $1"
     status "ERROR: $1. Nothing on the head unit was deleted. Unplug the drive and plug it in again to retry."
-    toast "Evergreen: $1"
+    toast "Ultimate Wireless Projection: $1"
     exit 1
 }
 ar_digest() {
@@ -78,7 +80,7 @@ fi
 case "$(getprop ro.build.product)" in CVEV.USA.*.260507) ;; *) fail "This drive is for the Kia EV6 (US) on 260507 only" ;; esac
 [ -n "$OURS" ] && [ -f "$ZIP" ] || fail "The drive is incomplete: unzip the whole release onto it again"
 
-if [ ! -f EVERGREEN-INSTALL ] && [ -f "$PKG/AR_INSTALL.json" ] && grep -q "\"version\": \"$OURS\"" "$PKG/AR_INSTALL.json"; then
+if [ ! -f UWP-INSTALL ] && [ ! -f EVERGREEN-INSTALL ] && [ -f "$PKG/AR_INSTALL.json" ] && grep -q "\"version\": \"$OURS\"" "$PKG/AR_INSTALL.json"; then
     MODE=logs
 else
     MODE=install
@@ -94,10 +96,10 @@ if [ "$MODE" = install ]; then
     fi
     UPDATE=
     nemesis pkg-list 2>/dev/null | grep -q "^$ID|" && UPDATE=--update
-    status "Installing Evergreen EV6 AR $OURS. The head unit restarts by itself when it's done: leave it on until it has.
+    status "Installing Ultimate Wireless Projection (EV6 AR) $OURS. The head unit restarts by itself when it's done: leave it on until it has.
 Next time you plug this drive in (parked, head unit fully started), it collects the logs instead."
-    toast "Evergreen: installing $OURS. The head unit restarts when it's done."
-    rm -f EVERGREEN-INSTALL
+    toast "Ultimate Wireless Projection: installing $OURS. The head unit restarts when it's done."
+    rm -f UWP-INSTALL EVERGREEN-INSTALL
     sync
     # NEMESIS's own install, as for a package drive. On success the package restarts the unit.
     nemesis install $UPDATE "$ZIP"
@@ -112,7 +114,7 @@ Next time you plug this drive in (parked, head unit fully started), it collects 
         RC=$?
     fi
     case "$RC" in
-        0) status "Installed Evergreen EV6 AR $OURS. Restart the head unit if it didn't restart by itself.
+        0) status "Installed Ultimate Wireless Projection (EV6 AR) $OURS. Restart the head unit if it didn't restart by itself.
 Next time you plug this drive in, it collects the logs."; exit 0 ;;
         20) fail "NEMESIS needs you to accept a compatibility risk: install packages/$ID.zip from NEMESIS Manager instead" ;;
         21|22|23) fail "NEMESIS blocked the install (another package depends on or conflicts with it); see NEMESIS Manager" ;;
@@ -125,7 +127,7 @@ fi
 OUT=AR-LOGS-$(date +%Y%m%d-%H%M%S)
 mkdir -p "$OUT" || fail "Cannot write to the drive"
 : > "$OUT/VERIFIED.txt" || fail "Cannot write to the drive"
-toast "Evergreen: collecting logs. Keep the drive in until it says done."
+toast "Ultimate Wireless Projection: collecting logs. Keep the drive in until it says done."
 # Stop the recorder only while its files are copied; it starts again afterwards.
 QNAME=; RECORDER_PID=
 nemesis service status "$SERVICE" > "$OUT/SERVICE-BEFORE.txt" 2>/dev/null &&
@@ -169,6 +171,6 @@ mkdir -p egmp-aa-ev-logs 2>/dev/null
 echo "Logs exported and verified. Recording continues for the next drive. $(date)" > "$OUT/FINISHED.txt"
 sync
 status "Logs saved in $OUT (send that folder privately). EV logs copy into egmp-aa-ev-logs within about 20 seconds: wait before unplugging.
-Recording continues; plug this drive in again after the next drive. To reinstall this version, put an empty file named EVERGREEN-INSTALL on the drive."
-toast "Evergreen: logs saved to the drive ($OUT). Wait 20 s for the EV logs, then unplug."
+Recording continues; plug this drive in again after the next drive. To reinstall this version, put an empty file named UWP-INSTALL on the drive."
+toast "Ultimate Wireless Projection: logs saved to the drive ($OUT). Wait 20 s for the EV logs, then unplug."
 echo "Logs saved in $OUT. Export complete."

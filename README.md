@@ -7,7 +7,7 @@ Ultimate Wireless Projection is a [NEMESIS](https://github.com/xwtk/hmg_nemesis)
 > [!IMPORTANT]
 > **Tested car:** 2022 Kia EV6 GT-Line, USA, Gen5W head-unit firmware **260507**, with the factory AR HUD. The installer only installs on that firmware. Want it on your Hyundai, Kia or Genesis? See [Help port it to your car](#help-port-it-to-your-car).
 
-**[⬇ Download the latest release](https://github.com/KSubedi/gen5w-Evergreen/releases/tag/v1.3.0.121-beta.1)** · [Report a problem](https://github.com/KSubedi/gen5w-Evergreen/issues/new/choose) · [Contributing](CONTRIBUTING.md)
+**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.121-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
 
 ## Features
 
@@ -31,7 +31,7 @@ From [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat) by willemcv
 - **Battery preconditioning:** when the next stop is a fast charger (over 50 kW) within an hour, the car is asked to warm the battery, the same request its own navigation makes. The car's battery conditioning setting is the off switch.
 - **EV logs** (driving and charging, no location) are saved with the other logs.
 - The energy model is currently the Ioniq 5's (same battery), so arrival % may read slightly low. Your EV logs help build a proper EV6 model.
-- Not wanted? Put an empty file named `EVERGREEN-NO-EV` next to `NEMESIS.data` before installing. CarPlay isn't affected.
+- Not wanted? Put an empty file named `UWP-NO-EV` next to `NEMESIS.data` before installing. CarPlay isn't affected.
 
 ### Recovery from freezes and drops
 - **Frozen CarPlay screen:** after 10 seconds without video, the phone is asked for a fresh frame. If that doesn't help within 4 seconds, the head unit takes the screen back for a moment (a short black flash), which restarts the phone's video. This is a common problem with every wireless package on these cars; its root cause is still being investigated ([notes](notes/hotspot-channel-debugging.md)).
@@ -75,7 +75,7 @@ This isn't just "wireless on". The AR HUD was tuned over about 20 test builds, e
 
 You need [NEMESIS](https://github.com/xwtk/hmg_nemesis) 1.15 or newer on the head unit.
 
-1. Download `Evergreen_EV6_US_260507_AR_<version>.zip` from the [latest release](https://github.com/KSubedi/gen5w-Evergreen/releases/tag/v1.3.0.121-beta.1).
+1. Download `UltimateWirelessProjection_EV6_US_260507_<version>.zip` (`Evergreen_EV6_US_260507_AR_<version>.zip` for 1.3.0.121 and earlier) from the [latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.121-beta.1).
 2. Unzip it onto an empty USB drive (exFAT or FAT32). The top of the drive should show `NEMESIS.data`, `NEMESIS.sh` and `packages`. **Keep this drive**: it also collects the logs.
 3. Park with the car in READY and wait until the head unit has fully started. Plug in the drive and approve the NEMESIS prompt.
 4. The head unit restarts by itself when the install is done. Remove the drive while it restarts.
@@ -100,17 +100,22 @@ Logs record in the background; there's nothing to do while driving.
 
 1. After the drive, park with the car in READY and wait until the head unit has fully started.
 2. Plug in **the same drive you installed from** and approve the NEMESIS prompt.
-3. Wait for **"logs saved"**, then about 20 seconds more for the EV logs. `EVERGREEN-STATUS.txt` on the drive says what it did.
+3. Wait for **"logs saved"**, then about 20 seconds more for the EV logs. `UWP-STATUS.txt` on the drive says what it did.
 4. Zip the newest `AR-LOGS-<date-time>` folder (and `egmp-aa-ev-logs` for Android Auto).
-5. [Open an issue](https://github.com/KSubedi/gen5w-Evergreen/issues/new/choose) with the **EV6 AR drive report** form and attach the zip. Note the clock time of anything odd, what the phone showed and what the HUD showed.
+5. [Open an issue](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) with the **EV6 AR drive report** form and attach the zip. Note the clock time of anything odd, what the phone showed and what the HUD showed.
 
 If an install failed, attach the `INSTALL-LOG` folder from the drive instead. Security problems go through [SECURITY.md](SECURITY.md), not public issues.
 
 ## Help port it to your car
 
-So far it has only been tested on the Kia EV6 (US, 260507). The same head unit runs in many Hyundai, Kia and Genesis cars, and the AR work should carry over to other cars with an AR HUD. Porting needs an owner willing to run a read-only data kit and test builds. If you're interested, open an issue or message the maintainer.
+So far it has only been tested on the Kia EV6 (US, 260507). The same head unit runs in many Hyundai, Kia and Genesis cars, and the AR work should carry over to other cars with an AR HUD. Porting starts with five minutes in your car:
 
-This repository still contains Evergreen's multi-car package, its compatibility data and the read-only Leafia kit for checking a car (`kits/leafia`). For cars other than the EV6 today, use [Evergreen](https://github.com/zpoon/gen5w-Evergreen) and its [compatibility page](https://zpoon.github.io/gen5w-Evergreen/).
+1. Download **UWP-Porting-Kit.zip** from the [releases](https://github.com/KSubedi/ultimate-wireless-projection/releases), unzip it onto an empty USB drive and run it through NEMESIS. It's read-only and changes nothing on the car.
+2. Zip the `UWP-PORT/attach-to-issue` folder it writes and attach it to a [port request](https://github.com/KSubedi/ultimate-wireless-projection/issues/new?template=port-request.yml).
+
+The [porting guide](PORTING.md) explains what the kit collects, what happens next, and how developers build a port.
+
+This repository still contains Evergreen's multi-car package and compatibility data. For cars other than the EV6 today, [Evergreen](https://github.com/zpoon/gen5w-Evergreen) and its [compatibility page](https://zpoon.github.io/gen5w-Evergreen/) may already have a build.
 
 ## How it works
 
@@ -119,7 +124,7 @@ This repository still contains Evergreen's multi-car package, its compatibility 
 - **The AR helpers** (`src/carplay-ar/`) are our own GPL-3.0 code, added to the rebuilt CarPlay, Android Auto and navigation apps. They convert the phone's maneuvers into the HUD's native AR types and send them with the phone's exact distance.
 - **Every write to `/system`** is checked against stock first, backed up, and restored byte for byte on uninstall.
 
-Developer notes: [AR HUD development and replay](notes/carplay-ar.md), [EV features](notes/ev-features.md), [hotspot channel switching](notes/hotspot-channel-debugging.md), [contributor guide](CONTRIBUTING.md).
+Developer notes: [AR HUD development and replay](notes/carplay-ar.md), [EV features](notes/ev-features.md), [hotspot channel switching](notes/hotspot-channel-debugging.md), [porting guide](PORTING.md), [contributor guide](CONTRIBUTING.md).
 
 ## Contributing
 
@@ -138,7 +143,11 @@ Ultimate Wireless Projection stands on a lot of community work:
 - **[aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs)**, **[open-android-auto](https://github.com/Deadknight/open-android-auto)** ([mrmees's fork](https://github.com/mrmees/open-android-auto)) and **[ArdaMapsEnergyProvider](https://github.com/Deadknight/ArdaMapsEnergyProvider)**: Android Auto protocol and EV energy-model references.
 - **[gen5w-preconditioning](https://github.com/paytondevs/gen5w-preconditioning)** by paytondevs: a reference for the battery preconditioning commands, which this project sends the same way.
 - **[nudl](https://github.com/chenxiaolong/nudl)** by chenxiaolong and **[HKG_Gen5W_ReverseEngineer](https://github.com/cantcs/HKG_Gen5W_ReverseEngineer)** by cantcs: used to download and study the stock firmware the patches are built against.
-- **Contributors:** [Isaac Wisdom](https://github.com/isaacwisdom) (CarPlay turn-by-turn maneuver fix), [gdonaldson1676](https://github.com/gdonaldson1676) (Ioniq 5 260903 port), and [W-Floyd](https://github.com/W-Floyd) for their help.
+- **Contributors:**
+  - **devilscent** (Discord): helped refine and calibrate the AR HUD.
+  - [Isaac Wisdom](https://github.com/isaacwisdom): CarPlay turn-by-turn maneuver fix.
+  - [gdonaldson1676](https://github.com/gdonaldson1676): Ioniq 5 260903 port.
+  - [W-Floyd](https://github.com/W-Floyd): help with the project.
 - **EV6 owners and testers** in the NEMESIS community, whose drive logs shaped every AR build.
 
 Licences and the details of what came from where are in [NOTICE.md](NOTICE.md).

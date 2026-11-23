@@ -11,7 +11,7 @@
 # drive never ends up with a half-written log. Logs stay on the head unit
 # (capped by EvLogger) and are never deleted from here.
 #
-# Without an EV log folder (no EV build on this car, EVERGREEN-NO-EV at install,
+# Without an EV log folder (no EV build on this car, UWP-NO-EV at install,
 # or nothing logged yet) a pass does nothing: no drive is touched and there's no
 # pop-up. The service keeps running rather than exiting, because NEMESIS stops
 # restarting a service that exits five times in a row.

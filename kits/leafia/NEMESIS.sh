@@ -8,6 +8,8 @@
 #   standard  + private/logs (latest crash records) and private/keys  (default)
 #   port      + private/stock
 #   full      + every crash record (as does an empty ALL-CRASHES file)
+#   porting   public/ + private/stock only, written as UWP-PORT/ (the
+#             Ultimate Wireless Projection porting kit): no logs, no key files
 # Writes LEAFIA/ on this USB drive:
 #
 #   public/          safe to post on a GitHub issue
@@ -33,10 +35,15 @@ export LD_LIBRARY_PATH=/vendor/lib:/system/lib
 KIT=$(pwd)
 LEVEL=standard
 [ -f "$KIT/LEAFIA-LEVEL" ] && read -r LEVEL < "$KIT/LEAFIA-LEVEL"
-case "$LEVEL" in quick|standard|port|full) ;; *) LEVEL=standard ;; esac
+case "$LEVEL" in quick|standard|port|full|porting) ;; *) LEVEL=standard ;; esac
 OUT=$KIT/LEAFIA
 PUB=$OUT/public
 PRIV=$OUT/private
+if [ $LEVEL = porting ]; then
+    OUT=$KIT/UWP-PORT
+    PUB=$OUT/attach-to-issue
+    PRIV=$OUT/send-privately
+fi
 LOGS=$PRIV/logs
 STOCK=$PRIV/stock
 KEYS=$PRIV/keys
@@ -45,10 +52,10 @@ N=/data/nemesis
 PKG=wireless.carplay.aa
 rm -r "$OUT" 2>/dev/null
 mkdir -p "$PUB/logs" || exit 1
-if [ $LEVEL != quick ]; then
+if [ $LEVEL != quick ] && [ $LEVEL != porting ]; then
     mkdir -p "$LOGS/nemesis-logs" "$LOGS/tombstones" "$LOGS/dropbox" "$KEYS" || exit 1
 fi
-if [ $LEVEL = port ] || [ $LEVEL = full ]; then
+if [ $LEVEL = port ] || [ $LEVEL = full ] || [ $LEVEL = porting ]; then
     mkdir -p "$STOCK/framework" "$STOCK/lib" "$STOCK/app" "$STOCK/etc/permissions" "$STOCK/etc/wifi" "$STOCK/onebin" || exit 1
 fi
 REPORT=$PUB/LEAFIA-REPORT.txt
@@ -339,7 +346,7 @@ for _l in $PKG wireless.projection projection.tbt wireless.carplay.bt carplay.wi
 done
 
 
-if [ $LEVEL != quick ]; then
+if [ $LEVEL != quick ] && [ $LEVEL != porting ]; then
 # ===== private: logs first, while they still cover the problem
 # ---- private: may hold phone names, Bluetooth addresses or commands
 copy_file $N/nemesis.log "$LOGS/nemesis.log"
@@ -442,7 +449,7 @@ copy_file /data/anr/traces.txt "$LOGS/anr-traces.txt"
 
 fi   # private logs
 
-if [ $LEVEL = port ] || [ $LEVEL = full ]; then
+if [ $LEVEL = port ] || [ $LEVEL = full ] || [ $LEVEL = porting ]; then
 # ===== private: stock files for porting, and key files
 echo "collected $(date) product=$(getprop ro.build.product) device=$(getprop ro.product.device)" >> "$COLLECT"
 # framework: needed to rebuild the projection apps safely for this firmware
@@ -474,7 +481,7 @@ pm list features > "$STOCK/features.txt" 2>&1
 
 fi   # stock files
 
-if [ $LEVEL != quick ]; then
+if [ $LEVEL != quick ] && [ $LEVEL != porting ]; then
 # private/keys: firmware decryption key files (per model, not per car)
 for f in /system/etc/recovery-resource.dat /system/etc/image.dat /system/etc/iv.dat /etc/image.dat /etc/iv.dat; do
     [ -f "$f" ] && grab "$f" "$KEYS/"
@@ -485,5 +492,25 @@ fi   # key files
 
 say ""
 say "end"
+if [ $LEVEL = porting ]; then
+    {
+        echo "Ultimate Wireless Projection - porting data for $(getprop ro.build.product)"
+        echo ""
+        echo "1. attach-to-issue: zip this folder and attach it to a new port request:"
+        echo "   https://github.com/KSubedi/ultimate-wireless-projection/issues/new?template=port-request.yml"
+        echo "   It holds firmware ids and checksums only: safe to post."
+        echo ""
+        echo "2. send-privately: Hyundai/Kia system files needed to build the port."
+        echo "   Don't post them publicly. Zip the folder and send it to the maintainer"
+        echo "   privately once your issue is answered (a download link is fine)."
+        echo "   If your firmware is already known, the issue will say it isn't needed."
+        echo ""
+        echo "Nothing on the car was changed. No logs, accounts, phone data, Wi-Fi"
+        echo "passwords, key files, VIN or serial numbers were collected."
+    } > "$OUT/NEXT-STEPS.txt"
+    sync
+    echo "Porting data saved to UWP-PORT on the drive. Open UWP-PORT/NEXT-STEPS.txt on a computer."
+    exit 0
+fi
 sync
 exit 0
