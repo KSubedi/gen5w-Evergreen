@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib,zipfile
 root=Path(__file__).resolve().parents[1]
 out=root/'dist/UWP-AR-export-stop-clean.zip'
+out.parent.mkdir(parents=True,exist_ok=True)
 with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
     for name in ('NEMESIS.data','NEMESIS.sh','stopped-recorder.sh'):
         z.write(root/'kits/ar-finish'/name,name)
