@@ -99,16 +99,19 @@
           "cd8581e0b11490b4733dbb3299b9f9e1"
         ],
         "/system/app/HKMC_GPM.apk": [
-          "1929356d4d7126b28ffd3a6f13392fcf"
+          "1929356d4d7126b28ffd3a6f13392fcf",
+          "7f9a1e9901c0514d45e45a9c039e8185"
         ],
         "/system/app/HKMC_Navi_ExSL.apk": [
           "b1fc88d42954c41e7944e9247647e9ad"
         ],
         "/system/app/Iap2ServerApp.apk": [
+          "531f5831f249614956399f36a212f4ff",
           "75d7fea4d2009be6aa5c840118f58c94",
           "7e90fa7d8a161ade71e11dc15e56c410"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
+          "7ada7d23a79cb4fbef198b500532bb7b",
           "c08410a8d32a615b1aa805cd8a243d52"
         ]
       }

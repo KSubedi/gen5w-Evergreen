@@ -1143,3 +1143,19 @@ same APK, 75d7fea4); `libCarPlayCore.so` (ef49c09b) accepts Wi-Fi sessions nativ
   no-EV and a failed install all uninstall to stock.
 - The owner's car has HMG-API's Wireless CarPlay + Android Auto mod installed; it must be
   turned off (or uninstalled) first: both change the same apps.
+
+## 1.3.0.125: Kia EV6 Canada 260206 (port request #2)
+
+A 2024 EV6 GT-Line (CVEV.CAN.0000.V015.011.260206, AR HUD). The first report was taken with
+Enhanced Phone Projection 2.2 installed, which replaces the four projection apps (odex removed)
+and the Android Auto library on disk; its backups listed the stock checksums, which are exactly
+`patches/ev6_ca/stock`. After the owner uninstalled it, the kit collected those files.
+
+The Canadian EV6's code is the US EV6's: the same four odex files, Navi and Iap2ServerApp APKs,
+Android Auto library and `libiap2session.so`; only the DiPO and GPM APK containers differ. So the
+EV6's EV deltas apply as they are (`ev6_ca/manifest` +ev lines reuse `ev6/` files; the existing
+tbt lines reproduce their checksums from the owner's APKs), and the AR inspection found every
+site identical to the EV6 US's. The 260206 vehicle framework: the same transactions,
+preconditioning methods, reset timer and AR trap API (hashes added to the EV gates). Mock head
+unit with the owner's stock files: EV, no-EV and a failed install uninstall to stock; the
+installer refuses a US EV6.
