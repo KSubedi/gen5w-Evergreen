@@ -29,8 +29,9 @@ Ultimate Wireless Projection is a [NEMESIS](https://github.com/xwtk/hmg_nemesis)
 From [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat) by willemcvu, built into the same package:
 - **EV routing in Google Maps:** the head unit sends Maps the battery's live energy, so Maps shows battery % on arrival and plans charging stops with realistic charge times.
 - **Battery preconditioning:** when the next stop is a fast charger (over 50 kW) within an hour, the car is asked to warm the battery, the same request its own navigation makes. The car's battery conditioning setting is the off switch.
+- **Calibrated for the EV6, and learns your car:** the EV6 has its own energy model, which then adjusts to your car's real highway consumption and DC charging speed from its own drives and charging stops.
+- **Maps' battery % matches the dash** instead of reading up to 2 points low.
 - **EV logs** (driving and charging, no location) are saved with the other logs.
-- The energy model is currently the Ioniq 5's (same battery), so arrival % may read slightly low. Your EV logs help build a proper EV6 model.
 - Not wanted? Put an empty file named `UWP-NO-EV` next to `NEMESIS.data` before installing. CarPlay isn't affected.
 
 ### Recovery from freezes and drops
@@ -138,6 +139,7 @@ Ultimate Wireless Projection stands on a lot of community work:
 - **[Evergreen](https://github.com/zpoon/gen5w-Evergreen)** by [zpoon](https://github.com/zpoon): the community continuation of Leafia that this project forked, including its multi-car builds, porting tools, mock head unit and compatibility page.
 - **[NEMESIS](https://github.com/xwtk/hmg_nemesis)** by xwtk: the platform everything installs through, and its community packages *Enable Wireless Features* and *Turn-by-Turn Guidance for Phone Projection*, which the wireless and turn-by-turn parts build on.
 - **[egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat)** by [willemcvu](https://github.com/willemcvu): EV routing, battery preconditioning and EV logging for Android Auto, used with their permission.
+- **[egmp-aa-ev-hmg-api](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api)** by [AwsomeFox](https://github.com/AwsomeFox): the EV6 energy-model calibration, highway-consumption and DC-charge learning, and the battery % curve (AGPL-3.0, see NOTICE.md). Its EV6 calibration came from logs shared by biscober.
 - **[HMG-API](https://github.com/VysseCodes/HMG-API)** and **[Open-HMG's AR HUD and cluster turn research](https://github.com/Open-HMG/hmgapi-wireless-cp-aa)**: the documented AR HUD protocol and cluster turn formats that showed AR was possible from projection. This project's AR code is a separate implementation.
 - **[hwjang1/ev6kr-wireless-carplay](https://github.com/hwjang1/ev6kr-wireless-carplay)**: EV6 CarPlay research, including a report of AR arrows working on Korean EV6 firmware.
 - **[aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs)**, **[open-android-auto](https://github.com/Deadknight/open-android-auto)** ([mrmees's fork](https://github.com/mrmees/open-android-auto)) and **[ArdaMapsEnergyProvider](https://github.com/Deadknight/ArdaMapsEnergyProvider)**: Android Auto protocol and EV energy-model references.
@@ -154,6 +156,6 @@ Licences and the details of what came from where are in [NOTICE.md](NOTICE.md).
 
 ## Licence and disclaimer
 
-Ultimate Wireless Projection is GPL-3.0 (see [LICENSE](LICENSE)), like HMG Leafia Plus and Evergreen. Parts derived from NEMESIS packages stay under their original AGPL-3.0 licence (see [NOTICE.md](NOTICE.md)).
+Ultimate Wireless Projection is GPL-3.0 (see [LICENSE](LICENSE)), like HMG Leafia Plus and Evergreen. Parts derived from NEMESIS packages and from egmp-aa-ev-hmg-api stay under their original AGPL-3.0 licence (see [NOTICE.md](NOTICE.md)).
 
 It is an unofficial community project, not affiliated with or endorsed by Hyundai, Kia, Genesis, Apple or Google. Modifying your head unit is at your own risk.

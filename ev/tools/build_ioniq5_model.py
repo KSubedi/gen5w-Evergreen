@@ -20,8 +20,9 @@ docs/ENERGY-MODEL.md:
             driving heater 3.0 kW at -6.7 C, 6.5 kW at -24.4 C, 400 W mild,
             950 W at 45 C
   block 8   charge-time tables per charger power, integrated from block 4
-            with AC limits (10.9 kW onboard, 1.44 kW L1); the 250 kW row is
-            Tesla Supercharger (500 V, boost-limited flat 105 kW to 90%).
+            with AC limits (10.9 kW onboard, 1.44 kW L1); the 250 and 325 kW
+            rows are Tesla Superchargers (~500 V cabinets, boost-limited flat
+            97 kW to 90%).
             Each point is (Wh still needed to reach full, seconds to full),
             descending, like Ford's DC rows - NOT (energy, seconds from empty)
   omitted   1.5, 1.8-1.12, 6, 9, 10 (the Ford sample works without them)
@@ -84,6 +85,22 @@ OUTSIDE_TEMP_C = 15.0  # placeholder; EvModelSender patches the live outside tem
 # Road load from reference/IONIQ5 roll-down test.xlsx (A, B, C).
 ROAD_LOAD = (196.0, 0.0, 0.493)
 
+# Road load per model, picked at runtime by the head unit's product id
+# (ro.build.product, e.g. CVEV.USA...): (product prefix, A in N, C in
+# N/(m/s)^2). Models not listed send ROAD_LOAD. The cold penalty
+# (COLD_DELTA_A) is added on top either way.
+#   EV6 (CV): fitted on 84 steady 10 km stretches of a 2022 EV6 AWD's logs
+#   (issue #13, ~1000 km, mostly interstate, 5-28 C): the Ioniq 5 values
+#   predicted 234 Wh/km at 120 km/h, the EV6 used ~193 (climate power
+#   measured and taken out). Highway data can't separate A from C; any C in
+#   0.35-0.45 with its matching A fits within 3 Wh/km. 0.40 (CdA ~0.65 m^2,
+#   a lower, sleeker body than the Ioniq 5's ~0.80) and A = 180 N (rolling
+#   resistance ~0.0085 at ~2150 kg) are the physical pair.
+#   tools/analyze_drive_logs.py reproduces the fit.
+CAR_ROAD_LOAD = [
+    ("CV", 180.0, 0.40),
+]
+
 # Drivetrain loss: spin(v) + 6% of wheel power. Spin grows with speed like
 # Ford's map (450 W @ 0 -> 2.7 kW @ 36 m/s) but leaner. Negative x = regen
 # (experiment: sint32 allows it, Ford omits it; whether the planner uses it
@@ -91,19 +108,22 @@ ROAD_LOAD = (196.0, 0.0, 0.493)
 DL_SPEEDS_MPS = [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0]
 DL_POWERS_W = [-150000, -100000, -50000, -20000,
                0, 10000, 25000, 50000, 75000, 100000, 150000, 191000]
-DL_SPIN = lambda v: 300 + 40 * v
+DL_SPIN_W = 300.0          # spin/inverter loss at standstill, W
+DL_SPIN_W_PER_MPS = 40.0   # and its growth with speed
+DL_SPIN = lambda v: DL_SPIN_W + DL_SPIN_W_PER_MPS * v
 DL_FRACTION = 0.06
 
 # Max DC charge power vs absolute battery energy (reference pack; the head
 # unit rescales the axis to the learned capacity, so read each point as SOC).
 #
-# Bulk (<=80%), warm/preconditioned pack: full 3C from 0% (no low-SOC ramp-in),
-# plateau to ~50%, thermal step-down to ~160 kW held to 80%. The step-down is
-# thermal (heat added THIS session), not absolute SOC: it lands ~55-60% from a
-# 0% start, ~65-70% from 10%, ~75-80% from 30%. An energy-indexed model can't
-# express that, so the step sits at 53%: calibrated so the canonical
-# road-trip number, 10->80% on a 350 kW charger, is ~17.5 min on the
-# reference pack (owner's logbook; Hyundai's official 18).
+# Bulk (<=80%): full 3C from 0% (no low-SOC ramp-in), plateau to ~50%, then
+# a step down to 135 kW held to 80%. The step-down is thermal (heat added THIS
+# session), not absolute SOC: it lands ~55-60% from a 0% start, ~65-70% from
+# 10%, ~75-80% from 30%. An energy-indexed model can't express that, so the
+# step sits at 53%. With 160 kW there, 10->80% on a 350 kW charger was
+# ~17.5 min on the reference pack (owner's logbook, a hot pack; Hyundai's
+# official 18); with 135 kW it is 19.0, closer to what packs reach in practice
+# (see the plateau note below).
 #
 # Top end (>80%): the car's own charge-time estimate, which the owner confirms
 # is realistic for this car: 80->90% = 8 min and 90->100% = 18 min on a
@@ -116,12 +136,18 @@ DL_FRACTION = 0.06
 # well or better without it. A slow top is also what makes Maps plan
 # departures well below 100%. Verified against the EA history: see
 # docs/ENERGY-MODEL.md "Field findings".
+#
+# 53-80% plateau: 135 kW (was 160). A 2022 EV6's DC stops (issue #13) held
+# 120-125 kW battery-side from 45 to 80% at a 20-28 C pack, even after the
+# car's own preconditioning had finished (it stops heating at ~22 C), and
+# the owner's 2024-26 EA sessions ran 1.2-1.3x the 160 kW model. 46->83% on
+# a 350 kW charger took 12.8 min; 160 kW said 9.4.
 CHARGE_CURVE = [
     (0, 230000),       # full send from 0%
     (20000, 235000),   # ~26%: peak
     (38700, 228000),   # 50%: plateau end
-    (41022, 160000),   # 53%: thermal step-down (see note above)
-    (61920, 160000),   # 80%: end of the bulk; the voltage taper starts here
+    (41022, 135000),   # 53%: thermal step-down (see note above)
+    (61920, 135000),   # 80%: end of the bulk; the voltage taper starts here
     (62694, 70000),    # 81%
     (65790, 48500),    # 85%
     (69660, 33500),    # 90%  (80->90% at k = 0.813: 8.0 min)
@@ -166,20 +192,30 @@ AUX_TABLE = [
     (35.0, 700), (40.0, 850), (45.0, 950),
 ]
 
-# Tesla Superchargers: in the US they're all listed at exactly 250 kW, and
-# little else is. They run at ~500 V, so the 800 V pack charges through the
-# car's boost converter: owner-measured flat 105 kW from 0 to 90%, no thermal
-# step-down or pause, then the normal taper. Maps keys the time tables by
-# charger power only (no voltage), so the 250 kW row carries this profile.
-SUPERCHARGER_W = 250000
-SUPERCHARGER_FLAT_W = 105000
+# Tesla Superchargers. Google Maps lists them by cabinet:
+#   250 kW  V3 cabinet (V3 posts, and V4 posts on a V3 cabinet)
+#   325 kW  V4 posts on an upgraded V3 cabinet ("V3.5")
+#   500 kW  V4 cabinet (up to 1000 V)
+# The 250 and 325 kW sites run at ~500 V, so a pre-2025 E-GMP pack (800 V)
+# charges through the car's boost converter: flat ~97 kW from 0 to 90%, no
+# thermal step-down or pause, then the normal taper. Owners report a 96-97 kW
+# peak (the first fit used one owner's 105 kW; the lower figure keeps Tesla
+# stops conservative, and a pessimistic Tesla row also steers Maps toward
+# 800 V stations). Only the 500 kW V4 cabinet charges the pack at full
+# speed, so it stays on the 800 V profile (it is above the 350 kW row).
+# Maps keys the time tables by charger power only (no voltage, no network),
+# so the boost limit has to live in those rows.
+SUPERCHARGERS_W = (250000, 325000)
+SUPERCHARGER_FLAT_W = 97000
 SUPERCHARGER_FLAT_TO_WH = 69660  # 90%
 
 # Charger powers for the time tables (DC + 10.9 kW AC + 1.44 kW L1).
-# 260/240 kW are ordinary 800 V rows bracketing the Supercharger row, so a
-# non-Tesla station near 250 kW isn't matched or interpolated onto it.
-CHARGERS_W = [350000, 260000, SUPERCHARGER_W, 240000, 200000, 175000,
-              150000, 125000, 100000, 50000, 25000, 10900, 1440]
+# 260/240 and 330/320 kW are ordinary 800 V rows bracketing the Supercharger
+# rows, so a non-Tesla station near 250 or 325 kW isn't matched or
+# interpolated onto them.
+CHARGERS_W = [350000, 330000, 325000, 320000, 260000, 250000, 240000,
+              200000, 175000, 150000, 125000, 100000, 50000, 25000, 10900,
+              1440]
 # 8.1 grid: GRID_WH = 0.5% of capacity, each cell integrated in GRID_SLICES
 # midpoint slices (the curve has knees at 53% and 80-81%). Rows list headroom
 # (in grid cells) every 5% from 100% down to 10%, every 1% below that, and a
@@ -193,6 +229,16 @@ HEADROOM_STEPS = list(range(200, 19, -10)) + list(range(18, 1, -2)) + [1]
 # I^2R + cooling/pumps. Fitted against 125 real EA sessions (see
 # tools/analyze_charge_history.py); eta = 1.0 biases the model ~1.8 min fast.
 CHARGE_ETA = 0.95  # fitted on two deep warm sessions (0.955, 0.944)
+# AC rows: the on-board charger loses more. A 2022 EV6 on a 10.9 kW-class
+# circuit put 9.3-9.7 kW into the battery over 2-4 h sessions (issue #13).
+AC_ETA = 0.89
+AC_MAX_W = 20000   # charger rows at or below this are AC
+
+# The BMS energy (1.3) reaches 0 at about this display SOC (%) on every car
+# logged so far (2022 EV6: 2.32, 2023 Ioniq 5: 2.27; fitted on parked rows).
+# Capacity is learned as the energy at 100% display, and the battery %
+# curve (sensor 26) maps raw 0 to it.
+ENERGY_ZERO_PCT = 2.3
 
 # Runtime-scaled varints (4.1 energy_wh, 8.1 energy_wh and seconds) are
 # widened to this many bytes: 21 bits, room for 2 097 151. The largest
@@ -200,6 +246,11 @@ CHARGE_ETA = 0.95  # fitted on two deep warm sessions (0.955, 0.944)
 # 90 kWh on the car (k <= 1.17), so scaled values always fit.
 SCALE_WIDTH = 3
 SCALE_MAX_CAPACITY_WH = 90000  # EvModelSender.CAP_MAX_WH
+# Learned DC charge curves (ChargeLearn): the 4.1 powers are multiplied by a learned
+# scale per SOC band, within these bounds, and the 8.1 rows recomputed from them on the
+# car (EvModelSender, the same integration as charge_table()).
+CHARGE_SCALE_MIN = 0.25
+CHARGE_SCALE_MAX = 1.2
 
 
 def interp_curve(energy_wh: float) -> float:
@@ -217,11 +268,16 @@ def interp_curve(energy_wh: float) -> float:
 
 def charger_power(charger_w: int, energy_wh: float) -> float:
     """Charger-side power at this energy on this charger."""
-    if charger_w == SUPERCHARGER_W:
+    if charger_w in SUPERCHARGERS_W:
         if energy_wh < SUPERCHARGER_FLAT_TO_WH:
             return float(SUPERCHARGER_FLAT_W)
         return min(SUPERCHARGER_FLAT_W, interp_curve(energy_wh))
     return min(charger_w, interp_curve(energy_wh))
+
+
+def charge_eta(charger_w: int) -> float:
+    """Charger-side to battery-side efficiency on this charger."""
+    return AC_ETA if charger_w <= AC_MAX_W else CHARGE_ETA
 
 
 def cumulative_table(charger_w: int) -> list[tuple[int, float]]:
@@ -236,7 +292,7 @@ def cumulative_table(charger_w: int) -> list[tuple[int, float]]:
         for j in range(GRID_SLICES):
             # slice midpoint power, charger-side; scale to battery-side energy
             p = charger_power(charger_w, e0 + (j + 0.5) * de)
-            seconds += 3600.0 * de / (p * CHARGE_ETA)
+            seconds += 3600.0 * de / (p * charge_eta(charger_w))
         out.append((i * GRID_WH, seconds))
     return out
 
@@ -341,6 +397,7 @@ def widen_runtime_fields(model: bytearray) -> tuple[int, int]:
 _SCALE_MSGS = {(4,), (4, 1), (8,), (8, 1), (8, 1, 2)}
 _SCALE_VARINTS = {
     (4, 1, 1): "axis",      # charge_limits.max_charge_power.energy_wh
+    (4, 1, 2): "power",     # charge_limits.max_charge_power.power_w (learned per car: ChargeLearn)
     (8, 1, 2, 1): "axis",   # charge_time...points.energy_wh (headroom to full)
     (8, 1, 2, 2): "time",   # charge_time...points.seconds (time to full)
 }
@@ -372,10 +429,10 @@ def _widen_scaled(buf, start: int, end: int, path: tuple, marks: list) -> bytear
     return out
 
 
-def widen_scaled_fields(model: bytearray) -> tuple[bytearray, list, list]:
-    """Widen the capacity-scaled varints of blocks 4.1 and 8.1.
+def widen_scaled_fields(model: bytearray) -> tuple[bytearray, list, list, list]:
+    """Widen the capacity-scaled varints of blocks 4.1 and 8.1, and 4.1's powers.
 
-    Returns (new model, axis marks, time marks), each mark (offset in the new
+    Returns (new model, axis marks, time marks, power marks), each mark (offset in the new
     model, reference value). Blocks 4 and 8 follow battery (1) and road load
     (2), so the patch points there keep their offsets. Checks the marks
     against CHARGE_CURVE / charge_table() so every point is accounted for.
@@ -384,6 +441,8 @@ def widen_scaled_fields(model: bytearray) -> tuple[bytearray, list, list]:
     new = _widen_scaled(model, 0, len(model), (), marks)
     axis = [(o, v) for k, o, v in marks if k == "axis"]
     times = [(o, v) for k, o, v in marks if k == "time"]
+    powers = [(o, v) for k, o, v in marks if k == "power"]
+    assert [v for _, v in powers] == [p for _, p in CHARGE_CURVE], "4.1 power mismatch"
     want_axis = [e for e, _ in CHARGE_CURVE]
     want_time = []
     for c in CHARGERS_W:
@@ -400,7 +459,11 @@ def widen_scaled_fields(model: bytearray) -> tuple[bytearray, list, list]:
     limit = 1 << (7 * SCALE_WIDTH)
     kmax = SCALE_MAX_CAPACITY_WH / CAPACITY_WH
     assert max(want_axis + want_time) * kmax < limit, "SCALE_WIDTH too small"
-    return new, axis, times
+    # learned charge curves: powers up to CHARGE_SCALE_MAX x, seconds for a curve down to
+    # CHARGE_SCALE_MIN x (slower: longer), at the largest pack
+    assert max(p for _, p in CHARGE_CURVE) * CHARGE_SCALE_MAX < limit, "SCALE_WIDTH too small for powers"
+    assert max(want_time) * kmax / CHARGE_SCALE_MIN < limit, "SCALE_WIDTH too small for learned seconds"
+    return new, axis, times, powers
 
 
 def protoc_decode(model: bytes) -> str:
@@ -463,7 +526,7 @@ def main() -> int:
 
     energy_off, cap_off = widen_runtime_fields(model)
     size_battery_only = len(model)
-    model, axis_marks, time_marks = widen_scaled_fields(model)
+    model, axis_marks, time_marks, power_marks = widen_scaled_fields(model)
     verify(bytes(model), canonical)
     # battery.outside_temp_c (field 7, wire type 5) - float bits patch point
     top = parse_fields(model, 0, len(model))
@@ -478,6 +541,11 @@ def main() -> int:
     assert af[1].wire == 5 and af[1].val_len == 4
     a_off_in_model = af[1].val_off
     assert struct.unpack("<f", model[a_off_in_model:a_off_in_model + 4])[0] == ROAD_LOAD[0]
+    # road_load.c_n_per_mps2.value (2.3.1, float) - per-model road load patch point
+    cf = parse_fields(model, rf[3].val_off, rf[3].val_off + rf[3].val_len)
+    assert cf[1].wire == 5 and cf[1].val_len == 4
+    c_off_in_model = cf[1].val_off
+    assert abs(struct.unpack("<f", model[c_off_in_model:c_off_in_model + 4])[0] - ROAD_LOAD[2]) < 1e-6
 
     batch = (
         b"\x80\x03"
@@ -490,10 +558,11 @@ def main() -> int:
     cap_off += hdr
     temp_off = temp_off_in_model + hdr
     a_off = a_off_in_model + hdr
+    c_off = c_off_in_model + hdr
     print(f"model {len(model)} bytes, batch {len(batch)} bytes "
           f"(model {size_battery_only} before widening the 4.1/8.1 varints); "
           f"offsets: energy@{energy_off} capacity@{cap_off} temp@{temp_off} "
-          f"roadA@{a_off}; {len(axis_marks)} energy-axis + {len(time_marks)} "
+          f"roadA@{a_off} roadC@{c_off}; {len(axis_marks)} energy-axis + {len(time_marks)} "
           f"seconds varints scaled at runtime")
     scale_java = (
         java_ints("AXIS_OFFSETS", [o + hdr for o, _ in axis_marks],
@@ -504,10 +573,31 @@ def main() -> int:
                     "8.1 seconds varints (SCALE_WIDTH bytes)")
         + java_ints("TIME_S", [v for _, v in time_marks],
                     "their values for the reference pack")
+        + java_ints("POWER_OFFSETS", [o + hdr for o, _ in power_marks],
+                    "4.1 power_w varints (SCALE_WIDTH bytes), x the learned charge scale")
+        + java_ints("CURVE_WH", [e for e, _ in CHARGE_CURVE], "4.1: energy (Wh, reference pack)")
+        + java_ints("CURVE_W", [p for _, p in CHARGE_CURVE], "4.1: max charge power there (W, charger side)")
+        + "    // 8.1, as charge_table(): rows by charger power, each the seconds to full from\n"
+        + "    // HEADROOM_STEPS x GRID_WH below full, integrated in GRID_SLICES slices per cell\n"
+        + java_ints("CHARGERS_W", CHARGERS_W, "8.1 rows: charger power (W)")
+        + java_ints("HEADROOM_STEPS", HEADROOM_STEPS, "8.1 points: headroom in GRID_WH cells")
+        + java_ints("SUPERCHARGERS_W", list(SUPERCHARGERS_W), "Tesla rows: flat SUPERCHARGER_FLAT_W (boost)")
+        + f"    static final int GRID_WH = {GRID_WH};\n"
+        + f"    static final int GRID_SLICES = {GRID_SLICES};\n"
+        + f"    static final int SUPERCHARGER_FLAT_W = {SUPERCHARGER_FLAT_W};\n"
+        + f"    static final int SUPERCHARGER_FLAT_TO_WH = {SUPERCHARGER_FLAT_TO_WH};\n"
+        + f"    static final double CHARGE_ETA = {CHARGE_ETA!r};\n"
+        + f"    static final double AC_ETA = {AC_ETA!r};\n"
+        + f"    static final int AC_MAX_W = {AC_MAX_W};\n"
+        + f"    static final float CHARGE_SCALE_MIN = {CHARGE_SCALE_MIN!r}f;\n"
+        + f"    static final float CHARGE_SCALE_MAX = {CHARGE_SCALE_MAX!r}f;\n"
     )
     model_rev = hashlib.sha1(batch).hexdigest()[:8]
     cold_t = ", ".join(f"{t}f" for t, _ in COLD_DELTA_A)
     cold_a = ", ".join(f"{a}f" for _, a in COLD_DELTA_A)
+    car_p = ", ".join(f'"{p}"' for p, _, _ in CAR_ROAD_LOAD)
+    car_a = ", ".join(f"{a}f" for _, a, _ in CAR_ROAD_LOAD)
+    car_c = ", ".join(f"{c}f" for _, _, c in CAR_ROAD_LOAD)
 
     OUT_MODEL.write_bytes(bytes(model))
     OUT_BATCH.write_bytes(batch)
@@ -532,6 +622,18 @@ def main() -> int:
         "    static final String MODEL_REV = \"%s\";  // sha1 of the batch, short\n"
         "    static final int ROAD_A_OFFSET = %d;  // road_load.a_n float bits\n"
         "    static final float ROAD_A_N = %rf;\n"
+        "    static final int ROAD_C_OFFSET = %d;  // road_load.c_n_per_mps2 float bits\n"
+        "    static final float ROAD_C_N = %rf;\n"
+        "    // road load per model: product id prefix, A (N), C (N/(m/s)^2)\n"
+        "    static final String[] CAR_PREFIX = {%s};\n"
+        "    static final float[] CAR_ROAD_A_N = {%s};\n"
+        "    static final float[] CAR_ROAD_C_N = {%s};\n"
+        "    // drivetrain loss (3.7): spin W + W per m/s, plus a fraction of wheel power\n"
+        "    static final float DL_SPIN_W = %rf;\n"
+        "    static final float DL_SPIN_W_PER_MPS = %rf;\n"
+        "    static final float DL_FRACTION = %rf;\n"
+        "    // display SOC (%%) at which the BMS energy reaches 0\n"
+        "    static final float ENERGY_ZERO_PCT = %rf;\n"
         "    // extra road load A vs outside temp (C), linear between, clamped\n"
         "    static final float[] COLD_TEMPS_C = {%s};\n"
         "    static final float[] COLD_DELTA_A_N = {%s};\n"
@@ -546,7 +648,9 @@ def main() -> int:
         "    private EvModelTemplate() {}\n"
         "}\n"
         % (CAPACITY_WH, cap_off, CAPACITY_WIDTH, energy_off, ENERGY_WIDTH,
-           PLACEHOLDER_WH, temp_off, model_rev, a_off, ROAD_LOAD[0], cold_t, cold_a,
+           PLACEHOLDER_WH, temp_off, model_rev, a_off, ROAD_LOAD[0], c_off, ROAD_LOAD[2],
+           car_p, car_a, car_c, DL_SPIN_W, DL_SPIN_W_PER_MPS, DL_FRACTION,
+           ENERGY_ZERO_PCT, cold_t, cold_a,
            SCALE_WIDTH, scale_java, lines[0], concat)
     )
     print(f"wrote {OUT_TXT.relative_to(ROOT)}, {OUT_MODEL.relative_to(ROOT)}, "

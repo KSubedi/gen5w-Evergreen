@@ -18,6 +18,18 @@ Message link (visible to members of that server): https://discord.com/channels/1
 
 On that basis, code taken from egmp-aa-ev-feat into Evergreen is distributed under Evergreen's licence, GPL-3.0, with credit to willemcvu. Its bundled `lpatch` came from HMG Leafia Plus and is GPL-3.0 already.
 
+## egmp-aa-ev-hmg-api (EV learning and calibration, AGPL-3.0)
+
+egmp-aa-ev-hmg-api by AwsomeFox (anthonyanderson), https://github.com/AwsomeFox/egmp-aa-ev-hmg-api, is a fork of egmp-aa-ev-feat licensed under the GNU Affero General Public License v3.0. From its v0.6.0 to v0.8.2 (2026-11), Ultimate Wireless Projection 1.3.0.123 takes, with that repository's history kept as the merge base:
+
+- `ev/gpm-ev/src/.../ChargeCurve.java`, `ChargeLearn.java`, `RoadLearn.java` and `SocCurve.java`, and the tests `ChargeLearnTest`, `RoadLearnTest` and `SocCurveTest`: new files, AGPL-3.0.
+- Its changes to `EvModelSender`, `EvModelTemplate`, `EvDriveLog`, `EvCar` and `PrecondCore` (EV6 road load, DC plateau, capacity at 100% display, highway and DC charge learning, the reconnect fix), and to `ev/tools/build_ioniq5_model.py`, `analyze_drive_logs.py`, `evlog_schema.json` and `ev/docs`: those changes are AGPL-3.0.
+- The library patch's sensor-type limit raised to 26 for the battery % curve, matching its recipe `ev-sensor-48ee793a`.
+
+GPLv3 section 13 permits combining GPL-3.0 and AGPL-3.0 code in one work; the parts above stay under the AGPL-3.0, and the rest of this project under the GPL-3.0. SocCurve's send was adapted to this project's `sendRawMessage`; nothing from its HMG-API runtime (`hmgapi-mod`) is used.
+
+The EV6 calibration in it came from a 2022 EV6 owner's logs (egmp-aa-ev-hmg-api issue #13, by biscober). Its 0.8.1 fixes credit Weab-chan's Canadian test build.
+
 ## NEMESIS
 
 HMG Leafia Plus packages install and run through **NEMESIS** by xwtk:

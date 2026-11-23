@@ -10,7 +10,7 @@ import com.hkmc.cluster.NavigationCluster;
  * five seconds), so a general release does not log at navigation cadence.
  */
 public final class ArHudDebug implements Thread.UncaughtExceptionHandler {
-    public static final String VERSION="v122";
+    public static final String VERSION="v123";
     private static long window=-1, sequence, flagCheckedAt=-1;
     private static int count, criticalCount, chatterCount, dropped, criticalDropped;
     private static boolean flagged;

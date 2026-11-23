@@ -201,3 +201,32 @@ the Ioniq 5 US 260507 on 2026-11-04; to redo it (or for another car):
   next rebuild (needs the Ioniq 5 stock files).
 - **Model improvements:** egmp-aa-ev-feat's roadmap (log analysis, a model that
   adjusts itself) moves to Evergreen issues.
+
+## egmp-aa-ev-hmg-api 0.6.0-0.8.2 (Ultimate Wireless Projection 1.3.0.123)
+
+AwsomeFox's fork (AGPL-3.0) moved the energy model on while ours stayed at willemcvu's 0.2.x.
+Its `gpm-ev` tree shares our history (merge base `698cf3b`, willemcvu's README commit), so
+`git diff 698cf3b v0.8.2 -- gpm-ev tools docs` applied three-way onto `ev/`; the only conflicts
+were `ev/gpm-ev/test/run.sh` (both test lists kept) and `ev/docs/LOGGING.md` (ours: no VIN).
+Merged: EV6 road load (`CAR_PREFIX "CV"`, A 180 N, C 0.4), DC plateau 135 kW, AC efficiency 0.89,
+capacity as energy at 100% display (zero at 2.3%), Supercharger 97 kW and V3.5, `RoadLearn`
+(highway consumption, 0.7-1.3x, `road_scale` in the app's files dir), `ChargeLearn` +
+`ChargeCurve` (DC charge per 10% band, guided stops only, `charge_curve`), the reconnect race
+fix. Learning is on (their HMG-API setting `model_learning` defaults to on; we have no settings
+UI). `ev/tools/build_ioniq5_model.py` regenerates `EvModelTemplate.java` byte for byte (needs
+`protoc`).
+
+The battery % curve (`SocCurve`, their 0.7.0) lived only in `hmgapi-mod`. Ported:
+`SocCurve.java` and its test, the send after each model message (`sendRawMessage`), sensor 26
+registered next to 23 in `SensorSource.init` (`patch_gpm_smali.py`), and the library's
+`SensorType_IsValid` limit `cmp r0,#22` -> `#25` (`patch_library.py`). The other two library
+patches already matched their `ev-sensor-48ee793a` recipe byte for byte. The EV6 gets its own
+library delta (`patches/ev6/libautoreceiver_infobank.ev.lpd`, `7ada7d23…`); the Ioniq 5 keeps
+`common/libautoreceiver_infobank.ev.lpd` and its old EV GPM.
+
+Build (steps 3-6 above, EV6 stock): the HEAD sources rebuilt the shipped EV GPM exactly
+(`efd717fc…`) first; the new EV GPM APK is `fff370ba…` (two builds identical, 834 classes, no
+`getVIN`); both deltas round-trip. The AR plan's fingerprints were unchanged apart from the EV
+base hashes. The owner's four EV6 logs (city, 0-2 km) have no highway stretch, so
+`RoadLearn` stays at 1.0 on them. Their SOC spans only 88.5-91.5%, too narrow for
+`analyze_drive_logs.py capacity` to say anything about the pack.

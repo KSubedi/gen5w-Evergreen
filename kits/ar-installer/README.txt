@@ -1,4 +1,4 @@
-ULTIMATE WIRELESS PROJECTION 1.3.0.122 -- EV6 AR HUD (TEST BUILD)
+ULTIMATE WIRELESS PROJECTION 1.3.0.123 -- EV6 AR HUD (TEST BUILD)
 Wireless CarPlay and Android Auto, with navigation on the factory AR HUD.
 https://github.com/KSubedi/ultimate-wireless-projection
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
@@ -7,6 +7,25 @@ The owner tested 1.2.0.102 for three hours of driving with generally good result
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.123: SMARTER EV ROUTING IN GOOGLE MAPS
+Android Auto's EV features now include the work from egmp-aa-ev-hmg-api 0.6.0
+to 0.8.2 by AwsomeFox (a fork of egmp-aa-ev-feat), built for this package:
+- EV6 calibration: the EV6 gets its own road load instead of the Ioniq 5's,
+  which over-predicted EV6 highway use by about 22% (Maps planned too much
+  charging), and the DC plateau at 53-80% is 135 kW instead of 160 kW.
+- Learns your car's highway consumption: every 10 km of steady driving at
+  60 km/h or more adjusts the model (0.7x to 1.3x).
+- Learns how fast your car DC-charges, per 10% battery band, from stops at
+  chargers Maps was guiding you to. Not AC charging.
+- Maps' battery % matches the dash: Maps read up to 2 points low, most near
+  empty. The head unit now sends Maps the car's own battery % curve.
+- Battery capacity is learned as the energy at 100% on the dash, and a
+  -40 C reading at start-up no longer counts as cold weather.
+- What is learned applies from the next Android Auto session, never in the
+  middle of a route. The EV log header shows it (road_scale, charge_scale).
+- A quick Android Auto reconnect can no longer leave two senders running.
+CarPlay, Android Auto turn-by-turn and the AR HUD are unchanged from 1.3.0.121.
 
 NEW IN 1.3.0.122: ULTIMATE WIRELESS PROJECTION
 This project is now maintained on its own as Ultimate Wireless Projection
@@ -452,7 +471,7 @@ AFTER THE DRIVE
    identifiers; they do hold timings, distances, speeds and battery data.
    Recording continues, so you can do this after every drive.
    (UWP-AR-export-stop-clean.zip, in the controls zip, also exports but
-   stops recording for good. This version supports 104 to 1.3.0.122.)
+   stops recording for good. This version supports 104 to 1.3.0.123.)
 4. In the issue, give the approximate clock time of anything odd, the app
    (Apple Maps, Google Maps, Waze...), what the phone showed versus the HUD,
    and whether leaving CarPlay or Android Auto and coming back changed it. No interaction

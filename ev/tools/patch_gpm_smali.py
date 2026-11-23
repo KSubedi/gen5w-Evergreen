@@ -7,7 +7,8 @@ the compiled EvModelSender/EvModelTemplate classes, and edits SensorSource.smali
   1. init(): force fuel types {10 (FUEL_TYPE_ELECTRIC)} and EV connectors
      {4 (COMBO_1), 1 (J1772)} instead of the UNKNOWN arrays GalReceiver passes.
   2. init(): after the normal sensor registration loop, register sensor 23
-     (SENSOR_VEHICLE_ENERGY_MODEL_DATA) and start EvModelSender.
+     (SENSOR_VEHICLE_ENERGY_MODEL_DATA) and 26 (the battery % curve) and start
+     EvModelSender.
   3. shutdown(): stop EvModelSender before nativeShutdown() frees the native
      SensorSource object.
   4. New method sendRawMessage([B)I: exposes nativeReportDiagnosticsData so
@@ -172,6 +173,10 @@ REGISTER_NEW = """\
     if-nez v0, :cond_ev_skip
 
     const/16 v1, 0x17
+
+    invoke-direct {p0, v1}, Lcom/google/android/projection/protocol/SensorSource;->nativeRegisterSensor(I)V
+
+    const/16 v1, 0x1a
 
     invoke-direct {p0, v1}, Lcom/google/android/projection/protocol/SensorSource;->nativeRegisterSensor(I)V
 

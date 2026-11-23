@@ -67,4 +67,6 @@ sh tools/build_release.sh v0.2.0           # USB release zip
 
 ## Credits
 
+The EV6 calibration, highway and DC-charge learning and the battery % curve come from [egmp-aa-ev-hmg-api](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api) v0.6.0–0.8.2 by AwsomeFox (AGPL-3.0; see the repository's NOTICE.md).
+
 [NEMESIS](https://github.com/xwtk/hmg_nemesis) (xwtk), [HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus) (including `lpatch`, GPL-3.0), [aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs), [open-android-auto](https://github.com/mrmees/open-android-auto), [gen5w-preconditioning](https://github.com/paytondevs/gen5w-preconditioning).

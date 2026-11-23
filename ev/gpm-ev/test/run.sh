@@ -3,7 +3,9 @@
 # vehicle and journal, plain JVM), the EV log row (EvDriveLog, SenderRowTest;
 # android.jar plus small Log/SystemClock shims in test/shim), the EV log
 # aggregation, folder cap and buffered writer (EvLogTest), and the 4.1/8.1
-# capacity scaling (ScaleTest), and the transaction lookup by name (TxTest).
+# capacity scaling (ScaleTest), the transaction lookup by name (TxTest), the on-car
+# road load learning (RoadLearnTest; EV_LOGS=<folder of logs> also replays real logs
+# through it) and DC charge learning (ChargeLearnTest).
 #   sh gpm-ev/test/run.sh          (VERBOSE=1 to see the EvPrecond log lines)
 set -e
 cd "$(dirname "$0")/.."
@@ -24,11 +26,12 @@ mkdir -p "$SOUT"
 javac -nowarn -d "$SOUT" -cp "$ANDROID_HOME/platforms/android-19/android.jar" \
     test/shim/android/util/Log.java test/shim/android/os/SystemClock.java \
     src/$PKG/EvModelSender.java src/$PKG/EvModelTemplate.java src/$PKG/EvLogger.java \
-    src/$PKG/EvCar.java src/$PKG/EvDriveLog.java src/$PKG/EvRowAgg.java \
+    src/$PKG/EvCar.java src/$PKG/EvDriveLog.java src/$PKG/EvRowAgg.java src/$PKG/RoadLearn.java \
+    src/$PKG/ChargeLearn.java src/$PKG/ChargeCurve.java src/$PKG/SocCurve.java \
     src/$PKG/NavProto.java src/$PKG/PrecondCore.java src/$PKG/Precond.java \
     stubs/$PKG/SensorSource.java stubs/com/hkmc/cluster/NavigationCluster.java \
     stubs/com/hkmc/cluster/NavigationClusterListener.java test/SenderRowTest.java \
-    test/ScaleTest.java test/EvLogTest.java test/TxTest.java \
+    test/ScaleTest.java test/EvLogTest.java test/TxTest.java test/RoadLearnTest.java test/ChargeLearnTest.java test/SocCurveTest.java \
     test/fake/com/hkmc/hev/IHEVService.java
 java -cp "$SOUT:$ANDROID_HOME/platforms/android-19/android.jar" \
     com.google.android.projection.protocol.SenderRowTest
@@ -38,3 +41,9 @@ java -cp "$SOUT:$ANDROID_HOME/platforms/android-19/android.jar" \
     com.google.android.projection.protocol.ScaleTest
 java -cp "$SOUT:$ANDROID_HOME/platforms/android-19/android.jar" \
     com.google.android.projection.protocol.TxTest
+java -cp "$SOUT:$ANDROID_HOME/platforms/android-19/android.jar" \
+    com.google.android.projection.protocol.RoadLearnTest
+java -cp "$SOUT:$ANDROID_HOME/platforms/android-19/android.jar" \
+    com.google.android.projection.protocol.ChargeLearnTest
+java -cp "$SOUT:$ANDROID_HOME/platforms/android-19/android.jar" \
+    com.google.android.projection.protocol.SocCurveTest
