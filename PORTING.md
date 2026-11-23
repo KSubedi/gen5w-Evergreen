@@ -36,6 +36,38 @@ What to expect per feature:
 
 Trims without built-in navigation have a different head unit ("Display Audio") that NEMESIS doesn't support. Only each car's newest head-unit firmware for its region is ported; update with the free Navigation Updater first.
 
+### FAQ
+
+**Do I need to uninstall HMG-API before running the porting kit?**
+No. The kit only reads files, and HMG-API applies its mods in memory without changing files on disk, so the kit still collects your car's stock files. (Port request #1 came from a car with HMG-API's Wireless CarPlay mod installed; every file matched stock.) You *do* need to turn off HMG-API's Wireless CarPlay + Android Auto mod later, before installing a test build, because both change the same apps.
+
+**What if Evergreen, Leafia or Ultimate Wireless Projection is installed?**
+Those change the projection apps and libraries on disk, so the kit would collect modified files. Uninstall the package in NEMESIS Manager and restart the head unit before running the kit, or say in your port request that it's installed.
+
+**Does the kit change anything on my car?**
+No. It writes only to the USB drive. It never collects logs, accounts, paired phones, Wi-Fi passwords, firmware key files, the VIN or serial numbers.
+
+**Why can't I post `send-privately` on the issue?**
+It holds Hyundai/Kia system files (the projection apps, libraries and framework), which aren't ours to publish. They're only used to build and test your car's port, and are never committed to this repository; the repository keeps only small patch files that rebuild everything from your car's own files at install time.
+
+**Do I need to send `send-privately` at all?**
+Often not. If your report shows the same firmware files as a car we already have, the build can be made from the public report alone, and the issue will say so.
+
+**My car has no AR HUD (or no HUD). Is it still worth it?**
+Yes. Wireless CarPlay and Android Auto, and turn-by-turn on the cluster (and on a regular HUD), work without the AR HUD. Say what your car has in the port request.
+
+**My car isn't electric. Can it be ported?**
+Yes. The EV features simply stay off; everything else works.
+
+**My firmware is older than the one listed for my car.**
+Update the head unit first with the free Hyundai, Kia or Genesis Navigation Updater. Ports are made for each region's newest firmware.
+
+**The kit didn't finish, or `UWP-PORT` is missing.**
+Make sure NEMESIS 1.15 or newer is installed, the drive is exFAT or FAT32 with 200 MB free, nothing else is on it, and the head unit had fully started before you plugged it in. Then run it again.
+
+**How long does a port take, and what happens after?**
+It depends on how different your car's apps are. A car whose firmware matches one we already support can get a test build quickly; others need their changes ported and checked first. Either way, you get a test build on the issue, and the drive logs you send afterwards decide when it's marked supported.
+
 ## For developers: build a port
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first: setup, the mock head unit and the safety rules apply to every port. Stock files stay private: never commit them or full modified apps.
@@ -74,7 +106,11 @@ python3 tools/build-carplay-ar-advanced.py --stock <stock> --plan <plan.json> --
 python3 tools/build-carplay-ar-installer.py --patches <private out>/patches --enable-ar
 ```
 
-Today these tools are gated to the EV6 (US, 260507): the fingerprints, the installer's firmware gate and the AR turn tables were made for it. A new car needs its fingerprints reviewed, the gate extended, and a first drive with logs to confirm the HUD's AR types and the arrow timing. The [AR development notes](notes/carplay-ar.md) describe each piece and how it was tuned.
+Pass `--variant <patch set>` (default `ev6`) to both builder steps. Builds exist for the EV6 US 260507 (`ev6`) and the Ioniq 5 US 260903 (`neev23_260903`). The Ioniq 5's CarPlay app needed one adaptation: its obfuscator named the AR fields one letter on, which the build check and `ArHudRoute` now recognise. A new car needs:
+- its fingerprints reviewed;
+- an entry in `CARS` in `tools/build-carplay-ar-installer.py`, which sets the installer's name and firmware gate;
+- its variant added to the verified framework list in `tools/check-carplay-ar-build.py` and to the product patterns in the control kits;
+- a first drive with logs, to confirm the HUD's AR types and the arrow timing. The [AR development notes](notes/carplay-ar.md) describe each piece and how it was tuned.
 
 ### 4. Test
 
