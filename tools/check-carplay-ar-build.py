@@ -42,9 +42,9 @@ def validate(patches, report):
         if any(l.split()[:3]==['2_tbt+ev','app','HKMC_GPM'] for l in (patches/variant/'manifest').read_text().splitlines()):
             wanted.add(('2_tbt+ev','HKMC_GPM'))
         api=data.get('framework_api',{})
-        # Cars whose framework trap API was inspected: the EV6 US 260507 and the Ioniq 5 US 260903
-        # (the same API: bar index 11, the same trap fields and hashes).
-        if variant not in ('ev6','neev23_260903') or api.get('bar_index')!=11 or not data.get('framework_sha256'):
+        # Cars whose framework trap API was inspected: the EV6 US 260507, the EV6 Canada 260206 and
+        # the Ioniq 5 US 260903 (the same API: bar index 11, the same trap fields and hashes).
+        if variant not in ('ev6','ev6_ca','neev23_260903') or api.get('bar_index')!=11 or not data.get('framework_sha256'):
             raise ValueError('advanced AR requires a verified framework API')
     if len(builds)!=len(wanted) or {(b.get('part'),b.get('name','HKMC_DiPO')) for b in builds}!=wanted:
         raise ValueError("AR report must cover every required DiPO/navigation/Android Auto build")

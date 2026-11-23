@@ -506,7 +506,7 @@ class ControlTest(unittest.TestCase):
 
     def test_wrong_firmware_and_unknown_mode_rejected_but_disable_available(self):
         (self.package / "AR_BUILD.json").write_text('{"variant": "ev6"}\n')
-        self.env["AR_TEST_PRODUCT"]="CVEV.CAN.0000.V015.011.260206"
+        self.env["AR_TEST_PRODUCT"]="NQ5.USA.0000.V015.012.260507"
         self.assertNotEqual(self.control("enable").returncode, 0)
         self.assertNotEqual(self.control("unexpected").returncode, 0)
         self.marker.touch()

@@ -355,6 +355,7 @@ public final class Precond {
         //    notes/ev-vehicle-commands.md.
         //  - Hyundai Ioniq 5 2024 SE US 260903 (NEEV23SE): deodexed 2026-11-23; the
         //    same transaction numbers, HEVService methods and reset timer as the EV6's.
+        //  - Kia EV6 Canada 260206: deodexed 2026-11-23; the same as the EV6 US's.
         static final String[][] PROFILES = {
             {"Ioniq 5 US 260507",
                 "dd72e04bce0a2b4bda1506308ac21f91002c1436553b8156c345cc4313661338",
@@ -365,6 +366,9 @@ public final class Precond {
             {"Ioniq 5 2024 SE US 260903",
                 "c52e0825956880d627b32979022705a618200f059476c094d729133d1ff6a3be",
                 "bf17e682d1beb349ae8ef2acaae6d6e908fe42e88853d7145ee16b29bb4d9ec1"},
+            {"Kia EV6 Canada 260206",
+                "347d05034e6b25e38f8d0446a6e9f02f4c8f5b786c09e583a500235613514c18",
+                "80bc04d04822464cfedb8878592f04eab8b16351be7aef6c70ff1ec9aa14d021"},
         };
 
         private Boolean compatible;  // null = not checked yet

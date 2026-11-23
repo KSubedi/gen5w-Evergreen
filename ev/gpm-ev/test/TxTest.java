@@ -25,7 +25,11 @@ public final class TxTest {
                 "c52e0825956880d627b32979022705a618200f059476c094d729133d1ff6a3be",
                 "bf17e682d1beb349ae8ef2acaae6d6e908fe42e88853d7145ee16b29bb4d9ec1")), "Ioniq 5 260903 profile");
         pass++;
-        check(EvCar.HCAN_MD5S.length == 3, "three verified telematics libraries");
+        check("Kia EV6 Canada 260206".equals(Precond.HkmcVehicle.profile(
+                "347d05034e6b25e38f8d0446a6e9f02f4c8f5b786c09e583a500235613514c18",
+                "80bc04d04822464cfedb8878592f04eab8b16351be7aef6c70ff1ec9aa14d021")), "EV6 Canada profile");
+        pass++;
+        check(EvCar.HCAN_MD5S.length == 4, "four verified telematics libraries");
         pass++;
         check(EvCar.tx("com.hkmc.hev.IHEVService", "getHEVStatus") == 3, "found by name");
         pass++;

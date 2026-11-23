@@ -19,6 +19,8 @@ VERSION = "1.3.0.125"
 CARS = {
     "ev6": {"car": "a US Kia EV6 on 260507", "short": "EV6 USA 260507", "title": "EV6 AR",
             "label": "EV6_US_260507", "products": "CVEV.USA.*.260507"},
+    "ev6_ca": {"car": "a Canadian Kia EV6 on 260206", "short": "EV6 Canada 260206", "title": "EV6 Canada AR",
+               "label": "EV6_CA_260206", "products": "CVEV.CAN.*.260206"},
     "neev23_260903": {"car": "a US Hyundai Ioniq 5 on 260903", "short": "Ioniq 5 USA 260903", "title": "Ioniq 5 AR",
                       "label": "IONIQ5_US_260903",
                       "products": "NEEV.USA.*.260903|NEEV23.USA.*.260903|NEEV23SE.USA.*.260903"},
