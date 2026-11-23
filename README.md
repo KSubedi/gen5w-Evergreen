@@ -34,6 +34,12 @@ From [egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat) by willemcv
 - **EV logs** (driving and charging, no location) are saved with the other logs.
 - Not wanted? Put an empty file named `UWP-NO-EV` next to `NEMESIS.data` before installing. CarPlay isn't affected.
 
+### EV routing in Apple Maps (CarPlay)
+From [egmp-carplay-ev-routing](https://github.com/isaacwisdom/egmp-carplay-ev-routing) by Isaac Wisdom, with the vehicle identity from HMG-API's Wireless CarPlay mod, built into this package (no HMG-API needed):
+- **The iPhone sees an electric car:** Apple Maps can add it under Vehicles, plan charging stops and show battery on arrival.
+- **Live data:** battery %, range and the car's charging and consumption figures, every 10 seconds while Maps asks. The charging curve uses the EV6's measured DC power.
+- **Setup:** after installing, re-pair the iPhone (remove it on the head unit, forget the car on the phone), then add the car in Apple Maps: profile picture → Vehicles. 77.4 kWh battery only.
+
 ### Recovery from freezes and drops
 - **Frozen CarPlay screen:** after 10 seconds without video, the phone is asked for a fresh frame. If that doesn't help within 4 seconds, the head unit takes the screen back for a moment (a short black flash), which restarts the phone's video. This is a common problem with every wireless package on these cars; its root cause is still being investigated ([notes](notes/hotspot-channel-debugging.md)).
 - **Phone gone from Wi-Fi without the head unit noticing:** after 30 seconds without contact, the HUD arrow is cleared and CarPlay restarts so the phone can reconnect. Before, the last arrow could stay up until the car was switched off.
@@ -140,9 +146,10 @@ Ultimate Wireless Projection stands on a lot of community work:
 - **[NEMESIS](https://github.com/xwtk/hmg_nemesis)** by xwtk: the platform everything installs through, and its community packages *Enable Wireless Features* and *Turn-by-Turn Guidance for Phone Projection*, which the wireless and turn-by-turn parts build on.
 - **[egmp-aa-ev-feat](https://github.com/willemcvu/egmp-aa-ev-feat)** by [willemcvu](https://github.com/willemcvu): EV routing, battery preconditioning and EV logging for Android Auto, used with their permission.
 - **[egmp-aa-ev-hmg-api](https://github.com/AwsomeFox/egmp-aa-ev-hmg-api)** by [AwsomeFox](https://github.com/AwsomeFox): the EV6 energy-model calibration, highway-consumption and DC-charge learning, and the battery % curve (AGPL-3.0, see NOTICE.md). Its EV6 calibration came from logs shared by biscober.
-- **[HMG-API](https://github.com/VysseCodes/HMG-API)** and **[Open-HMG's AR HUD and cluster turn research](https://github.com/Open-HMG/hmgapi-wireless-cp-aa)**: the documented AR HUD protocol and cluster turn formats that showed AR was possible from projection. This project's AR code is a separate implementation.
+- **[HMG-API](https://github.com/VysseCodes/HMG-API)** and **[Open-HMG's Wireless CarPlay + Android Auto mod](https://github.com/Open-HMG/hmgapi-wireless-cp-aa)**: the documented AR HUD protocol and cluster turn formats that showed AR was possible from projection (this project's AR code is a separate implementation), and the CarPlay vehicle identity code and iAP2 hook map used for Apple Maps EV routing.
 - **[hwjang1/ev6kr-wireless-carplay](https://github.com/hwjang1/ev6kr-wireless-carplay)**: EV6 CarPlay research, including a report of AR arrows working on Korean EV6 firmware.
 - **[aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs)**, **[open-android-auto](https://github.com/Deadknight/open-android-auto)** ([mrmees's fork](https://github.com/mrmees/open-android-auto)) and **[ArdaMapsEnergyProvider](https://github.com/Deadknight/ArdaMapsEnergyProvider)**: Android Auto protocol and EV energy-model references.
+- **[egmp-carplay-ev-routing](https://github.com/isaacwisdom/egmp-carplay-ev-routing)** by [Isaac Wisdom](https://github.com/isaacwisdom): Apple Maps EV routing over CarPlay (GPL-3.0); its charging and consumption dictionaries come from [augard/evmaps](https://github.com/augard/evmaps).
 - **[gen5w-preconditioning](https://github.com/paytondevs/gen5w-preconditioning)** by paytondevs: a reference for the battery preconditioning commands, which this project sends the same way.
 - **[nudl](https://github.com/chenxiaolong/nudl)** by chenxiaolong and **[HKG_Gen5W_ReverseEngineer](https://github.com/cantcs/HKG_Gen5W_ReverseEngineer)** by cantcs: used to download and study the stock firmware the patches are built against.
 - **Contributors:**
@@ -156,6 +163,6 @@ Licences and the details of what came from where are in [NOTICE.md](NOTICE.md).
 
 ## Licence and disclaimer
 
-Ultimate Wireless Projection is GPL-3.0 (see [LICENSE](LICENSE)), like HMG Leafia Plus and Evergreen. Parts derived from NEMESIS packages and from egmp-aa-ev-hmg-api stay under their original AGPL-3.0 licence (see [NOTICE.md](NOTICE.md)).
+Ultimate Wireless Projection is GPL-3.0 (see [LICENSE](LICENSE)), like HMG Leafia Plus and Evergreen. Parts derived from NEMESIS packages, egmp-aa-ev-hmg-api and HMG-API's Wireless mod stay under their original AGPL-3.0 licence (see [NOTICE.md](NOTICE.md)).
 
 It is an unofficial community project, not affiliated with or endorsed by Hyundai, Kia, Genesis, Apple or Google. Modifying your head unit is at your own risk.

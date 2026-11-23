@@ -6,7 +6,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 MODES = ("enable", "disable", "status", "basic", "advanced", "diagnostics",
-         "trace-on", "trace-off", "tune-reset", "baseline", "hotspot")
+         "trace-on", "trace-off", "tune-reset", "baseline", "hotspot", "carplay-ev-off", "carplay-ev-on")
 RANGES = {"street_ar_meters": (30, 457), "gain": (0.5, 1.0), "backstep_meters": (0, 50),
           "bar_meters": (30, 457), "turn_offset_meters": (0, 60), "guidance_restart_s": (0, 600),
           "street_ar_seconds": (0, 30)}

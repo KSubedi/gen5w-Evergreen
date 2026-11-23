@@ -3,7 +3,12 @@ export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system
 . ./scripts/common.sh
 
 log "preuninstall wireless.carplay.bt"
+pick_iap_sum
 if ! restore_all; then
+    log "keeping $BACKUP_DIR"
+    exit 1
+fi
+if ! restore_cpev; then
     log "keeping $BACKUP_DIR"
     exit 1
 fi

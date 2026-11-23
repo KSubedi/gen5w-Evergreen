@@ -30,6 +30,12 @@ GPLv3 section 13 permits combining GPL-3.0 and AGPL-3.0 code in one work; the pa
 
 The EV6 calibration in it came from a 2022 EV6 owner's logs (egmp-aa-ev-hmg-api issue #13, by biscober). Its 0.8.1 fixes credit Weab-chan's Canadian test build.
 
+## egmp-carplay-ev-routing and HMG-API Wireless identity (Apple Maps EV routing, 1.3.0.124)
+
+- egmp-carplay-ev-routing by Isaac Wisdom, https://github.com/isaacwisdom/egmp-carplay-ev-routing (v0.5.0, d148562), GPL-3.0-or-later: `src/carplay-ev/native/ev_extension.c`, `bridge_core.c`, `bridge_jni.c`, `native/compat/stdio.h`, and `src/carplay-ev/java/.../NativeBridge.java`, `VehicleSource.java`, `Subscription.java`, unchanged; `CarPlayEv.java` follows its EvRouting/AppProvider; the EV6 profile starts from its `vehicles/kia/ev6/us-77kwh/profile.json` (whose charging and consumption dictionaries it credits to augard/evmaps). Its compile-only `com.tcc.iap2` stubs (`src/carplay-ev/stubs`) were adapted from HMG-API reference material (AGPL-3.0) and are not shipped.
+- Open-HMG/hmgapi-wireless-cp-aa (HMG-API's Wireless CarPlay + Android Auto mod), https://github.com/Open-HMG/hmgapi-wireless-cp-aa (f657ca4): `src/carplay-ev/native/identity.c` comes from its `native/identity/identity.c` (marked GPL-3.0-or-later; the repository is AGPL-3.0) with the changes listed in its header; `native/gate.s` follows its `recipe_gate.s`; the patch bytes at 0x129c6 in `recipes/carplay-ev-identity.recipe` are its `carplay-identification-fc7` recipe's. These parts stay under the licence they came with (AGPL-3.0 where the GPL-or-later grant doesn't apply).
+- Hook point names and fields come from HMG-API's `maps/base/iap2.json` (AGPL-3.0, VysseCodes/Open-HMG).
+
 ## NEMESIS
 
 HMG Leafia Plus packages install and run through **NEMESIS** by xwtk:

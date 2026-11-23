@@ -436,6 +436,16 @@ class ControlTest(unittest.TestCase):
         self.assertIn(b"is disabled", self.control("status").stdout)
         self.assertEqual(report.read_text(), '{"variant": "ev6"}\n')
 
+    def test_carplay_ev_off_and_on_change_only_their_flag(self):
+        before=sorted(p.name for p in self.package.iterdir())
+        self.assertEqual(self.control('carplay-ev-off').returncode,0)
+        flag=self.package/'carplay-ev.disabled'
+        self.assertTrue(flag.is_file());self.assertEqual(flag.read_bytes(),b'')
+        self.assertEqual(sorted(p.name for p in self.package.iterdir()),sorted(before+['carplay-ev.disabled']))
+        self.assertEqual(self.control('carplay-ev-on').returncode,0)
+        self.assertFalse(flag.exists());self.assertEqual(sorted(p.name for p in self.package.iterdir()),before)
+        self.assertFalse(self.marker.exists())
+
     def test_trace_and_tuning_controls_change_only_their_files(self):
         (self.package/'AR_BUILD.json').write_text('{"variant": "ev6", "schema": 2}\n');self.marker.touch()
         self.assertEqual(self.control('trace-on').returncode,0)
@@ -480,7 +490,7 @@ class ControlTest(unittest.TestCase):
         with zipfile.ZipFile(out/'UWP-AR-tune.zip') as z:
             self.assertEqual(z.read('AR_TUNING').decode(),'street_ar_meters=90\ngain=0.7\n');self.assertEqual(z.read('AR_MODE'),b'tune\n')
         with zipfile.ZipFile(out/'UWP-AR-baseline.zip') as z:self.assertEqual(z.read('AR_BASELINE_MINUTES'),b'20\n')
-        for mode in ('trace-on','trace-off','tune-reset'):self.assertTrue((out/('UWP-AR-'+mode+'.zip')).is_file())
+        for mode in ('trace-on','trace-off','tune-reset','carplay-ev-off','carplay-ev-on'):self.assertTrue((out/('UWP-AR-'+mode+'.zip')).is_file())
         result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--gain','1.5'],capture_output=True)
         self.assertNotEqual(result.returncode,0)
         result=subprocess.run([sys.executable,str(ROOT/'tools/build-carplay-ar-controls.py'),str(out),'--bar-meters','125',

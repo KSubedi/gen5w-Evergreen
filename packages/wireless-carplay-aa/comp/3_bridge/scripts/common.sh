@@ -39,6 +39,20 @@ if [ -z "$SUM_DIPO_APK" ] && [ -s "$BACKUP_DIR/sums" ]; then
     . "$BACKUP_DIR/sums"
 fi
 
+# ---- Apple Maps EV routing over CarPlay (tools/build-carplay-ev.py) ----
+# A car whose manifest has a "3_bridge+ev app Iap2ServerApp" line, installed with the EV
+# features, gets that build of Iap2ServerApp (the bridge build plus three calls into
+# CarPlayEv), /system/lib/libcarplayev.so (ours: the EV sender and the identity
+# serializer), and libiap2session.so's identification gate (recipes/carplay-ev-identity).
+# Both libraries are backed up or removed and put back on uninstall. A libiap2session.so
+# the recipe doesn't fit is left alone: CarPlay works as before, without EV routing.
+[ -n "$SUM_IAP_APK_EV" ] || SUM_IAP_APK_EV=$(built_sum "3_bridge+ev" Iap2ServerApp)
+CPEV_LIB=/system/lib/libcarplayev.so
+CPEV_PAYLOAD=files/libcarplayev.so
+CPEV_SESSION=/system/lib/libiap2session.so
+CPEV_RECIPE=carplay-ev-identity
+[ -z "$SUM_CPEV_LIB" ] && [ -s "$CPEV_PAYLOAD.md5" ] && read -r SUM_CPEV_LIB < "$CPEV_PAYLOAD.md5"
+
 # no printf on the HU (mksh); the && chain keeps a failed write an error
 save_sums() {
     mkdir -p "$BACKUP_DIR" || return 1
@@ -46,7 +60,9 @@ save_sums() {
         echo "SUM_TBT_DIPO_APK=$SUM_TBT_DIPO_APK" &&
         echo "SUM_TBT_IAP_APK=$SUM_TBT_IAP_APK" &&
         echo "SUM_DIPO_APK=$SUM_DIPO_APK" &&
-        echo "SUM_IAP_APK=$SUM_IAP_APK"
+        echo "SUM_IAP_APK=$SUM_IAP_APK" &&
+        echo "SUM_IAP_APK_EV=$SUM_IAP_APK_EV" &&
+        echo "SUM_CPEV_LIB=$SUM_CPEV_LIB"
     } > "$BACKUP_DIR/sums"
 }
 
@@ -103,6 +119,22 @@ sum_eq() {
     [ -s "$1" ] || return 1
     _got=$(file_md5 "$1") || return 1
     [ "$_got" = "$2" ]
+}
+
+# pick_iap_sum: our Iap2ServerApp build is the EV one when that is the payload (install) or,
+# without a payload (uninstall), when that is what is live
+pick_iap_sum() {
+    [ -n "$SUM_IAP_APK_EV" ] || return 0
+    if [ -s "$FILES/Iap2ServerApp.apk" ]; then
+        sum_eq "$FILES/Iap2ServerApp.apk" "$SUM_IAP_APK_EV" && SUM_IAP_APK=$SUM_IAP_APK_EV
+    elif sum_eq "$APP_DIR/Iap2ServerApp.apk" "$SUM_IAP_APK_EV"; then
+        SUM_IAP_APK=$SUM_IAP_APK_EV
+    fi
+    return 0
+}
+
+cpev_wanted() {
+    [ -n "$SUM_IAP_APK_EV" ] && [ "$SUM_IAP_APK" = "$SUM_IAP_APK_EV" ]
 }
 
 tbt_sum() {
@@ -578,5 +610,105 @@ restore_core() {
     sync
     sys_ro
     log "restored stock $_p"
+    return 0
+}
+
+# ---- Apple Maps EV routing: libcarplayev.so and libiap2session.so's gate ----
+cpev_session_state() {
+    [ -s "$CPEV_SESSION" ] || { echo MISSING; return 0; }
+    lp_state "$CPEV_RECIPE" "$CPEV_SESSION"
+}
+
+# cpev_done: nothing left to install (not wanted, or both libraries in place)
+cpev_done() {
+    cpev_wanted || return 0
+    sum_eq "$CPEV_LIB" "$SUM_CPEV_LIB" || return 1
+    case "$(cpev_session_state)" in APPLIED) return 0 ;; esac
+    return 1
+}
+
+# apply_cpev (with /system rw): our library, then the gate; a gate that doesn't fit is skipped
+apply_cpev() {
+    local _st
+    cpev_wanted || return 0
+    if [ -z "$SUM_CPEV_LIB" ] || ! sum_eq "$CPEV_PAYLOAD" "$SUM_CPEV_LIB"; then
+        log "FAIL: payload libcarplayev.so corrupt"
+        return 1
+    fi
+    _st=$(cpev_session_state)
+    case "$_st" in
+        PATCHABLE|APPLIED) ;;
+        *) log "Apple Maps EV routing: libiap2session.so status $_st - not this firmware's library; CarPlay stays as it was, without EV routing"
+           return 0 ;;
+    esac
+    if ! sum_eq "$CPEV_LIB" "$SUM_CPEV_LIB"; then
+        if [ -e "$CPEV_LIB" ]; then
+            log "FAIL: $CPEV_LIB exists and is not ours - leaving it alone"
+            return 1
+        fi
+        put_lib "$CPEV_PAYLOAD" "$CPEV_LIB" || { log "FAIL: write $CPEV_LIB"; return 1; }
+        log "OK: installed $CPEV_LIB"
+    fi
+    [ "$_st" = APPLIED ] && { log "libiap2session.so identification gate already in place"; return 0; }
+    mkdir -p "$BACKUP_DIR" 2>/dev/null || true
+    if [ ! -s "$BACKUP_DIR/libiap2session.so" ]; then
+        cp -f "$CPEV_SESSION" "$BACKUP_DIR/libiap2session.so" || return 1
+        if ! cmp "$CPEV_SESSION" "$BACKUP_DIR/libiap2session.so" >/dev/null 2>&1; then
+            log "FAIL: snapshot of $CPEV_SESSION mismatch"
+            return 1
+        fi
+        log "backed up $CPEV_SESSION"
+    fi
+    if ! lp_apply "$CPEV_RECIPE" "$CPEV_SESSION" "$BACKUP_DIR/libiap2session.patched"; then
+        log "FAIL: lpatch could not patch $CPEV_SESSION"
+        return 1
+    fi
+    if ! put_lib "$BACKUP_DIR/libiap2session.patched" "$CPEV_SESSION"; then
+        rm -f "$BACKUP_DIR/libiap2session.patched"
+        log "FAIL: could not write $CPEV_SESSION"
+        return 1
+    fi
+    rm -f "$BACKUP_DIR/libiap2session.patched"
+    if [ "$(cpev_session_state)" != APPLIED ]; then
+        log "FAIL: $CPEV_SESSION did not verify after patching"
+        return 1
+    fi
+    log "OK: $CPEV_SESSION patched (identification gate for Apple Maps EV routing)"
+    return 0
+}
+
+# restore_cpev: the stock libiap2session.so back (if ours is live), our library removed
+restore_cpev() {
+    local _rw=0
+    if [ ! -s "$BACKUP_DIR/libiap2session.so" ] && [ ! -e "$CPEV_LIB" ]; then
+        return 0
+    fi
+    if ! sys_rw; then
+        log "FAIL: remount /system rw"
+        return 1
+    fi
+    if [ -s "$BACKUP_DIR/libiap2session.so" ]; then
+        if [ "$(cpev_session_state)" = APPLIED ]; then
+            if ! put_lib "$BACKUP_DIR/libiap2session.so" "$CPEV_SESSION"; then
+                log "FAIL: restore $CPEV_SESSION"
+                sys_ro
+                return 1
+            fi
+            log "restored stock $CPEV_SESSION"
+        else
+            log "WARN: live libiap2session.so is not this package's patch - leaving it alone"
+        fi
+        rm -f "$BACKUP_DIR/libiap2session.so"
+    fi
+    if [ -e "$CPEV_LIB" ]; then
+        if [ -n "$SUM_CPEV_LIB" ] && sum_eq "$CPEV_LIB" "$SUM_CPEV_LIB"; then
+            rm -f "$CPEV_LIB" || { log "FAIL: remove $CPEV_LIB"; sys_ro; return 1; }
+            log "removed $CPEV_LIB"
+        else
+            log "WARN: $CPEV_LIB is not ours - leaving it alone"
+        fi
+    fi
+    sync
+    sys_ro
     return 0
 }

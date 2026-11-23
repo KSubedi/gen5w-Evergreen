@@ -5,7 +5,7 @@ if [ -z "$SOURCE" ]; then
     export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 fi
 read -r MODE < AR_MODE || exit 1
-case "$MODE" in enable|disable|status|basic|advanced|diagnostics|trace-on|trace-off|tune|tune-reset|baseline|hotspot) ;; *) echo "Unknown AR control mode"; exit 1 ;; esac
+case "$MODE" in enable|disable|status|basic|advanced|diagnostics|trace-on|trace-off|tune|tune-reset|baseline|hotspot|carplay-ev-off|carplay-ev-on) ;; *) echo "Unknown AR control mode"; exit 1 ;; esac
 PKG=$SOURCE/data/nemesis/apps/wireless.carplay.aa
 MARKER=$PKG/ar-hud.enabled
 # Hotspot channel debugging (notes/hotspot-channel-debugging.md): read-only, any build of this package.
@@ -95,6 +95,22 @@ if [ "$MODE" = hotspot ]; then
     } > "$F" 2>&1
     sync
     echo "Saved HOTSPOT/hotspot.txt to the USB (no network name, password or hardware address). Export complete."
+    exit 0
+fi
+# Apple Maps EV routing over CarPlay: read at the iAP2 app's start (CarPlayEv), so after a
+# head-unit restart. Off is allowed on any build; it only adds an empty flag file.
+if [ "$MODE" = carplay-ev-off ]; then
+    [ -d "$PKG" ] || { echo "The package is not installed."; exit 1; }
+    : > "$PKG/carplay-ev.disabled" || exit 1
+    chmod 644 "$PKG/carplay-ev.disabled" 2>/dev/null
+    sync
+    echo "Apple Maps EV routing over CarPlay turned off. Restart the head unit."
+    exit 0
+fi
+if [ "$MODE" = carplay-ev-on ]; then
+    rm -f "$PKG/carplay-ev.disabled" || exit 1
+    sync
+    echo "Apple Maps EV routing over CarPlay turned on (if this build has it). Restart the head unit."
     exit 0
 fi
 if [ "$MODE" = disable ]; then

@@ -1,4 +1,4 @@
-ULTIMATE WIRELESS PROJECTION 1.3.0.123 -- EV6 AR HUD (TEST BUILD)
+ULTIMATE WIRELESS PROJECTION 1.3.0.124 -- EV6 AR HUD (TEST BUILD)
 Wireless CarPlay and Android Auto, with navigation on the factory AR HUD.
 https://github.com/KSubedi/ultimate-wireless-projection
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
@@ -7,6 +7,27 @@ The owner tested 1.2.0.102 for three hours of driving with generally good result
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.124: EV ROUTING IN APPLE MAPS (CARPLAY)
+Apple Maps can now plan charging stops and show battery on arrival over
+CarPlay, as Google Maps does over Android Auto. From egmp-carplay-ev-routing
+by Isaac Wisdom, with the vehicle identity from HMG-API's Wireless CarPlay
+mod (Open-HMG), built into this package (no HMG-API needed):
+- When the iPhone connects, the head unit tells it it's an electric car
+  (Kia EV6, CCS up to 235 kW, J1772 up to 10.9 kW). Every 10 seconds while
+  Apple Maps asks, it sends the battery %, range, and the car's charging and
+  consumption figures.
+- The charging curve uses the EV6's measured DC power (135 kW between 53%
+  and 80%, as for Google Maps). Consumption values are the ones Isaac
+  measured within 1-2% on an EV6.
+- After installing: remove the iPhone from the head unit's paired devices,
+  forget the car on the iPhone (Bluetooth and CarPlay), and pair again.
+  Then in Apple Maps tap your profile picture, Vehicles, and add the car.
+- For the 77.4 kWh battery only. UWP-NO-EV on the install drive leaves it
+  out (with the Android Auto EV features), and UWP-AR-carplay-ev-off.zip
+  turns it off without reinstalling.
+- New files: /system/lib/libcarplayev.so, and a small patch to
+  /system/lib/libiap2session.so. Uninstall puts both back.
 
 NEW IN 1.3.0.123: SMARTER EV ROUTING IN GOOGLE MAPS
 Android Auto's EV features now include the work from egmp-aa-ev-hmg-api 0.6.0
@@ -471,7 +492,7 @@ AFTER THE DRIVE
    identifiers; they do hold timings, distances, speeds and battery data.
    Recording continues, so you can do this after every drive.
    (UWP-AR-export-stop-clean.zip, in the controls zip, also exports but
-   stops recording for good. This version supports 104 to 1.3.0.123.)
+   stops recording for good. This version supports 104 to 1.3.0.124.)
 4. In the issue, give the approximate clock time of anything odd, the app
    (Apple Maps, Google Maps, Waze...), what the phone showed versus the HUD,
    and whether leaving CarPlay or Android Auto and coming back changed it. No interaction
