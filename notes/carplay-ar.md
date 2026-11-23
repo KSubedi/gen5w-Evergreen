@@ -1066,3 +1066,34 @@ every part's log to the drive, which showed the cause:
   password). It's now skipped, and other configuration files keep only `key=value` lines.
 
 120 installed on the owner's car. No CarPlay, Android Auto or HUD changes from 117.
+
+## 1.3.0.121: Android Auto AR timing
+
+First 1.3.0.120 export (2026-11-22, 17:28-18:21, three Android Auto sessions, about 2,000 native
+frames, no expiry, no link_dead). Owner: Android Auto worked well; "sometimes the zoom didn't
+happen till the last minute"; once "the AR part was showing directions, but the other direction
+was not showing below".
+
+- **False turn-now arrows.** Google Maps sends `onNextTurn` before the new maneuver's
+  `onNextTurnDistance`, and GPM's frame in between carries 0. With the previous maneuver's
+  last meters (0-15 m) still fresh, every new maneuver went out as native AR at bar 10 for a
+  moment (18:05:59 slight left that was 563 m away, 18:14:15 at 651 m). Worse, a "continue"
+  (event 14, side 3) with meters 0 for minutes became a straight AR arrow at bar 10:
+  17:50:00-17:55:14 and 17:55:53-17:59:00, also at each route start (17:31, 17:41, 17:44,
+  17:49, 18:19). Now `turn()` drops the old distance, and a maneuver gets native AR only after
+  the phone has put it at least 10 m ahead (`APPROACH_METERS`); before that GPM's frame goes
+  through (`aaturn result=no_distance`).
+- **Late start at speed.** Street AR started at 200 m: 10 s at 18 m/s, first bar 40
+  (18:14:37, 189 m, 8 m at 18:14:47). The window is now `max(street_ar_meters,
+  street_ar_seconds x closing rate)`, capped at 457 m, and latched per maneuver so slowing
+  down doesn't drop the arrow. `street_ar_seconds` default 15 (5-30, 0 off). Closing rate is
+  `ArHudMotion.speed()` (phone samples, no gain). Android Auto only.
+- Replaying the drive's 7,734 Android Auto inputs through 120's and 121's `ArHudAuto`: AR
+  starts 17 -> 11; every straight/0 m start and both turn-now flashes gone; 18:07:03 slight
+  right from 271 m (was 202 m), 18:14:31 slight left from 316 m bar 60 (was 190 m bar 40);
+  slower turns unchanged.
+- "Nothing below": the lower HUD list is GPM's `sendHudList` (`updateTPTurnListNew`), sent
+  only when GPM's icon is 64 or more and only when its type/next/road changes; we don't touch
+  it and the export doesn't record it. Possibly the 0 m straight arrow above GPM's real next
+  turn; not shown by the log. Logging its numbers (not the road) needs one more GPM hook.
+- `tools/analyze-ar-log.py` crashed at the end of the text report (`a` reused); fixed.

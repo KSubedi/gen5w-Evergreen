@@ -444,13 +444,13 @@ def main():
         for pid, r in report["processes"].items():
             print("process %s %s (%s): %d records, %s .. %s" % (pid, r["version"], r["role"], r["records"], r["wall_first"], r["wall_last"]))
             if r["role"] == "android_auto":
-                a = r["android_auto"]
-                print("  maneuvers from Android Auto:", a["maneuvers"])
-                print("  native AR frames (new maneuver/update):", a["native_sent"], "glide frames:", a["glide_sends"])
-                print("  GPM frames passed unchanged (by icon):", a["gpm_frames_passed"])
+                aa = r["android_auto"]
+                print("  maneuvers from Android Auto:", aa["maneuvers"])
+                print("  native AR frames (new maneuver/update):", aa["native_sent"], "glide frames:", aa["glide_sends"])
+                print("  GPM frames passed unchanged (by icon):", aa["gpm_frames_passed"])
                 print("  exact distance updates %d, median interval %s ms, silences >5 s: %s" % (
-                    a["distance_updates"], a["distance_median_interval_ms"], a["distance_silences_over_5s"]))
-                print("  status:", a["status"], "expiries (wall, input age ms, passed):", [(x["wall"], x["input_age"], x["passed"]) for x in a["expiries"]], "stops:", a["stops"])
+                    aa["distance_updates"], aa["distance_median_interval_ms"], aa["distance_silences_over_5s"]))
+                print("  status:", aa["status"], "expiries (wall, input age ms, passed):", [(x["wall"], x["input_age"], x["passed"]) for x in aa["expiries"]], "stops:", aa["stops"])
                 if r.get("health"): print("  health: %d samples; CPU busy %% %s" % (r["health"]["samples"], r["health"]["busy_percent"]))
                 continue
             if r["role"] != "dipo": continue

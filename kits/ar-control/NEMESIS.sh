@@ -151,7 +151,7 @@ elif [ "$MODE" = tune ]; then
         case "$LINE" in ''|'#'*) continue ;; esac
         KEY=${LINE%%=*}
         VALUE=${LINE#*=}
-        case "$KEY" in street_ar_meters|gain|backstep_meters|bar_meters|turn_offset_meters|guidance_restart_s) ;; exit_side|exit_style|recover|android_auto) ;; *) echo "Unknown tuning key: $KEY"; exit 1 ;; esac
+        case "$KEY" in street_ar_meters|gain|backstep_meters|bar_meters|turn_offset_meters|guidance_restart_s|street_ar_seconds) ;; exit_side|exit_style|recover|android_auto) ;; *) echo "Unknown tuning key: $KEY"; exit 1 ;; esac
         if [ "$KEY" = exit_side ]; then
             case "$VALUE" in auto|right|left|generic) ;; *) echo "Bad tuning value for $KEY"; exit 1 ;; esac
         elif [ "$KEY" = exit_style ]; then

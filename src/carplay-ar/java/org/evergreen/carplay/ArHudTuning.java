@@ -27,6 +27,9 @@ public final class ArHudTuning {
     public static final int DEFAULT_RECOVER = RECOVER_SCREEN;
     /** Silence of the phone's active route guidance before it is restarted (s); 0 turns it off. */
     public static final float DEFAULT_GUIDANCE_RESTART_S = 90f, MIN_GUIDANCE_RESTART_S = 60f, MAX_GUIDANCE_RESTART_S = 600f;
+    /** Android Auto street turns start this many seconds ahead at the car's closing speed, when that is
+     * farther than street_ar_meters (up to 457 m); 0 turns it off. */
+    public static final float DEFAULT_STREET_AR_SECONDS = 15f, MIN_STREET_AR_SECONDS = 5f, MAX_STREET_AR_SECONDS = 30f;
     public static final int MAX_BYTES = 4096;
     static String path = ArHudIpc.ROOT + "/ar-tuning";
     private static float streetArMeters = DEFAULT_STREET_AR_METERS, gain = DEFAULT_GAIN, backstepMeters = DEFAULT_BACKSTEP_METERS;
@@ -34,7 +37,7 @@ public final class ArHudTuning {
     // The sign is what the 108 drive showed correctly; its freeze was missing phone input.
     public static final int DEFAULT_EXIT_STYLE = EXIT_STYLE_SIGN;
     private static int exitSide = EXIT_AUTO, exitStyle = DEFAULT_EXIT_STYLE, recover = DEFAULT_RECOVER;
-    private static float guidanceRestartS = DEFAULT_GUIDANCE_RESTART_S;
+    private static float guidanceRestartS = DEFAULT_GUIDANCE_RESTART_S, streetArSeconds = DEFAULT_STREET_AR_SECONDS;
     private static boolean androidAuto = true;
     private static long checkedAt = -1, seenModified = -2, seenLength = -2;
 
@@ -42,6 +45,8 @@ public final class ArHudTuning {
 
     /** Large street-turn AR starts inside this distance; smaller cues stay earlier. */
     public static synchronized float streetArMeters(long now) { refresh(now); return streetArMeters; }
+    /** Seconds of lead for Android Auto street turns at speed; 0: street_ar_meters only. */
+    public static synchronized float streetArSeconds(long now) { refresh(now); return streetArSeconds; }
     /** Fraction of the measured closing rate used between phone samples. */
     public static synchronized float gain(long now) { refresh(now); return gain; }
     /** A phone sample this far above the last sent distance holds instead of stepping back. */
@@ -78,15 +83,18 @@ public final class ArHudTuning {
             streetArMeters = values[0]; gain = values[1]; backstepMeters = values[2];
             barMeters = values[3]; turnOffsetMeters = values[4]; exitSide = (int) values[5];
             exitStyle = (int) values[6]; recover = (int) values[7]; guidanceRestartS = values[8]; androidAuto = values[9] != 0f;
+            streetArSeconds = values[10];
             ArHudDebug.event("tuning present=" + present + " street_ar_meters=" + streetArMeters
                     + " gain=" + gain + " backstep_meters=" + backstepMeters + " bar_meters=" + barMeters
                     + " turn_offset_meters=" + turnOffsetMeters + " exit_side=" + exitSideName(exitSide)
                     + " exit_style=" + exitStyleName(exitStyle) + " recover=" + recoverName(recover)
-                    + " guidance_restart_s=" + (int) guidanceRestartS + " android_auto=" + (androidAuto ? "on" : "off"));
+                    + " guidance_restart_s=" + (int) guidanceRestartS + " android_auto=" + (androidAuto ? "on" : "off")
+                    + " street_ar_seconds=" + (int) streetArSeconds);
         } catch (RuntimeException unavailable) {
             streetArMeters = DEFAULT_STREET_AR_METERS; gain = DEFAULT_GAIN; backstepMeters = DEFAULT_BACKSTEP_METERS;
             barMeters = DEFAULT_BAR_METERS; turnOffsetMeters = DEFAULT_TURN_OFFSET_METERS; exitSide = EXIT_AUTO;
             exitStyle = DEFAULT_EXIT_STYLE; recover = DEFAULT_RECOVER; guidanceRestartS = DEFAULT_GUIDANCE_RESTART_S; androidAuto = true;
+            streetArSeconds = DEFAULT_STREET_AR_SECONDS;
         }
     }
 
@@ -126,12 +134,12 @@ public final class ArHudTuning {
     }
 
     /** {street AR meters, gain, backstep meters, bar meters, turn offset meters, exit side, exit style,
-     * recover mode, guidance restart seconds, Android Auto AR (1 on, 0 off)}.
+     * recover mode, guidance restart seconds, Android Auto AR (1 on, 0 off), street AR seconds}.
      * Unknown keys and bad values are ignored. */
     static float[] parse(String text) {
         float[] values = {DEFAULT_STREET_AR_METERS, DEFAULT_GAIN, DEFAULT_BACKSTEP_METERS,
                 DEFAULT_BAR_METERS, DEFAULT_TURN_OFFSET_METERS, EXIT_AUTO, DEFAULT_EXIT_STYLE,
-                DEFAULT_RECOVER, DEFAULT_GUIDANCE_RESTART_S, 1f};
+                DEFAULT_RECOVER, DEFAULT_GUIDANCE_RESTART_S, 1f, DEFAULT_STREET_AR_SECONDS};
         if (text == null) return values;
         String[] lines = text.split("\n");
         for (int i = 0; i < lines.length; i++) {
@@ -173,6 +181,7 @@ public final class ArHudTuning {
             else if (key.equals("backstep_meters")) values[2] = accept(value, 0f, MAX_BACKSTEP_METERS, values[2]);
             else if (key.equals("bar_meters")) values[3] = accept(value, MIN_BAR_METERS, ArHudTurns.GUIDE_METERS, values[3]);
             else if (key.equals("turn_offset_meters")) values[4] = accept(value, 0f, MAX_TURN_OFFSET_METERS, values[4]);
+            else if (key.equals("street_ar_seconds")) values[10] = value == 0f ? 0f : accept(value, MIN_STREET_AR_SECONDS, MAX_STREET_AR_SECONDS, values[10]);
             else if (key.equals("guidance_restart_s")) values[8] = value == 0f ? 0f : accept(value, MIN_GUIDANCE_RESTART_S, MAX_GUIDANCE_RESTART_S, values[8]);
         }
         return values;

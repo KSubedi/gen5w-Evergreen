@@ -1,0 +1,49 @@
+name: EV6 AR drive report
+description: Something odd on a drive with the EV6 AR build (CarPlay or Android Auto, the AR HUD, EV features, freezes or drops).
+title: "[EV6 AR] "
+labels: ["ev6-ar"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing! The install drive collects the logs:
+
+        1. After the drive, park with the car in **READY** and wait until the head unit has fully started.
+        2. Plug in the same USB drive you installed from and approve the NEMESIS prompt.
+        3. Wait for **"logs saved"**, then about 20 seconds more (for the EV logs). `EVERGREEN-STATUS.txt` on the drive says what it did.
+        4. Zip the newest `AR-LOGS-<date-time>` folder (and `egmp-aa-ev-logs` if you use Android Auto) and attach the zip below.
+
+        The logs contain no road names, locations, Wi-Fi names, passwords or phone identifiers. They do contain timings, turn distances, speeds and battery data.
+        If an install failed, attach the `INSTALL-LOG` folder from the drive instead.
+  - type: input
+    id: version
+    attributes:
+      label: Evergreen version
+      placeholder: 1.3.0.121
+    validations:
+      required: true
+  - type: dropdown
+    id: projection
+    attributes:
+      label: CarPlay or Android Auto
+      options: ["CarPlay", "Android Auto", "Both"]
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: Phone and navigation app
+      placeholder: iPhone 15, Apple Maps / Pixel 8, Google Maps / Waze
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, with the approximate clock time
+      description: One line per event. Say what the phone showed and what the HUD or cluster showed, and whether it fixed itself or leaving CarPlay/Android Auto and coming back fixed it.
+      placeholder: "6:14 pm: HUD showed a left arrow, the phone said keep right. Fixed itself after the turn."
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Drag the zipped AR-LOGS folder here.

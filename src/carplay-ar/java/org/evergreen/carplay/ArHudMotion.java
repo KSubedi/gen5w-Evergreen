@@ -44,6 +44,9 @@ public final class ArHudMotion {
 
     public float meters(long now) { return distance.meters(now); }
 
+    /** The measured closing rate in m/s (no gain), 0 while unknown. */
+    public float speed() { return speed; }
+
     /** Time after which a car that was moving at the last sample has passed the maneuver
      * (twice the time it needed, plus ten seconds); -1 when it may simply have stopped. */
     public long passedAt() {

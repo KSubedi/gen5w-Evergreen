@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 MODES = ("enable", "disable", "status", "basic", "advanced", "diagnostics",
          "trace-on", "trace-off", "tune-reset", "baseline", "hotspot")
 RANGES = {"street_ar_meters": (30, 457), "gain": (0.5, 1.0), "backstep_meters": (0, 50),
-          "bar_meters": (30, 457), "turn_offset_meters": (0, 60), "guidance_restart_s": (0, 600)}
+          "bar_meters": (30, 457), "turn_offset_meters": (0, 60), "guidance_restart_s": (0, 600),
+          "street_ar_seconds": (0, 30)}
 EXIT_SIDES = ("auto", "right", "left", "generic")
 EXIT_STYLES = ("slight", "sign")
 RECOVER = ("off", "keyframe", "screen", "reconnect")
@@ -49,6 +50,8 @@ def tuning(values, exit_side=None, exit_style=None, recover=None, android_auto=N
         lines.append("android_auto=" + android_auto)
     if values.get("guidance_restart_s") not in (None, 0) and values["guidance_restart_s"] < 60:
         raise ValueError("guidance_restart_s must be 0 (off) or between 60 and 600")
+    if values.get("street_ar_seconds") not in (None, 0) and values["street_ar_seconds"] < 5:
+        raise ValueError("street_ar_seconds must be 0 (off) or between 5 and 30")
     if not lines:
         raise ValueError("no tuning values given")
     return "\n".join(lines) + "\n"
@@ -77,6 +80,7 @@ def main():
     p.add_argument("--exit-style", choices=EXIT_STYLES, help="exits as a slight-turn arrow or the native exit sign (default)")
     p.add_argument("--recover", choices=RECOVER, help="stalled CarPlay picture: off, key frame, + screen return (default), + reconnect")
     p.add_argument("--guidance-restart-s", type=float, help="restart silent phone guidance after this many seconds (60-600, 0 off; default 90)")
+    p.add_argument("--street-ar-seconds", type=float, help="Android Auto street turns start this many seconds ahead at speed (5-30, 0 off; default 15)")
     p.add_argument("--android-auto", choices=("on", "off"), help="Android Auto turns as AR (on, default) or GPM's icons only")
     p.add_argument("--tune-name", help="suffix for the tuning kit file name: Evergreen-AR-tune-<name>.zip")
     p.add_argument("--baseline-minutes", type=int, default=20, help="stock-navigation cluster capture length (1-60)")
@@ -89,7 +93,7 @@ def main():
         kit(a.directory / ("Evergreen-AR-" + mode + ".zip"), mode, extra)
     values = {"street_ar_meters": a.street_ar_meters, "gain": a.gain, "backstep_meters": a.backstep_meters,
               "bar_meters": a.bar_meters, "turn_offset_meters": a.turn_offset_meters,
-              "guidance_restart_s": a.guidance_restart_s}
+              "guidance_restart_s": a.guidance_restart_s, "street_ar_seconds": a.street_ar_seconds}
     if any(v is not None for v in values.values()) or a.exit_side is not None or a.exit_style is not None or a.recover is not None or a.android_auto is not None:
         try:
             text = tuning(values, a.exit_side, a.exit_style, a.recover, a.android_auto)

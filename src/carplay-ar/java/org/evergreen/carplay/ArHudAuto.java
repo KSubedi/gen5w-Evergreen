@@ -30,6 +30,10 @@ public final class ArHudAuto implements Runnable {
     static final long FRESH_MS = 5000, GLIDE_MS = 250;
     /** A distance this much larger than the last one is a new maneuver or a reroute, not noise. */
     static final float NEW_MANEUVER_METERS = 50f;
+    /** A maneuver gets AR only once the phone has put it at least this far ahead. Google Maps reports
+     * 0 m for a new maneuver until its distance arrives, and 0 m for minutes for a "continue" with no
+     * distance; drawn as AR, both looked like a turn right now. */
+    static final float APPROACH_METERS = 10f;
     private static final ArHudMotion motion = new ArHudMotion();
     private static int event = -1, side, angle, number, exactMeters = -1;
     private static long distanceAt = -1, receivedAt = -1, heartbeatAt = -1, traceAt = -1;
@@ -37,6 +41,8 @@ public final class ArHudAuto implements Runnable {
     private static int icon, originalSide, originalError, originalCombi, unit, originalBar, originalBarError;
     private static float originalDirection, originalDistance, sentMeters = -1f;
     private static boolean active, running;
+    /** This maneuver: a real distance seen (APPROACH_METERS); its street AR already started. */
+    private static boolean approached, streetStarted;
     private static int shownType;
     private static String traceKey;
     static boolean background = true; // Host tests drive tick() deterministically.
@@ -52,6 +58,8 @@ public final class ArHudAuto implements Runnable {
             if (turnEvent == event && turnSide == side && turnAngle == angle && turnNumber == number) return;
             event = turnEvent; side = turnSide; angle = turnAngle; number = turnNumber;
             motion.reset(); sentMeters = -1f;
+            // The distance so far belongs to the previous maneuver.
+            exactMeters = -1; distanceAt = -1; approached = false; streetStarted = false;
             ArHudDebug.event("auto_turn event=" + turnEvent + " side=" + turnSide + " angle=" + turnAngle + " number=" + turnNumber);
         }
     }
@@ -62,7 +70,8 @@ public final class ArHudAuto implements Runnable {
         synchronized (ArHudAuto.class) {
             if (ArHudDebug.on()) ArHudDebug.event("auto_distance meters=" + meters + " e3=" + displayE3 + " unit=" + displayUnit);
             if (meters < 0) { exactMeters = -1; distanceAt = -1; motion.reset(); return; }
-            if (exactMeters >= 0 && meters > exactMeters + NEW_MANEUVER_METERS) { motion.reset(); sentMeters = -1f; }
+            if (exactMeters >= 0 && meters > exactMeters + NEW_MANEUVER_METERS) { motion.reset(); sentMeters = -1f; streetStarted = false; }
+            if (meters >= APPROACH_METERS) approached = true;
             motion.gain(ArHudTuning.gain(now));
             motion.sample(meters, now);
             exactMeters = meters; distanceAt = now;
@@ -75,7 +84,7 @@ public final class ArHudAuto implements Runnable {
         synchronized (ArHudAuto.class) {
             ArHudDebug.event("auto_status status=" + status);
             if (status == 2) stop(now);
-            else if (status == 3) { motion.reset(); sentMeters = -1f; }
+            else if (status == 3) { motion.reset(); sentMeters = -1f; streetStarted = false; }
         }
     }
 
@@ -121,16 +130,25 @@ public final class ArHudAuto implements Runnable {
     /** {native type, direction, bar} for the current maneuver at these meters, or null for GPM's frame. */
     static int[] convert(float meters, long now) {
         if (meters < 0f || ArHudTurns.fromMeters(meters, unit) < 0f) return null;
+        if (event >= 0 && !approached) return null;
         int exitSide = ArHudTurns.exitSide(8, 0, 0, ArHudTuning.exitSide(now));
         int[] turn = event < 0 ? ArHudTurns.convert(icon, ArHudTurns.fromMeters(meters, unit), 0, unit, 0)
                 : map(event, side, icon, meters, exitSide, ArHudTuning.exitStyle(now) == ArHudTuning.EXIT_STYLE_SIGN);
         if (turn == null) return null;
         if (turn[0] == 13 && event != OFF_RAMP) {
             // Street turns start inside the street window; the bar keeps its own scale (as for CarPlay).
-            if (meters > ArHudTuning.streetArMeters(now)) return null;
+            // At speed the window grows to street_ar_seconds ahead (up to 457 m); once started it stays.
+            if (!streetStarted && meters > streetWindow(now)) return null;
+            streetStarted = true;
             turn[2] = ArHudTurns.bar(meters, ArHudTuning.barMeters(now));
         }
         return turn;
+    }
+
+    /** Where street AR starts: street_ar_meters, or street_ar_seconds at the closing speed if farther. */
+    static float streetWindow(long now) {
+        float window = ArHudTuning.streetArMeters(now), lead = motion.speed() * ArHudTuning.streetArSeconds(now);
+        return Math.max(window, Math.min(lead, ArHudTurns.GUIDE_METERS));
     }
 
     /** Android Auto's maneuver as the cluster's native type, through the CarPlay table (US right-hand traffic). */
@@ -174,13 +192,13 @@ public final class ArHudAuto implements Runnable {
     private static void stop(long now) {
         if (active) ArHudDebug.event("auto_stopped type=" + shownType);
         active = false; shownType = 0; sentMeters = -1f; event = -1; exactMeters = -1; distanceAt = -1;
-        motion.reset();
+        approached = false; streetStarted = false; motion.reset();
         ArHudIpc.publish(false, 0, now, now);
     }
 
     /** Once a second when the conversion changes: what came in and what went out. */
     private static void trace(long now, float meters, int[] turn) {
-        String result = turn != null ? "native" : event >= 0 && map(event, side, icon, ArHudTurns.GUIDE_METERS / 2f, 0, true) == null
+        String result = turn != null ? "native" : event >= 0 && !approached ? "no_distance" : event >= 0 && map(event, side, icon, ArHudTurns.GUIDE_METERS / 2f, 0, true) == null
                 ? "kept" : meters > ArHudTurns.GUIDE_METERS ? "far" : "street_ar_deferred";
         String key = event + ":" + side + ":" + angle + ":" + icon + ":" + result;
         // A change at most once a second; an unchanged conversion every ten seconds.
@@ -251,6 +269,7 @@ public final class ArHudAuto implements Runnable {
     static synchronized void reset() {
         event = -1; side = 0; angle = 0; number = 0; exactMeters = -1; distanceAt = -1; receivedAt = -1; heartbeatAt = -1;
         traceAt = -1; traceKey = null; cluster = null; active = false; shownType = 0; sentMeters = -1f; motion.reset();
+        approached = false; streetStarted = false;
     }
     static synchronized int shown() { return active ? shownType : 0; }
 }

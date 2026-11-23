@@ -1,4 +1,4 @@
-EVERGREEN 1.3.0.120 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
+EVERGREEN 1.3.0.121 -- EXPERIMENTAL ADVANCED CARPLAY AR HUD
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
 This is a NEMESIS application update, not a firmware/bootloader flash.
 The owner tested 1.2.0.102 for three hours of driving with generally good results.
@@ -6,7 +6,21 @@ This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
 
-NEW IN 1.3.0.120: THE INSTALL FAILURE OF 117 TO 119
+NEW IN 1.3.0.121: ANDROID AUTO AR TIMING
+From the first 1.3.0.120 drive with Android Auto:
+- No more false "turn now" arrows. Google Maps reports 0 m for a new turn
+  for a moment before its real distance arrives, and 0 m for minutes for a
+  "continue" with no distance yet. Both were drawn as a fully zoomed AR
+  arrow (one "go straight" arrow stayed up for five minutes). A turn now gets
+  AR only once the phone has placed it at least 10 m ahead; until then the
+  HUD shows Android Auto's own icon.
+- Street turns start earlier at speed: about 15 seconds ahead at the car's
+  speed when that is farther than 200 m, up to 457 m. At 40 mph that is
+  about 270 m instead of 200 m; in town nothing changes. Once the arrow is
+  up it stays until the turn. Tuning: street_ar_seconds (5-30, 0 turns it
+  off). Android Auto only; CarPlay is unchanged.
+- The export kits accept 1.3.0.121.
+
 - The cause: the wireless projection part saves the head unit's projection
   settings (added in 117) and renamed that file with "mv -f". The head
   unit's mv takes no options, so the step failed on every fresh install.
@@ -386,8 +400,9 @@ ar-tuning file next to the AR flags. Allowed ranges: street_ar_meters 30-457,
 gain 0.5-1, backstep_meters 0-50, bar_meters 30-457, turn_offset_meters 0-60,
 exit_side auto|right|left|generic, exit_style slight|sign,
 recover off|keyframe|screen|reconnect, guidance_restart_s 0 or 60-600,
-android_auto on|off; anything else keeps the built-in default (200 m, 0.8,
-15 m, 457 m, 0 m, auto, sign, screen, 90, on). The distance and exit
+android_auto on|off, street_ar_seconds 0 or 5-30; anything else keeps the
+built-in default (200 m, 0.8, 15 m, 457 m, 0 m, auto, sign, screen, 90, on,
+15 s). The distance and exit
 settings apply to Android Auto as well. Values apply
 within two seconds; start a fresh route. A tune kit replaces the whole file, so
 one kit is in effect at a time. The 1.3.0.115 kits zip has ready-made variants:
@@ -418,12 +433,16 @@ AFTER THE DRIVE
 2. Wait for the "logs saved" message, then about 20 s more for the EV logs.
    EVERGREEN-STATUS.txt on the drive says where everything went.
 3. Zip the newest AR-LOGS-<date-time> folder (and egmp-aa-ev-logs, if you use
-   Android Auto) and send them privately, using an upload link if too large for
-   chat. Recording continues, so you can do this after every drive.
+   Android Auto) and open an issue at
+   https://github.com/KSubedi/gen5w-Evergreen/issues with the zip attached.
+   The logs hold no road names, locations, network names, passwords or phone
+   identifiers; they do hold timings, distances, speeds and battery data.
+   Recording continues, so you can do this after every drive.
    (Evergreen-AR-export-stop-clean.zip, in the controls zip, also exports but
-   stops recording for good. This version supports 104 to 1.3.0.120.)
-4. Tell us the approximate time, what Apple Maps showed versus HUD, left/right
-   exit and whether switching out of CarPlay and back changed it. No interaction
+   stops recording for good. This version supports 104 to 1.3.0.121.)
+4. In the issue, give the approximate clock time of anything odd, the app
+   (Apple Maps, Google Maps, Waze...), what the phone showed versus the HUD,
+   and whether leaving CarPlay or Android Auto and coming back changed it. No interaction
    with diagnostics or observation tasks are needed from the driver in motion.
 
 The finish kit stops persistent recording, verifies USB copies, then removes

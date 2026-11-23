@@ -104,6 +104,50 @@ public final class ArHudAutoTest {
             check(ArHudAuto.shown() == 13, "left turn shown");
             ArHudAuto.status(2);
             check(ArHudAuto.shown() == 0, "status inactive ends ours");
+            // 1.3.0.120 drive: a new maneuver's first frame comes before its distance (0 m, and the
+            // previous maneuver's 2 m still fresh): GPM's frame until the phone puts it ahead.
+            ArHudAuto.status(1); ArHudAuto.turn(ArHudAuto.RIGHT, ArHudAuto.SLIGHT, 0, 0);
+            android.os.SystemClock.now = 310000; ArHudAuto.distance(2, 0, 6);
+            ArHudAuto.turn(ArHudAuto.LEFT, ArHudAuto.SLIGHT, 0, 0);
+            ArHudAuto.update(c, 71, 65535, 0f, 0f, 0, 0, 3, 0, 0);
+            check(c.type == 71 && ArHudAuto.shown() == 0, "new maneuver before its distance: GPM's frame, no turn-now arrow");
+            ArHudAuto.distance(83, 250000, 6); ArHudAuto.update(c, 71, 65535, 0f, 250f, 0, 0, 3, 0, 0);
+            check(c.type == 13 && c.direction == 315f, "its distance arrives: native AR");
+            // "Continue" with no distance (0 m for minutes): never AR.
+            ArHudAuto.turn(ArHudAuto.UNSPECIFIED, ArHudAuto.STRAIGHT, -1, -1);
+            for (int i = 0; i < 30; i++) {
+                android.os.SystemClock.now = 320000 + i * 1000L; ArHudAuto.distance(0, 0, 6);
+                ArHudAuto.update(c, 65, 65535, 0f, 0f, 0, 0, 3, 0, 0);
+                ArHudAuto.tick(android.os.SystemClock.now + 250, true);
+            }
+            check(c.type == 65 && ArHudAuto.shown() == 0, "straight at 0 m without a distance: GPM's frame");
+            // At speed street AR starts street_ar_seconds (15) ahead: 18 m/s -> 270 m, not 200 m.
+            ArHudAuto.turn(ArHudAuto.RIGHT, ArHudAuto.TURN, -1, -1);
+            android.os.SystemClock.now = 400000; ArHudAuto.distance(400, 0, 6);
+            android.os.SystemClock.now = 401000; ArHudAuto.distance(382, 0, 6);
+            android.os.SystemClock.now = 402000; ArHudAuto.distance(364, 0, 6);
+            ArHudAuto.update(c, 67, 65535, 0f, 1200f, 0, 0, 3, 0, 0);
+            check(c.type == 67, "364 m at 18 m/s: still the icon");
+            for (int m = 346; m >= 256; m -= 18) { android.os.SystemClock.now += 1000; ArHudAuto.distance(m, 0, 6); }
+            ArHudAuto.update(c, 67, 65535, 0f, 840f, 0, 0, 3, 0, 0);
+            check(c.type == 13 && c.direction == 90f && c.bar == 50, "256 m at 18 m/s: native AR, bar 50");
+            // Slowing down shrinks the lead below the distance: the arrow stays.
+            android.os.SystemClock.now += 1000; ArHudAuto.distance(252, 0, 6);
+            android.os.SystemClock.now += 1000; ArHudAuto.distance(250, 0, 6);
+            ArHudAuto.update(c, 67, 65535, 0f, 820f, 0, 0, 3, 0, 0);
+            check(c.type == 13, "once started it stays while slowing");
+            // street_ar_seconds=0: street_ar_meters only.
+            write(tuning, "street_ar_seconds=0\n"); ArHudTuning.reload();
+            ArHudAuto.turn(ArHudAuto.LEFT, ArHudAuto.TURN, -1, -1);
+            android.os.SystemClock.now = 500000; ArHudAuto.distance(300, 0, 6);
+            android.os.SystemClock.now = 501000; ArHudAuto.distance(282, 0, 6);
+            android.os.SystemClock.now = 502000; ArHudAuto.distance(264, 0, 6);
+            ArHudAuto.update(c, 70, 65535, 0f, 870f, 0, 0, 3, 0, 0);
+            check(c.type == 70, "street_ar_seconds=0: 264 m at speed keeps the icon");
+            write(tuning, ""); ArHudTuning.reload();
+            check(ArHudTuning.parse("")[10] == 15f && ArHudTuning.parse("street_ar_seconds=0\n")[10] == 0f
+                    && ArHudTuning.parse("street_ar_seconds=20\n")[10] == 20f && ArHudTuning.parse("street_ar_seconds=3\n")[10] == 15f
+                    && ArHudTuning.parse("street_ar_seconds=31\n")[10] == 15f, "street_ar_seconds tuning");
             // Off: the opt-in, or android_auto=off.
             ArHudAuto.testFlags = 0; ArHudAuto.reset(); ArHudAuto.turn(ArHudAuto.RIGHT, ArHudAuto.TURN, 0, 0);
             android.os.SystemClock.now = 400000; ArHudAuto.distance(100, 0, 2);
