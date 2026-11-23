@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the explicitly enabled, EV6-260507-only experimental NEMESIS update."""
+"""Build the explicitly enabled AR installer for one car (the AR build report's variant)."""
 import argparse
 import hashlib
 import importlib.util
@@ -13,7 +13,24 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.3.0.124"
+VERSION = "1.3.0.125"
+# Cars with an AR build: the patch set (the report's variant) -> how the installer names and gates it.
+# products: the shell case pattern (and, comma-separated, the NEMESIS os= list).
+CARS = {
+    "ev6": {"car": "a US Kia EV6 on 260507", "short": "EV6 USA 260507", "title": "EV6 AR",
+            "label": "EV6_US_260507", "products": "CVEV.USA.*.260507"},
+    "neev23_260903": {"car": "a US Hyundai Ioniq 5 on 260903", "short": "Ioniq 5 USA 260903", "title": "Ioniq 5 AR",
+                      "label": "IONIQ5_US_260903",
+                      "products": "NEEV.USA.*.260903|NEEV23.USA.*.260903|NEEV23SE.USA.*.260903"},
+}
+
+
+def gated(script, car):
+    """A kit script with this car's product pattern and name filled in."""
+    text = script.decode()
+    if "@AR_PRODUCTS@" not in text or "@AR_CAR@" not in text:
+        raise ValueError("script has no product gate placeholders")
+    return text.replace("@AR_PRODUCTS@", car["products"]).replace("@AR_CAR@", car["car"]).encode()
 
 
 def verifier():
@@ -51,8 +68,9 @@ def build(patches, output, enable_ar, trace=True):
     patches, output = Path(patches).resolve(), Path(output).absolute()
     source_report = patches.parent / "ar-build.json"
     data = verifier().validate(patches, source_report)
-    if data["variant"] != "ev6" or data["enabled_by_default"]:
-        raise ValueError("start from a disabled, inspected US EV6 delta build")
+    car = CARS.get(data["variant"])
+    if car is None or data["enabled_by_default"]:
+        raise ValueError("start from a disabled, inspected delta build of a car in CARS")
     if output.exists() or output.is_symlink():
         raise ValueError("output already exists; choose a new installer filename")
     with tempfile.TemporaryDirectory(prefix="evergreen-ar-installer-") as temp:
@@ -65,11 +83,11 @@ def build(patches, output, enable_ar, trace=True):
                 files = {name: inner.read(name) for name in inner.namelist() if not name.endswith("/")}
                 modes = {name: (inner.getinfo(name).external_attr >> 16) & 0o777 for name in files}
         original = files["NEMESIS.data"].decode()
-        original = field(original, "name", "Ultimate Wireless Projection (EV6 AR)")
+        original = field(original, "name", "Ultimate Wireless Projection (" + car["title"] + ")")
         original = field(original, "package-version", VERSION)
-        original = field(original, "short-desc", '"Wireless CarPlay/AA with the AR HUD; EV6 USA 260507 only"')
+        original = field(original, "short-desc", '"Wireless CarPlay/AA with the AR HUD; ' + car["short"] + ' only"')
         original = field(original, "detailed-desc", '"Ultimate Wireless Projection: wireless CarPlay and Android Auto with navigation on the factory AR HUD, and EV routing for Android Auto. Uninstall restores stock. See README-AR.txt."')
-        original = field(original, "os", '"CVEV.USA.*.260507"')
+        original = field(original, "os", '"' + car["products"].replace("|", ",") + '"')
         original = field(original, "preinstall", "scripts/ar-pre.sh")
         original = field(original, "repository", "https://github.com/KSubedi/ultimate-wireless-projection")
         if data['schema']==2:
@@ -82,11 +100,12 @@ def build(patches, output, enable_ar, trace=True):
         checked_descriptor = Path(temp) / "NEMESIS.data"
         checked_descriptor.write_text(original)
         checked_cars = Path(temp) / "cars"
-        checked_cars.write_text("CVEV.USA. ev6 Kia EV6 (US)\n")
+        checked_cars.write_text("".join(line + "\n" for line in (ROOT / "patches/cars").read_text().splitlines()
+                                        if len(line.split()) > 1 and line.split()[1] == data["variant"]))
         subprocess.run(["python3", str(ROOT / "tools/check-descriptor.py"),
                         str(checked_descriptor), str(checked_cars)], check=True)
         files["NEMESIS.data"] = original.encode()
-        files["scripts/ar-pre.sh"] = (ROOT / "kits/ar-installer/ar-pre.sh").read_bytes()
+        files["scripts/ar-pre.sh"] = gated((ROOT / "kits/ar-installer/ar-pre.sh").read_bytes(), car)
         modes["scripts/ar-pre.sh"] = 0o755
         if data['schema']==2:
             files['scripts/ar-post.sh']=(ROOT/'kits/ar-installer/ar-post.sh').read_bytes()
@@ -104,7 +123,7 @@ def build(patches, output, enable_ar, trace=True):
         data["activation"] = "explicit-experimental-installer"
         data["trace_enabled"] = bool(trace and data['schema']==2)
         files["AR_BUILD.json"] = (json.dumps(data, indent=2)+"\n").encode()
-        files["AR_INSTALL.json"] = (json.dumps({"version": VERSION, "product": "CVEV.USA.*.260507",
+        files["AR_INSTALL.json"] = (json.dumps({"version": VERSION, "product": car["products"],
             "enable_requested": True, "source_build_report_sha256": hashlib.sha256(source_report.read_bytes()).hexdigest(),
             "on_car_tested": False}, indent=2)+"\n").encode()
         readme = (ROOT / "kits/ar-installer/README.txt").read_bytes()
@@ -120,7 +139,7 @@ def build(patches, output, enable_ar, trace=True):
         combo = ROOT / "kits/ar-combo"
         if "path=packages/wireless.carplay.aa.zip" not in descriptor:
             raise ValueError("unexpected base install descriptor")
-        outer_files = {"NEMESIS.data": (combo / "NEMESIS.data").read_bytes(), "NEMESIS.sh": (combo / "NEMESIS.sh").read_bytes(),
+        outer_files = {"NEMESIS.data": (combo / "NEMESIS.data").read_bytes(), "NEMESIS.sh": gated((combo / "NEMESIS.sh").read_bytes(), car),
                        "AR_VERSION": (VERSION + "\n").encode(), "hotspot.sh": (ROOT / "kits/ar-control/NEMESIS.sh").read_bytes(),
                        "packages/wireless.carplay.aa.zip": archive(files, modes), "README-AR.txt": readme}
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -134,11 +153,18 @@ def build(patches, output, enable_ar, trace=True):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--patches", type=Path, required=True)
-    p.add_argument("--out", type=Path, default=ROOT / "dist" / ("UltimateWirelessProjection_EV6_US_260507_"+VERSION+".zip"))
+    p.add_argument("--out", type=Path, help="default: dist/UltimateWirelessProjection_<car label>_<version>.zip")
     p.add_argument("--enable-ar", action="store_true")
     p.add_argument("--no-trace", action="store_true", help="omit ar-trace.enabled (release candidates)")
     a = p.parse_args()
     try:
-        build(a.patches, a.out, a.enable_ar, not a.no_trace)
+        out = a.out
+        if out is None:
+            report = json.loads((a.patches.resolve().parent / "ar-build.json").read_text())
+            car = CARS.get(report.get("variant"))
+            if car is None:
+                p.exit(1, "no installer name for variant %r\n" % report.get("variant"))
+            out = ROOT / "dist" / ("UltimateWirelessProjection_" + car["label"] + "_" + VERSION + ".zip")
+        build(a.patches, out, a.enable_ar, not a.no_trace)
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         p.exit(1, str(error)+"\n")

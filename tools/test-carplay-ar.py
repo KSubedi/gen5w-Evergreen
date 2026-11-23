@@ -219,7 +219,7 @@ class PackageTest(unittest.TestCase):
             bin.mkdir()
             (bin / "getprop").write_text('#!/bin/sh\necho "$AR_TEST_PRODUCT"\n')
             (bin / "getprop").chmod(0o755)
-            script = (ROOT / "kits/ar-installer/ar-pre.sh").read_text()
+            script = (ROOT / "kits/ar-installer/ar-pre.sh").read_text().replace("@AR_PRODUCTS@", "CVEV.USA.*.260507").replace("@AR_CAR@", "a US Kia EV6 on 260507")
             script = script.replace("export PATH=", "export PATH=" + str(bin) + ":").replace("exec /system/bin/sh", "exec /bin/sh")
             (tmp / "guard.sh").write_text(script)
             for product, expected in (("CVEV.CAN.0000.V015.011.260206", False),

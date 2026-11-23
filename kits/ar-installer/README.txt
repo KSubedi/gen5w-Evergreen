@@ -1,4 +1,4 @@
-ULTIMATE WIRELESS PROJECTION 1.3.0.124 -- EV6 AR HUD (TEST BUILD)
+ULTIMATE WIRELESS PROJECTION 1.3.0.125 -- AR HUD (TEST BUILD)
 Wireless CarPlay and Android Auto, with navigation on the factory AR HUD.
 https://github.com/KSubedi/ultimate-wireless-projection
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
@@ -7,6 +7,20 @@ The owner tested 1.2.0.102 for three hours of driving with generally good result
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.125: HYUNDAI IONIQ 5 (US, 260903)
+A second car: the US Ioniq 5 on head-unit firmware 260903 gets the same build
+as the EV6 (wireless CarPlay and Android Auto, the AR HUD on both, EV routing
+in Google Maps and Apple Maps, preconditioning), from its own installer:
+UltimateWirelessProjection_IONIQ5_US_260903_<version>.zip.
+- Its CarPlay app names two of the fields the AR HUD reads one letter on;
+  the AR code recognises either layout and refuses anything else.
+- Its vehicle framework was checked against the EV6's: the same commands,
+  numbers and reset timer for preconditioning, so the EV features are on.
+- Apple Maps EV routing uses the Ioniq 5 profile (egmp-carplay-ev-routing's,
+  checked by its author on an Ioniq 5), and turns itself off on a car whose
+  battery isn't the 77.4 kWh one (for example the 58 kWh standard range).
+- EV6: no change in behaviour; the same battery check applies.
 
 NEW IN 1.3.0.124: EV ROUTING IN APPLE MAPS (CARPLAY)
 Apple Maps can now plan charging stops and show battery on arrival over
@@ -492,7 +506,7 @@ AFTER THE DRIVE
    identifiers; they do hold timings, distances, speeds and battery data.
    Recording continues, so you can do this after every drive.
    (UWP-AR-export-stop-clean.zip, in the controls zip, also exports but
-   stops recording for good. This version supports 104 to 1.3.0.124.)
+   stops recording for good. This version supports 104 to 1.3.0.125.)
 4. In the issue, give the approximate clock time of anything odd, the app
    (Apple Maps, Google Maps, Waze...), what the phone showed versus the HUD,
    and whether leaving CarPlay or Android Auto and coming back changed it. No interaction

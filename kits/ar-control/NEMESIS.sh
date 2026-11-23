@@ -118,8 +118,8 @@ if [ "$MODE" = disable ]; then
     echo "CarPlay AR disabled. Start a fresh route to refresh the HUD."
     exit 0
 fi
-case "$(getprop ro.build.product)" in CVEV.USA.*.260507) ;; *) echo "This AR prototype targets the US EV6 on 260507."; exit 1 ;; esac
-if [ ! -f "$PKG/AR_BUILD.json" ] || ! grep -q '"variant": "ev6"' "$PKG/AR_BUILD.json"; then
+case "$(getprop ro.build.product)" in CVEV.USA.*.260507|NEEV.USA.*.260903|NEEV23.USA.*.260903|NEEV23SE.USA.*.260903) ;; *) echo "No AR build for this car (US EV6 260507 and US Ioniq 5 260903 so far)."; exit 1 ;; esac
+if [ ! -f "$PKG/AR_BUILD.json" ] || ! grep -q -e '"variant": "ev6"' -e '"variant": "neev23_260903"' "$PKG/AR_BUILD.json"; then
     echo "The generated EV6 CarPlay AR prototype is not installed."
     exit 1
 fi

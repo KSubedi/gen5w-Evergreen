@@ -63,8 +63,10 @@ final class EvCar {
     private static final String HCAN_GET_SOH = "getXEV_Bms_GDS_SOH";       // ()I, 0xd6 on 260507
     // com.hkmc.ext.hcan.odex of the Ioniq 5 US 260507, where 0x0b and 0xd6 were verified
     static final String HCAN_ODEX = "/system/framework/com.hkmc.ext.hcan.odex";
-    // Ioniq 5 US 260507, and the Kia EV6 US 260507's (same 0x0b and 0xd6, deodexed 2026-11-22)
-    static final String[] HCAN_MD5S = {"c4638b2befbabce418d2664f4e7ec304", "b9ed02d077649b7c2a589d665f33e2e0"};
+    // Ioniq 5 US 260507, the Kia EV6 US 260507's (same 0x0b and 0xd6, deodexed 2026-11-22) and
+    // the Ioniq 5 2024 SE US 260903's (same, deodexed 2026-11-23)
+    static final String[] HCAN_MD5S = {"c4638b2befbabce418d2664f4e7ec304", "b9ed02d077649b7c2a589d665f33e2e0",
+            "1cab9265954bbf48a5dddb67a1e6f2bc"};
 
     private static final String DATC_SERVICE = "com.hkmc.micom.datc";
     private static final String DATC_TOKEN = "com.hkmc.datc.IDATCService";

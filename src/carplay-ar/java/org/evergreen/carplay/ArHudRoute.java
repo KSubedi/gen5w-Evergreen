@@ -31,9 +31,36 @@ public final class ArHudRoute {
     private static synchronized Field fieldOf(Object object, String name) throws Exception {
         String key = object.getClass().getName() + ":" + name;
         Field f = fields.get(key);
-        if (f == null) { f = object.getClass().getDeclaredField(name); f.setAccessible(true); fields.put(key, f); }
+        if (f == null) {
+            f = object.getClass().getDeclaredField(layoutName(object.getClass(), name));
+            f.setAccessible(true); fields.put(key, f);
+        }
         return f;
     }
+
+    /**
+     * Names are the EV6 260507 DiPO's. The Ioniq 5 260903 DiPO has the same fields with
+     * one more before them in e/u and e/v, so the obfuscator named each one letter on
+     * (e/u Al, Am -> Am, An; e/v DM..DV -> DN..DW; same types, same users). Which layout a
+     * class has is read from the class: its last field of that run (e/u An, a map; e/v DW,
+     * an int) exists only in the 260903 build. Other names (e/c, e/b) are the same on both.
+     */
+    static String layoutName(Class<?> type, String name) {
+        boolean u = name.equals("Al") || name.equals("Am");
+        boolean v = name.length() == 2 && name.charAt(0) == 'D' && "MRSTUV".indexOf(name.charAt(1)) >= 0;
+        if (!u && !v) return name;
+        String marker = u ? "An" : "DW";
+        Boolean shifted = layouts.get(type);
+        if (shifted == null) {
+            boolean found;
+            try { Field m = type.getDeclaredField(marker); found = u ? Map.class.isAssignableFrom(m.getType()) : m.getType() == int.class; }
+            catch (NoSuchFieldException absent) { found = false; }
+            shifted = Boolean.valueOf(found);
+            layouts.put(type, shifted);
+        }
+        return shifted.booleanValue() ? "" + name.charAt(0) + (char) (name.charAt(1) + 1) : name;
+    }
+    private static final Map<Class<?>, Boolean> layouts = new HashMap<Class<?>, Boolean>();
 
     /** The phone's display distance as stock DiPO can parse it (Float.parseFloat). Apple Maps
      * sends 1,000 ft as "1,000": the parse failed and DiPO sent the cluster and HUD distance 0

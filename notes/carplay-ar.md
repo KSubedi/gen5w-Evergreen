@@ -1113,3 +1113,33 @@ Porting kit: the Leafia kit's new `porting` level (`tools/build-kit.sh porting` 
 `UWP-PORT/send-privately/stock` (stock files), never logs or key files, plus `NEXT-STEPS.txt`
 with the port-request form link. `tools/test-leafia-kit.py` runs the kit against a fake head unit.
 See [PORTING.md](../PORTING.md).
+
+## 1.3.0.125: Hyundai Ioniq 5 US 260903 (port request #1)
+
+A 2024 Ioniq 5 (NEEV23SE.USA.0000.V016.010.260903, AR HUD) from the porting kit. Its stock files
+match Evergreen's `neev23_260903` patch set exactly. Same files as the EV6: `libiap2session.so`
+(fc7cb675), the Android Auto library (48ee793a), Iap2ServerApp's code (the bridge build is the
+same APK, 75d7fea4); `libCarPlayCore.so` (ef49c09b) accepts Wi-Fi sessions natively.
+
+- **AR:** `build-carplay-ar-advanced.py --variant neev23_260903`. The only difference the
+  adapter met: DiPO's obfuscator named e/u's and e/v's fields one letter on (one more field
+  before them in each class): e/u `Al`,`Am` -> `Am`,`An` (the same two maps, used by the same
+  methods), e/v `DM`..`DV` -> `DN`..`DW` (same types). `inspect_dipo` and `ArHudRoute` read the
+  layout from a marker field (e/u `An` a map, e/v `DW` an int); anything else is refused at build
+  time or reads the EV6 names. Every method fingerprint, call site and the framework trap API
+  (bar index 11, the same fields and hashes) matched; the EV6 plan is unchanged.
+- **EV (Android Auto):** the 260903 vehicle framework, deodexed: the same transaction numbers
+  (HEV 3/0x3e/0x41/0x42, BCM 1/0x6d, IBCMListener 0x11, DATC 6/0x29, hscan 0x0b/0xd6) and
+  identical `HEVService` preconditioning methods and reset timer; its hashes are in
+  `Precond.PROFILES` and `EvCar.HCAN_MD5S`. EV GPM built from the 260903 turn-by-turn GPM
+  (deterministic, 24 EV classes, sensors 23 and 26); the library delta is the EV6's (same stock).
+- **Apple Maps EV routing:** the same `libiap2session.so` recipe and `libcarplayev.so`;
+  `CarPlayEv` picks the profile by product id (`CVEV.` EV6, `NEEV` Isaac's Ioniq 5 profile, which
+  he measured within 1-2% on an Ioniq 5) and stays off unless HEV 0x35 (BMS_EVENERGYCAPA, 2 Wh
+  steps) says 77,400 Wh, since 2024 Ioniq 5 SEs also come with the 58 kWh pack.
+- **Installer:** `build-carplay-ar-installer.py` names and gates by the report's variant
+  (`CARS`); `ar-pre.sh` and the one-drive `NEMESIS.sh` get the car's product pattern filled in.
+  Each installer refuses the other car (mock). Mock head unit with the owner's stock files: EV,
+  no-EV and a failed install all uninstall to stock.
+- The owner's car has HMG-API's Wireless CarPlay + Android Auto mod installed; it must be
+  turned off (or uninstalled) first: both change the same apps.

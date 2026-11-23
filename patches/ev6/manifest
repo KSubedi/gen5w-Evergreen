@@ -7,4 +7,4 @@
 2_tbt file libautoreceiver_infobank.so common/libautoreceiver_infobank.tbt.lpd c08410a8d32a615b1aa805cd8a243d52
 2_tbt+ev app HKMC_GPM ev6/HKMC_GPM.ev.lpd fff370ba08bda3e8b00e501f092d82d4
 2_tbt+ev file libautoreceiver_infobank.so ev6/libautoreceiver_infobank.ev.lpd 7ada7d23a79cb4fbef198b500532bb7b
-3_bridge+ev app Iap2ServerApp ev6/Iap2ServerApp.bridge.ev.lpd a36498d1176a0822cb5cc7e7ae126311
+3_bridge+ev app Iap2ServerApp ev6/Iap2ServerApp.bridge.ev.lpd 531f5831f249614956399f36a212f4ff

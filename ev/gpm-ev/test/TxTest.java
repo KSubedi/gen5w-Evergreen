@@ -21,7 +21,11 @@ public final class TxTest {
                 "b9e7e02b81e1a8cfcf767c6b8bbb28bcf1d2c411a208fbf6a465e7f0c662774a",
                 "3cf40fb00854c63afa49abea1dad18a0afcbc0dd68b17de9ed7ea3f5aeab4222") == null, "mixed files: no profile");
         pass++;
-        check(EvCar.HCAN_MD5S.length == 2, "two verified telematics libraries");
+        check("Ioniq 5 2024 SE US 260903".equals(Precond.HkmcVehicle.profile(
+                "c52e0825956880d627b32979022705a618200f059476c094d729133d1ff6a3be",
+                "bf17e682d1beb349ae8ef2acaae6d6e908fe42e88853d7145ee16b29bb4d9ec1")), "Ioniq 5 260903 profile");
+        pass++;
+        check(EvCar.HCAN_MD5S.length == 3, "three verified telematics libraries");
         pass++;
         check(EvCar.tx("com.hkmc.hev.IHEVService", "getHEVStatus") == 3, "found by name");
         pass++;

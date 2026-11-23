@@ -353,6 +353,8 @@ public final class Precond {
         //    numbers (HEV 3/62/65/66, BCM 1/109) and the same HEVService
         //    implementation (MICOM 0xc68/0xc66/0xc65, the 120 ms station reset);
         //    notes/ev-vehicle-commands.md.
+        //  - Hyundai Ioniq 5 2024 SE US 260903 (NEEV23SE): deodexed 2026-11-23; the
+        //    same transaction numbers, HEVService methods and reset timer as the EV6's.
         static final String[][] PROFILES = {
             {"Ioniq 5 US 260507",
                 "dd72e04bce0a2b4bda1506308ac21f91002c1436553b8156c345cc4313661338",
@@ -360,6 +362,9 @@ public final class Precond {
             {"Kia EV6 US 260507",
                 "b9e7e02b81e1a8cfcf767c6b8bbb28bcf1d2c411a208fbf6a465e7f0c662774a",
                 "8af745b41aa28f490953d61531215cd94e059f104b31f6236a8f6c7af23b8062"},
+            {"Ioniq 5 2024 SE US 260903",
+                "c52e0825956880d627b32979022705a618200f059476c094d729133d1ff6a3be",
+                "bf17e682d1beb349ae8ef2acaae6d6e908fe42e88853d7145ee16b29bb4d9ec1"},
         };
 
         private Boolean compatible;  // null = not checked yet

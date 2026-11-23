@@ -83,11 +83,25 @@ def insert_entry(text, instruction):
     return result
 
 
+# The Ioniq 5 260903 DiPO has one more field before these in e/u and e/v, so each is named one
+# letter on (e/u Al, Am -> Am, An; e/v DM..DV -> DN..DW); ArHudRoute.layoutName reads the same
+# marker (e/u An, a map; e/v DW, an int) at run time. Other classes keep the EV6 names.
+SHIFT_MARKERS = {U: "An:Ljava/util/LinkedHashMap;", V: "DW:I"}
+
+
+def layout_fields(tree, path, fields):
+    """The fields to expect in this build: the EV6 names, or all one letter on (260903)."""
+    marker = SHIFT_MARKERS.get(path)
+    if not marker or not re.search(r"(?m)^\.field [^\n]*\b" + re.escape(marker) + r"$", (tree / path).read_text()):
+        return fields
+    return {name[0] + chr(ord(name[1]) + 1): type for name, type in fields.items()}
+
+
 def inspect_dipo(tree):
     tree = Path(tree); sites = []
     for path, fields in FIELDS.items():
         text = (tree / path).read_text()
-        for name, type in fields.items():
+        for name, type in layout_fields(tree, path, fields).items():
             if len(re.findall(r"(?m)^\.field [^\n]*\b"+re.escape(name+":"+type)+r"$", text)) != 1:
                 raise ValueError("unexpected field layout: " + path + ":" + name)
     for path, signature in ((U,"a(Ljava/lang/Integer;Ljava/lang/Object;)V"), (U,"nT()V"),

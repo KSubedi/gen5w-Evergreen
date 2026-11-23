@@ -92,8 +92,16 @@ public final class CarPlayEv {
             log("inactive: libiap2session.so md5=" + md5 + " is not this build's patched library");
             return;
         }
+        String product = prop("ro.build.product");
+        String profile = profileFor(product);
+        if (profile == null) { log("inactive: no EV profile for " + product); return; }
+        int nominal = nominalWh();
+        if (nominal > 0 && nominal != 77400) {
+            log("inactive: the profiles are for the 77.4 kWh battery; this car reports " + nominal + " Wh");
+            return;
+        }
         if (!loaded) { NativeBridge.load(LIB); loaded = true; }
-        source = new VehicleSource(s, Generated.PROFILE);
+        source = new VehicleSource(s, profile);
         service = s;
         arm();
         if (armed) enableGroups();
@@ -188,6 +196,40 @@ public final class CarPlayEv {
     }
     static Object nativeLock() throws Exception { return serviceField("mLock").get(null); }
     static long nativeHandle() throws Exception { return serviceField("mHandleIap2").getLong(null); }
+
+    // ---- the car: profile and battery ---------------------------------------------
+
+    /** The bundled profile for this product id (Generated.PROFILES: {prefix, json}), or null. */
+    static String profileFor(String product) {
+        if (product == null) return null;
+        for (String[] p : Generated.PROFILES) if (product.startsWith(p[0])) return p[1];
+        return null;
+    }
+
+    /** Nominal pack energy in Wh (HEV getHEVStatus 0x35 BMS_EVENERGYCAPA, 2 Wh steps), or -1. */
+    static int nominalWh() {
+        try {
+            Class<?> pc = Class.forName("android.os.Parcel"), ib = Class.forName("android.os.IBinder");
+            Object binder = Class.forName("android.os.ServiceManager").getMethod("getService", String.class)
+                    .invoke(null, "com.hkmc.micom.hev");
+            if (binder == null) return -1;
+            Object data = pc.getMethod("obtain").invoke(null), reply = pc.getMethod("obtain").invoke(null);
+            try {
+                pc.getMethod("writeInterfaceToken", String.class).invoke(data, "com.hkmc.hev.IHEVService");
+                pc.getMethod("writeInt", int.class).invoke(data, 0x35);
+                if (!Boolean.TRUE.equals(ib.getMethod("transact", int.class, pc, pc, int.class).invoke(binder, 3, data, reply, 0)))
+                    return -1;
+                pc.getMethod("readException").invoke(reply);
+                int raw = ((Integer) pc.getMethod("readInt").invoke(reply)).intValue();
+                return raw > 0 && raw < 0xFFFF ? raw * 2 : -1;
+            } finally { pc.getMethod("recycle").invoke(data); pc.getMethod("recycle").invoke(reply); }
+        } catch (Throwable unavailable) { return -1; }
+    }
+
+    static String prop(String name) {
+        try { return (String) Class.forName("android.os.SystemProperties").getMethod("get", String.class).invoke(null, name); }
+        catch (Throwable unavailable) { return null; }
+    }
 
     // ---- helpers --------------------------------------------------------------------
 

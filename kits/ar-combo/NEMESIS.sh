@@ -77,7 +77,7 @@ if [ "$(getprop sys.boot_completed)" != 1 ]; then
     echo "Android is still starting: nothing to do. Plug the drive in again once the head unit is up."
     exit 0
 fi
-case "$(getprop ro.build.product)" in CVEV.USA.*.260507) ;; *) fail "This drive is for the Kia EV6 (US) on 260507 only" ;; esac
+case "$(getprop ro.build.product)" in @AR_PRODUCTS@) ;; *) fail "This drive is for @AR_CAR@ only" ;; esac
 [ -n "$OURS" ] && [ -f "$ZIP" ] || fail "The drive is incomplete: unzip the whole release onto it again"
 
 if [ ! -f UWP-INSTALL ] && [ ! -f EVERGREEN-INSTALL ] && [ -f "$PKG/AR_INSTALL.json" ] && grep -q "\"version\": \"$OURS\"" "$PKG/AR_INSTALL.json"; then

@@ -12,7 +12,8 @@ class ComboTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name); self.usb = self.root/'usb'; self.car = self.root/'car'; self.bin = self.root/'bin'
         for d in (self.usb/'packages', self.bin): d.mkdir(parents=True)
-        for name in ('NEMESIS.sh', 'NEMESIS.data'): shutil.copy(ROOT/'kits/ar-combo'/name, self.usb/name)
+        shutil.copy(ROOT/'kits/ar-combo/NEMESIS.data', self.usb/'NEMESIS.data')
+        (self.usb/'NEMESIS.sh').write_text((ROOT/'kits/ar-combo/NEMESIS.sh').read_text().replace("@AR_PRODUCTS@", "CVEV.USA.*.260507").replace("@AR_CAR@", "a US Kia EV6 on 260507"))
         shutil.copy(ROOT/'kits/ar-control/NEMESIS.sh', self.usb/'hotspot.sh')
         (self.usb/'AR_VERSION').write_text('1.3.0.116\n'); (self.usb/'packages'/(ID+'.zip')).write_bytes(b'package')
         self.pkg = self.car/'data/nemesis/apps'/ID; self.debug = self.car/'data/nemesis'/(ID+'-ar-debug')

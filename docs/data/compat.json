@@ -50,9 +50,9 @@
           "b1fc88d42954c41e7944e9247647e9ad"
         ],
         "/system/app/Iap2ServerApp.apk": [
+          "531f5831f249614956399f36a212f4ff",
           "75d7fea4d2009be6aa5c840118f58c94",
-          "7e90fa7d8a161ade71e11dc15e56c410",
-          "a36498d1176a0822cb5cc7e7ae126311"
+          "7e90fa7d8a161ade71e11dc15e56c410"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
           "7ada7d23a79cb4fbef198b500532bb7b",
@@ -161,16 +161,19 @@
           "3daf5f71bfea1a624a71f8f1d2d68ac0"
         ],
         "/system/app/HKMC_GPM.apk": [
+          "a629652d17a9fdfdddb05afc6b912343",
           "eaaf50bb30953b0fcaf59b2cf211d709"
         ],
         "/system/app/HKMC_Navi_ExSL.apk": [
           "e01f7ef64d1d824930b656129f77c6bc"
         ],
         "/system/app/Iap2ServerApp.apk": [
+          "531f5831f249614956399f36a212f4ff",
           "75d7fea4d2009be6aa5c840118f58c94",
           "7e90fa7d8a161ade71e11dc15e56c410"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
+          "7ada7d23a79cb4fbef198b500532bb7b",
           "c08410a8d32a615b1aa805cd8a243d52"
         ]
       }
@@ -218,16 +221,19 @@
           "3daf5f71bfea1a624a71f8f1d2d68ac0"
         ],
         "/system/app/HKMC_GPM.apk": [
+          "a629652d17a9fdfdddb05afc6b912343",
           "eaaf50bb30953b0fcaf59b2cf211d709"
         ],
         "/system/app/HKMC_Navi_ExSL.apk": [
           "e01f7ef64d1d824930b656129f77c6bc"
         ],
         "/system/app/Iap2ServerApp.apk": [
+          "531f5831f249614956399f36a212f4ff",
           "75d7fea4d2009be6aa5c840118f58c94",
           "7e90fa7d8a161ade71e11dc15e56c410"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
+          "7ada7d23a79cb4fbef198b500532bb7b",
           "c08410a8d32a615b1aa805cd8a243d52"
         ]
       }

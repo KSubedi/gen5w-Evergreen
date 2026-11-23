@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generate exact-distance/interpolation/progress patches for US EV6 260507.
+"""Generate exact-distance/interpolation/progress patches for one car's patch set (--variant:
+ev6 = Kia EV6 US 260507, the default; neev23_260903 = Hyundai Ioniq 5 US 260903).
 
 Uses the owner's private stock files and already committed Evergreen deltas.
 Exports only three new deltas, their complete patch tree, and fingerprint plans.
@@ -15,6 +16,8 @@ import subprocess
 import tempfile
 
 ROOT=Path(__file__).resolve().parents[1]
+# The patch set (patches/<VARIANT>); --variant sets it.
+VARIANT='ev6'
 
 
 def module(name):
@@ -28,8 +31,8 @@ simple=module('patch-carplay-ar')
 
 
 def inputs(stock,patches):
-    lines, entries, fingerprint=base.inputs(stock,'ev6',patches)
-    wanted=dict(line.split() for line in (patches/'ev6/stock').read_text().splitlines() if line.strip())
+    lines, entries, fingerprint=base.inputs(stock,VARIANT,patches)
+    wanted=dict(line.split() for line in (patches/VARIANT/'stock').read_text().splitlines() if line.strip())
     for name in ('HKMC_Navi_ExSL.apk','HKMC_Navi_ExSL.odex','HKMC_GPM.apk','HKMC_GPM.odex'):
         if base.md5(stock/'app'/name)!=wanted.get(name):raise ValueError('stock checksum mismatch: '+name)
         fingerprint[name]=base.sha256(stock/'app'/name)
@@ -78,8 +81,8 @@ def inspect(stock,patches=None,lpatch=None):
     stock=Path(stock).resolve();patches=Path(patches or ROOT/'patches').resolve()
     lpatch=Path(lpatch or ROOT/'tools/lpatch/lpatch-host').resolve()
     _,entries,fingerprint,fw=inputs(stock,patches)
-    report={'schema':2,'variant':'ev6','mode':'advanced','stock_sha256':fingerprint,'framework_sha256':fw,'builds':[]}
-    with tempfile.TemporaryDirectory(prefix='ev6-ar-inspect-') as temp:
+    report={'schema':2,'variant':VARIANT,'mode':'advanced','stock_sha256':fingerprint,'framework_sha256':fw,'builds':[]}
+    with tempfile.TemporaryDirectory(prefix=VARIANT+'-ar-inspect-') as temp:
         temp=Path(temp);report['framework_api']=framework(stock,temp)
         for entry in entries:
             _,plan=reconstruct(stock,patches,entry,temp,lpatch);report['builds'].append(plan)
@@ -93,17 +96,17 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
         raise ValueError('choose a NEW private output directory or ignored dist directory')
     if {p.name for p in helpers.rglob('*.smali')}!=simple.HELPER_NAMES:raise ValueError('build the AR helpers first')
     lines,entries,fingerprint,fw=inputs(stock,patches)
-    if not isinstance(plan,dict) or plan.get('schema')!=2 or plan.get('mode')!='advanced' or plan.get('variant')!='ev6':
-        raise ValueError('an advanced EV6 inspection plan is required')
+    if not isinstance(plan,dict) or plan.get('schema')!=2 or plan.get('mode')!='advanced' or plan.get('variant')!=VARIANT:
+        raise ValueError('an advanced inspection plan for '+VARIANT+' is required')
     if plan.get('stock_sha256')!=fingerprint or plan.get('framework_sha256')!=fw:raise ValueError('plan inputs changed')
     output.parent.mkdir(parents=True,exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='ev6-ar-advanced-') as temp:
+    with tempfile.TemporaryDirectory(prefix=VARIANT+'-ar-advanced-') as temp:
         temp=Path(temp);api=framework(stock,temp)
         if api!=plan.get('framework_api'):raise ValueError('framework API plan changed')
-        actual={'schema':2,'variant':'ev6','mode':'advanced','stock_sha256':fingerprint,'framework_sha256':fw,
+        actual={'schema':2,'variant':VARIANT,'mode':'advanced','stock_sha256':fingerprint,'framework_sha256':fw,
                 'framework_api':api,'builds':[]}
         staged=temp/'patches';shutil.copytree(patches,staged)
-        report={'schema':2,'variant':'ev6','on_car_tested':False,'enabled_by_default':False,
+        report={'schema':2,'variant':VARIANT,'on_car_tested':False,'enabled_by_default':False,
                 'baseline_on_car_confirmed':'1.2.0.101','stock_sha256':fingerprint,'framework_sha256':fw,'framework_api':api,
                 'features':{'icon_ar':True,'metadata_adapter':True,'distance_adapter':True,'progress_adapter':True,
                             'carplay_recovery':True,'android_auto_ar':True},
@@ -131,7 +134,7 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
                 sites=adapter.inspect_navi(checked)
                 if len(sites)!=3 or any(p['file']!='org/evergreen/carplay/ArHudTrap.smali' for p in sites):
                     raise ValueError('unwrapped navigation trap call')
-            delta='ev6/'+name+'.'+advanced_suffix(part)+'.advanced-ar.lpd'
+            delta=VARIANT+'/'+name+'.'+advanced_suffix(part)+'.advanced-ar.lpd'
             base.run('python3',ROOT/'tools/mkdelta.py',stock/'app'/(name+'.odex'),dex,staged/delta)
             roundtrip=temp/(key+'-roundtrip.dex');base.run(lpatch,'delta',staged/delta,stock/'app'/(name+'.odex'),roundtrip)
             if dex.read_bytes()!=roundtrip.read_bytes():raise ValueError('delta round trip mismatch')
@@ -141,7 +144,7 @@ def build(stock,output,helpers,plan,patches=None,lpatch=None):
                                      'apk_md5':checksum,'dex_sha256':base.sha256(dex),
                                      'calls':1 if name=='HKMC_DiPO' else len(adapter.GPM_CALLS) if name=='HKMC_GPM' else len(expected['sites'])})
         if actual!=plan:raise ValueError('inspection plan contains unexpected fields or builds')
-        (staged/'ev6/manifest').write_text('\n'.join(lines)+'\n')
+        (staged/VARIANT/'manifest').write_text('\n'.join(lines)+'\n')
         with tempfile.TemporaryDirectory(prefix='.ar-publish-',dir=output.parent) as publish:
             result=Path(publish)/'result';result.mkdir();shutil.copytree(staged,result/'patches')
             (result/'ar-build.json').write_text(json.dumps(report,indent=2)+'\n')
@@ -153,7 +156,10 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--stock',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
     p.add_argument('--inspect',action='store_true');p.add_argument('--plan',type=Path)
+    p.add_argument('--variant',default='ev6',help='patch set under patches/ (default ev6)')
     p.add_argument('--helpers',type=Path,default=ROOT/'src/carplay-ar/build/smali');a=p.parse_args()
+    VARIANT=a.variant
+    if not (ROOT/'patches'/VARIANT/'manifest').is_file():p.exit(1,'no patch set patches/'+VARIANT+'\n')
     try:
         if a.inspect:
             report=inspect(a.stock)
