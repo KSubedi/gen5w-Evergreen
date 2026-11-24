@@ -11,4 +11,8 @@ final class NativeIdentity {
     static native int configure(byte[] displayName, int engineType, int dcConnector,
             int dcPowerW, int acConnector, int acPowerW, byte[] themeIdentity);
     static native void shutdown();
+    /** CarPlayStartSession: the encoded 0x4301 message (StartSession.encode), or empty for off */
+    static native int startSession(byte[] message);
+    /** 0 CarPlayAvailability offers seen, 1 answers sent, 2 last send result, 3 last offer's length, 16+i its bytes */
+    static native int startSessionStatus(int which);
 }

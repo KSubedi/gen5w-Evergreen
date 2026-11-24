@@ -138,6 +138,9 @@ public final class CarPlayEv {
             armed = true;
             log("identity armed: electric, CCS " + source.dcW + " W, J1772 " + source.acW + " W"
                     + (theme.length() > 0 ? ", CarPlay theme " + theme : ""));
+            // with a theme (CarPlay Ultra-Lite installed): answer the phone's CarPlayAvailability with
+            // CarPlayStartSession, without which the phone keeps the car in plain CarPlay
+            if (theme.length() > 0 && service != null) StartSession.start(service, theme);
         }
         else log("identity not armed: native=" + rc);
     }

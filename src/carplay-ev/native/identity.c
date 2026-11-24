@@ -5,6 +5,9 @@
  * (gate.s, tools/build-carplay-ev.py), its handler word lives in the library's
  * writable .bss tail, so it is set with a plain store (no mprotect of code pages);
  * the header is version 2; JNI names are org.egmp.carplay.ev.app.NativeIdentity's.
+ * CarPlayStartSession (start_* below) is egmp-carplay-ev-routing's (ioniq6.15, src/native/identity.c,
+ * GPL-3.0-or-later, as LIVI's livi-runtime bringup.rs does it), for the CarPlay Ultra-Lite test port:
+ * the car answers the phone's CarPlayAvailability (0x4300) with the 0x4301 message Java encodes.
  */
 #include <jni.h>
 typedef unsigned int u32;
@@ -33,6 +36,60 @@ static Param info_copy[9],status_copy[15];
 static Children stock_children;
 static Lookup wireless_lookup;
 static Param wireless_copy[WIRELESS_MAX+2];
+static int (*protect_page)(void *,u32,int);
+
+/* CarPlayStartSession (egmp-carplay-ev-routing ioniq6.15; LIVI livi-runtime bringup.rs): the
+ * identification also lists 0x4301 sent and 0x4300 (CarPlayAvailability) received, and when the
+ * phone sends 0x4300 the car answers with the 0x4301 message Java encoded (Wi-Fi, AirPlay identity,
+ * theme asset). The stock stack knows neither message: the 0x4300 handler takes over the dead
+ * duplicate 0x5202 entry of iAP2CtlHandleMsgFuncList (the dispatcher stops at the first 0x5202), and
+ * the reply goes out below SendCmd, whose supported-message check would refuse 0x4301. */
+#define START_MAX 512
+#define AVAILABILITY 0x4300
+typedef struct {u32 name,id,label,arg,notify,reply;} Handler;
+typedef int (*Blob)(unsigned char *,int,u32,u32,u32);
+static unsigned char start_msg[START_MAX];
+static u32 start_len,start_offers,start_sent,start_offer_len;
+static int start_last=1;
+static unsigned char start_offer[64];
+static Blob stock_blob;
+static void *(*packet_create)(u32,u32);
+static void (*packet_destroy)(void *);
+static void *(*session_malloc)(u32,const char *,u32);
+static int (*send_packet)(void *);
+static Handler *handlers;
+static u32 start_notify(u32 link,u32 session,const unsigned char *params,u32 n){
+    u32 keep=n<sizeof start_offer?n:sizeof start_offer;
+    for(u32 i=0;params && i<keep;i++)start_offer[i]=params[i];
+    start_offer_len=n;__atomic_add_fetch(&start_offers,1,__ATOMIC_RELEASE);
+    u32 len=__atomic_load_n(&start_len,__ATOMIC_ACQUIRE);
+    if(!len){start_last=-1;return 0;}
+    void *packet=packet_create(link,session);
+    if(!packet){start_last=-2;return 0;}
+    unsigned char *buf=session_malloc(len,"carplayev",1);
+    if(!buf){packet_destroy(packet);start_last=-3;return 0;}
+    for(u32 i=0;i<len;i++)buf[i]=start_msg[i];
+    ((u32*)packet)[1]=(u32)buf;((u32*)packet)[2]=len;
+    start_last=send_packet(packet);
+    __atomic_add_fetch(&start_sent,1,__ATOMIC_RELEASE);
+    return 0;
+}
+/* messages sent (6) / received (7) by the accessory: the stock list, then 0x4301 / 0x4300 */
+static int start_blob(unsigned char *buf,int cap,u32 id,u32 x,u32 y){
+    int n=stock_blob(buf,cap,id,x,y);
+    if(n<0 || (id!=6 && id!=7))return n;
+    if(!buf)return n+2;
+    if(cap-n<2)return n;
+    buf[n]=0x43;buf[n+1]=id==6?0x01:0x00;return n+2;
+}
+static int start_bind(void *lib){
+    packet_create=dlsym(lib,"iAP2SessionPacketCreate");
+    packet_destroy=dlsym(lib,"iAP2SessionPacketDestroy");
+    session_malloc=dlsym(lib,"iAP2SessionMalloc");
+    send_packet=dlsym(lib,"iAP2ControlSessionSendPacket");
+    handlers=dlsym(lib,"iAP2CtlHandleMsgFuncList");
+    return packet_create && packet_destroy && session_malloc && send_packet && handlers?0:-18;
+}
 
 static void copy(char *d,const char *s,u32 n){while(n--)*d++=*s++;}
 static int string_ok(const char *s,u32 n){if(!s || !n)return 0;for(u32 i=0;i<n;i++)if(!s[i])return 0;return 1;}
@@ -84,7 +141,10 @@ static u32 identity_builder(u32 handle,u32 session,u32 a,u32 b,u32 command,void 
     if(lock_mutex(&identity_mutex))return 0;
     Param root[24];for(u32 i=0;i<24;i++){
         root[i]=root_table[i];
-        if(has_vehicle && (root[i].id==20 || root[i].id==21)){root[i].used=1;root[i].children=(u32)identity_children;}
+        if((root[i].id==6 || root[i].id==7) && root[i].length && __atomic_load_n(&start_len,__ATOMIC_ACQUIRE)){
+            stock_blob=(Blob)root[i].length;root[i].length=(u32)start_blob;
+        }
+        else if(has_vehicle && (root[i].id==20 || root[i].id==21)){root[i].used=1;root[i].children=(u32)identity_children;}
         else if(has_theme && root[i].id==WIRELESS_GROUP && wireless_lookup && root[i].children){
             stock_children=(Children)root[i].children;root[i].children=(u32)identity_children;
         }
@@ -106,6 +166,8 @@ static int bind(void){
     void *lib=dlopen("/system/lib/libiap2session.so",2),*c=dlopen("/system/lib/libc.so",2);
     if(!lib || !c)return -10;
     lock_mutex=dlsym(c,"pthread_mutex_lock");unlock_mutex=dlsym(c,"pthread_mutex_unlock");
+    protect_page=dlsym(c,"mprotect");   /* only for CarPlayStartSession's handler entry */
+    start_bind(lib);                    /* optional: no CarPlayStartSession without it */
     raw_builder=recipe_original(dlsym(lib,"iAP2SessionPacketMakePacketUsingParamListNew"));
     root_table=dlsym(lib,"iAP2IdenInfoMsgList");root_lookup=dlsym(lib,"_Z26iAP2ControlIden_GetPointerttPtPvPi");
     info_lookup=dlsym(lib,"_Z41iAP2ControlIden_VehicleInfoIdenGetPointerttPtPvPi");
@@ -152,6 +214,44 @@ static int configure(const char *name,u32 len,int engine_type,int dc_type,u32 dc
     unlock_mutex(&identity_mutex);return result;
 }
 
+/* Before configure (any time: re-armed when the hotspot's addresses change): the encoded 0x4301
+ * message (40 40 len 43 01 ...), or len 0 for off */
+static int start_session(const unsigned char *msg,u32 len){
+    if(!hook_mailbox){int rc=bind();if(rc)return rc;}
+    if(len>START_MAX || (len && (len<6 || msg[0]!=0x40 || msg[1]!=0x40 || ((u32)msg[2]<<8|msg[3])!=len || msg[4]!=0x43 || msg[5]!=0x01)))return -12;
+    if(!len){__atomic_store_n(&start_len,0,__ATOMIC_RELEASE);return 0;}
+    if(!handlers || !packet_create || !protect_page)return -18;
+    Handler *h=&handlers[33];
+    if(handlers[32].id!=0x5202 || (h->id!=0x5202 && h->id!=AVAILABILITY))return -20;
+    if(lock_mutex(&identity_mutex))return -15;
+    for(u32 i=0;i<len;i++)start_msg[i]=msg[i];
+    __atomic_store_n(&start_len,len,__ATOMIC_RELEASE);
+    if(h->id!=AVAILABILITY){
+        void *page=(void*)((u32)h&~4095U);u32 span=((u32)(h+1)-(u32)page+4095U)&~4095U;
+        if(protect_page(page,span,3)){__atomic_store_n(&start_len,0,__ATOMIC_RELEASE);unlock_mutex(&identity_mutex);return -19;}
+        h->notify=(u32)start_notify;h->reply=0;h->arg=0;
+        __atomic_store_n(&h->id,AVAILABILITY,__ATOMIC_RELEASE);
+    }
+    unlock_mutex(&identity_mutex);return 0;
+}
+/* 0 offers seen, 1 answers sent, 2 last send result, 3 last offer's parameter length, 16+i its bytes */
+static int start_status(int which){
+    if(which==0)return (int)__atomic_load_n(&start_offers,__ATOMIC_ACQUIRE);
+    if(which==1)return (int)__atomic_load_n(&start_sent,__ATOMIC_ACQUIRE);
+    if(which==2)return start_last;
+    if(which==3)return (int)start_offer_len;
+    if(which>=16 && which<16+(int)sizeof start_offer)return start_offer[which-16];
+    return -1;
+}
+JNIEXPORT jint JNICALL Java_org_egmp_carplay_ev_app_NativeIdentity_startSession(JNIEnv *env,jclass cls,jbyteArray msg){
+    (void)cls;jsize n=msg?(*env)->GetArrayLength(env,msg):0;if(n<0 || n>START_MAX)return -12;
+    unsigned char bytes[START_MAX];if(n)(*env)->GetByteArrayRegion(env,msg,0,n,(jbyte*)bytes);
+    if((*env)->ExceptionCheck(env))return -12;
+    return start_session(bytes,(u32)n);
+}
+JNIEXPORT jint JNICALL Java_org_egmp_carplay_ev_app_NativeIdentity_startSessionStatus(JNIEnv *env,jclass cls,jint which){
+    (void)env;(void)cls;return start_status(which);
+}
 JNIEXPORT jint JNICALL Java_org_egmp_carplay_ev_app_NativeIdentity_configure(JNIEnv *env,jclass cls,jbyteArray name,jint engine_type,jint dc_type,jint dc,jint ac_type,jint ac,jbyteArray theme_id){
     (void)cls;if(!name || !theme_id)return -12;jsize n=(*env)->GetArrayLength(env,name),t=(*env)->GetArrayLength(env,theme_id);
     if(n>320 || t>96)return -12;char bytes[321],theme_bytes[97];
