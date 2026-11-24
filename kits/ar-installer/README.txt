@@ -1,4 +1,4 @@
-ULTIMATE WIRELESS PROJECTION 1.3.0.126 -- AR HUD
+ULTIMATE WIRELESS PROJECTION 1.3.0.127 -- AR HUD
 Wireless CarPlay and Android Auto, with navigation on the factory AR HUD.
 https://github.com/KSubedi/ultimate-wireless-projection
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
@@ -7,6 +7,19 @@ The owner tested 1.2.0.102 for three hours of driving with generally good result
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.127: HYUNDAI SONATA HYBRID (US, 260206)
+A fourth car, in testing: the US Sonata Hybrid on head-unit firmware 260206
+(port request #3). Its CarPlay, Android Auto and iAP2 apps run the EV6's code,
+so it gets the same wireless CarPlay and Android Auto build with turn-by-turn
+on the cluster and HUD.
+- It has a regular HUD, not the AR HUD: on a car whose firmware doesn't report
+  an AR HUD, the install turns AR off and every turn is shown as the car's own
+  HUD and cluster draw it. Recovery from CarPlay freezes and drops stays on.
+- No EV features (it isn't an electric car).
+- Turn off HMG-API's Wireless CarPlay + Android Auto mod first: both change the
+  same apps.
+- Other cars: no change.
 
 NEW IN 1.3.0.126: ONE INSTALLER FOR EVERY CAR
 UltimateWirelessProjection_1.3.0.126.zip installs on every car with a build:

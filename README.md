@@ -5,9 +5,9 @@
 Ultimate Wireless Projection is a [NEMESIS](https://github.com/xwtk/hmg_nemesis) package. It started as a fork of [Evergreen](https://github.com/zpoon/gen5w-Evergreen), which continues [HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus). Development here moves fast, so it is now maintained as its own project; see [Credits](#credits) for everyone whose work it builds on.
 
 > [!IMPORTANT]
-> **Tested car:** 2022 Kia EV6 GT-Line, USA, Gen5W head-unit firmware **260507**, with the factory AR HUD. A **Hyundai Ioniq 5 (US, 260903)** has been driven too, and a **Kia EV6 (Canada, 260206)** build is in testing. Each installer only installs on its own car and firmware: see [Cars and port status](#cars-and-port-status). Want it on your Hyundai, Kia or Genesis? See [Help port it to your car](#help-port-it-to-your-car).
+> **Tested car:** 2022 Kia EV6 GT-Line, USA, Gen5W head-unit firmware **260507**, with the factory AR HUD. A **Hyundai Ioniq 5 (US, 260903)** has been driven too, and builds for the **Kia EV6 (Canada, 260206)** and **Hyundai Sonata Hybrid (US, 260206)** are in testing. Each installer only installs on its own car and firmware: see [Cars and port status](#cars-and-port-status). Want it on your Hyundai, Kia or Genesis? See [Help port it to your car](#help-port-it-to-your-car).
 
-**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.126-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
+**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.127-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
 
 ## Features
 
@@ -93,7 +93,7 @@ This isn't just "wireless on". The AR HUD was tuned over about 20 test builds, e
 
 You need [NEMESIS](https://github.com/xwtk/hmg_nemesis) 1.15 or newer on the head unit.
 
-1. Download `UltimateWirelessProjection_<version>.zip` from the [latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.126-beta.1). The same file works on every car in [Cars and port status](#cars-and-port-status).
+1. Download `UltimateWirelessProjection_<version>.zip` from the [latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.127-beta.1). The same file works on every car in [Cars and port status](#cars-and-port-status).
 2. Unzip it onto an empty USB drive (exFAT or FAT32). The top of the drive should show `NEMESIS.data`, `NEMESIS.sh` and `packages`. **Keep this drive**: it also collects the logs.
 3. Park with the car in READY and wait until the head unit has fully started. Plug in the drive and approve the NEMESIS prompt.
 4. The head unit restarts by itself when the install is done. Remove the drive while it restarts.
@@ -133,8 +133,9 @@ If an install failed, attach the `INSTALL-LOG` folder from the drive instead. Se
 | Kia EV6, US (2022–2024) | 260507 | ✅ Driven and confirmed (CarPlay and Android Auto) |
 | Hyundai Ioniq 5, US (2022–2024) | 260903 | ✅ Driven and confirmed (CarPlay, AR HUD, Apple Maps EV routing; [#1](https://github.com/KSubedi/ultimate-wireless-projection/issues/1)) |
 | Kia EV6, Canada (2022–2024) | 260206 | 🧪 Built, waiting for its first drive ([#2](https://github.com/KSubedi/ultimate-wireless-projection/issues/2)) |
+| Hyundai Sonata Hybrid, US (2022) | 260206 | 🧪 Built, waiting for its first drive ([#3](https://github.com/KSubedi/ultimate-wireless-projection/issues/3)); regular HUD, so no AR; no EV features |
 
-They all use the same installer, `UltimateWirelessProjection_<version>.zip`, and get everything in the [feature table](#features): the AR HUD and the EV features need the car's factory AR HUD and the 77.4 kWh battery (Apple Maps EV routing turns itself off on other packs).
+They all use the same installer, `UltimateWirelessProjection_<version>.zip`, and get everything in the [feature table](#features): the AR HUD and the EV features need the car's factory AR HUD and the 77.4 kWh battery (Apple Maps EV routing turns itself off on other packs). On a car without the AR HUD, AR turns itself off and turn-by-turn shows as the car draws it.
 
 ### Ready to build: Evergreen already supports the car
 
@@ -154,7 +155,7 @@ Other Gen5W cars (the head unit in trims with built-in navigation; US and Canada
 
 | Make | Models |
 |---|---|
-| Hyundai | **Ioniq 6** (2023–2026, E-GMP EV) · **Kona** and Kona Electric (2020–2023) · Palisade (2020–2023) · Tucson, Hybrid, Plug-in Hybrid (2022–2023) · Santa Fe, Hybrid, Plug-in Hybrid (2021–2023) · Santa Cruz (2022–2023) · Sonata and Hybrid (2020–2023) · Elantra, Hybrid, N (2021–2026) · Ioniq Hybrid, Plug-in, Electric (2020–2022) · Venue (2021–2026) · Veloster N (2021) |
+| Hyundai | **Ioniq 6** (2023–2026, E-GMP EV) · **Kona** and Kona Electric (2020–2023) · Palisade (2020–2023) · Tucson, Hybrid, Plug-in Hybrid (2022–2023) · Santa Fe, Hybrid, Plug-in Hybrid (2021–2023) · Santa Cruz (2022–2023) · Sonata (2020–2023) and Sonata Hybrid (other years) · Elantra, Hybrid, N (2021–2026) · Ioniq Hybrid, Plug-in, Electric (2020–2022) · Venue (2021–2026) · Veloster N (2021) |
 | Kia | **Niro**, Hybrid, Plug-in Hybrid, EV (2020–2026) · Sorento, Hybrid, Plug-in Hybrid (2021–2022) · Telluride (2020–2023) · Sportage, Hybrid, Plug-in Hybrid (2023) · Carnival (2022–2023) · K5 (2021–2022) · Seltos (2021–2024) · Soul and Soul EV (2020–2023) · Stinger (2022–2023) · Forte (2022) · Cadenza (2020) |
 | Genesis | G70 (2022–2026) |
 
@@ -162,7 +163,7 @@ Bold: most wanted. EV features need a Hyundai Motor Group EV; the AR HUD needs a
 
 ## Help port it to your car
 
-It runs on the Kia EV6 (US, 260507) and the Hyundai Ioniq 5 (US, 260903), with the Canadian EV6 in testing. The same head unit runs in many Hyundai, Kia and Genesis cars ([list](#port-help-wanted)), and the AR work carries over to other cars with an AR HUD. Porting starts with five minutes in your car:
+It runs on the Kia EV6 (US, 260507) and the Hyundai Ioniq 5 (US, 260903), with the Canadian EV6 and the US Sonata Hybrid in testing. The same head unit runs in many Hyundai, Kia and Genesis cars ([list](#port-help-wanted)), and the AR work carries over to other cars with an AR HUD. Porting starts with five minutes in your car:
 
 1. Download **UWP-Porting-Kit.zip** from the [releases](https://github.com/KSubedi/ultimate-wireless-projection/releases), unzip it onto an empty USB drive and run it through NEMESIS. It's read-only and changes nothing on the car.
 2. Zip the `UWP-PORT/attach-to-issue` folder it writes and attach it to a [port request](https://github.com/KSubedi/ultimate-wireless-projection/issues/new?template=port-request.yml).

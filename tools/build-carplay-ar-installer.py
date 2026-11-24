@@ -16,7 +16,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.3.0.126"
+VERSION = "1.3.0.127"
 # Cars with an AR build: the patch set (the report's variant) -> how the installer names and gates it.
 # products: the shell case pattern (and, comma-separated, the NEMESIS os= list).
 CARS = {
@@ -27,6 +27,9 @@ CARS = {
     "neev23_260903": {"car": "a US Hyundai Ioniq 5 on 260903", "short": "Ioniq 5 USA 260903", "title": "Ioniq 5 AR",
                       "label": "IONIQ5_US_260903",
                       "products": "NEEV.USA.*.260903|NEEV23.USA.*.260903|NEEV23SE.USA.*.260903"},
+    # Regular HUD: ar-post.sh turns AR off on a car whose ro.product.opt.hud.artist isn't true.
+    "dn8hev": {"car": "a US Hyundai Sonata Hybrid on 260206", "short": "Sonata Hybrid USA 260206",
+               "title": "Sonata Hybrid", "label": "SONATA_HEV_US_260206", "products": "DN822HEV.USA.*.260206"},
 }
 
 
@@ -67,8 +70,9 @@ def archive(files, modes=None):
     return stream.getvalue()
 
 
-UNIFIED = {"car": "the Kia EV6 (US 260507, Canada 260206) and Hyundai Ioniq 5 (US 260903)", "title": "AR",
-           "short": "EV6 US/CA, Ioniq 5 US", "label": "AR"}
+UNIFIED = {"car": "the Kia EV6 (US 260507, Canada 260206), Hyundai Ioniq 5 (US 260903) and Hyundai Sonata Hybrid"
+                   " (US 260206)", "title": "AR",
+           "short": "EV6, Ioniq 5, Sonata Hybrid", "label": "AR"}
 
 
 def merge(trees, work):
@@ -131,7 +135,7 @@ def build(patches, output, enable_ar, trace=True):
         original = files["NEMESIS.data"].decode()
         original = field(original, "name", "Ultimate Wireless Projection (" + car["title"] + ")")
         original = field(original, "package-version", VERSION)
-        original = field(original, "short-desc", '"Wireless CarPlay/AA with the AR HUD; ' + car["short"] + ' only"')
+        original = field(original, "short-desc", '"Wireless CarPlay/AA + AR HUD; ' + car["short"] + ' only"')
         original = field(original, "detailed-desc", '"Ultimate Wireless Projection: wireless CarPlay and Android Auto with navigation on the factory AR HUD, and EV routing for Android Auto. Uninstall restores stock. See README-AR.txt."')
         original = field(original, "os", '"' + car["products"].replace("|", ",") + '"')
         original = field(original, "preinstall", "scripts/ar-pre.sh")

@@ -1173,3 +1173,27 @@ built cars' products (anything else, such as an Ioniq 5 on 260507, is refused be
 The installer is 12.9 MB with three cars (about 1.4 MB per car's AR deltas). Mock head unit, each
 car with its owner's stock files: EV, no-EV and a failed install all uninstall to stock. The
 control kits are no longer published (the tools still build them).
+
+## 1.3.0.127: Hyundai Sonata Hybrid US 260206 (port request #3)
+
+A 2022 Sonata Hybrid (DN822HEV.USA.0000.V015.011.260206, TCC897x, regular HUD), from the porting
+kit with HMG-API's wireless mod installed (in memory; every file collected is stock). Its Wi-Fi
+chip is up (SDIO card, `Firmware up`, hostapd). Hyundai's updater offers 260903 for it; the
+maintainer chose to port 260206 (the owner's NEMESIS setup; no TCC897x unit seen on 260903 yet).
+
+- **Port:** `port.py --ref-variant ev6` (the EV6 stock rebuilt to the `ev6` builds byte for byte
+  first): GPM, DiPO and Iap2ServerApp are the EV6's classes exactly; the navigation app differs
+  in one class, `b/i`, by two framework string ids, and `projectionRoute()` merged as a 3-way
+  patch (checked: the same edit). With the Ioniq 5 260903 as reference instead, DiPO `service/q`
+  and three navigation classes needed hand merges (260903 renamed `b/i` to `util/NaviConfig`).
+  The same AA library (48ee793a) and `libiap2session.so` (fc7cb675). Menu fix `bda250d3`;
+  universal lines for its code.
+- **AR:** `build-carplay-ar-advanced.py --variant dn8hev`: every site and the framework trap API
+  are the EV6's. The car has no AR HUD (`ro.product.opt.hud.artist` empty; `true` on every AR
+  car so far), so `ar-post.sh` removes `ar-hud.enabled` there: `ArHudForwarder` and `ArHudAuto`
+  then send DiPO's and GPM's frames unchanged, as the plain turn-by-turn build does. The
+  recovery hooks don't read the opt-in and stay on.
+- **No EV lines:** a hybrid; `cpev_wanted` is off without a `3_bridge+ev` line.
+- **Mock** (owner's stock, mksh): install in full mode, no-EV, NEMESIS 1.15 with Android down
+  and a failed install all uninstall to stock, AR off; refused on 260903. EV6 US/CA and
+  Ioniq 5 260903 in the same installer: unchanged, AR on.
