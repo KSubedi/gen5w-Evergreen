@@ -53,6 +53,26 @@ CPEV_SESSION=/system/lib/libiap2session.so
 CPEV_RECIPE=carplay-ev-identity
 [ -z "$SUM_CPEV_LIB" ] && [ -s "$CPEV_PAYLOAD.md5" ] && read -r SUM_CPEV_LIB < "$CPEV_PAYLOAD.md5"
 
+# ---- CarPlay Ultra-Lite (test build, src/carplay-ultra) ----
+# A "3_bridge+ultra" build of DiPO (scripts/build.sh makes it only when UWP-CARPLAY-ULTRA is on
+# the install drive) comes with CarPlay Ultra-Lite's libCarPlayCore.so: our Wi-Fi patch plus its
+# code segment, rebuilt from the stock library, so the Wi-Fi recipe still reads APPLIED and the
+# same stock snapshot puts it back. Also, while it is installed:
+#   ULTRA_ON     the file the carplay-ultra service waits for (firewall rule, CarPlay Ultra-Lite's
+#                root helper, log copy)
+#   ULTRA_THEME  the theme asset id Iap2ServerApp's CarPlayEv puts in the identification
+#                (EV build only; not written for climate-only)
+#   ULTRA_CONF   DiPO's uwp-carplay-ultra.conf, only for climate-only (carplay_ultra=false)
+[ -n "$SUM_DIPO_APK_ULTRA" ] || SUM_DIPO_APK_ULTRA=$(built_sum "3_bridge+ultra" HKMC_DiPO)
+[ -n "$SUM_CORE_ULTRA" ] || SUM_CORE_ULTRA=$(built_sum "3_bridge+ultra" libCarPlayCore.so)
+ULTRA_PKG=/data/nemesis/apps/wireless.carplay.aa
+ULTRA_ON=$ULTRA_PKG/carplay-ultra.on
+ULTRA_THEME=$ULTRA_PKG/carplay-ultra.theme
+ULTRA_THEME_ID=44C9FA31EC:985:19.0
+ULTRA_DIPO=/data/data/com.daudio.app.dipo/files
+ULTRA_CONF=$ULTRA_DIPO/uwp-carplay-ultra.conf
+ULTRA_MODE_FILE=/data/nemesis/build/wireless.carplay.aa/ultra-mode
+
 # no printf on the HU (mksh); the && chain keeps a failed write an error
 save_sums() {
     mkdir -p "$BACKUP_DIR" || return 1
@@ -62,7 +82,9 @@ save_sums() {
         echo "SUM_DIPO_APK=$SUM_DIPO_APK" &&
         echo "SUM_IAP_APK=$SUM_IAP_APK" &&
         echo "SUM_IAP_APK_EV=$SUM_IAP_APK_EV" &&
-        echo "SUM_CPEV_LIB=$SUM_CPEV_LIB"
+        echo "SUM_CPEV_LIB=$SUM_CPEV_LIB" &&
+        echo "SUM_DIPO_APK_ULTRA=$SUM_DIPO_APK_ULTRA" &&
+        echo "SUM_CORE_ULTRA=$SUM_CORE_ULTRA"
     } > "$BACKUP_DIR/sums"
 }
 
@@ -131,6 +153,22 @@ pick_iap_sum() {
         SUM_IAP_APK=$SUM_IAP_APK_EV
     fi
     return 0
+}
+
+# pick_dipo_sum: our DiPO build is the CarPlay Ultra-Lite one when that is the payload (install)
+# or, without a payload (uninstall), when that is what is live
+pick_dipo_sum() {
+    [ -n "$SUM_DIPO_APK_ULTRA" ] || return 0
+    if [ -s "$FILES/HKMC_DiPO.apk" ]; then
+        sum_eq "$FILES/HKMC_DiPO.apk" "$SUM_DIPO_APK_ULTRA" && SUM_DIPO_APK=$SUM_DIPO_APK_ULTRA
+    elif sum_eq "$APP_DIR/HKMC_DiPO.apk" "$SUM_DIPO_APK_ULTRA"; then
+        SUM_DIPO_APK=$SUM_DIPO_APK_ULTRA
+    fi
+    return 0
+}
+
+ultra_wanted() {
+    [ -n "$SUM_DIPO_APK_ULTRA" ] && [ "$SUM_DIPO_APK" = "$SUM_DIPO_APK_ULTRA" ]
 }
 
 cpev_wanted() {
@@ -496,10 +534,18 @@ core_state() {
     lp_state "$CORE_RECIPE" "$_p"
 }
 
-# done = nothing left to do for the core (patched by us, or native support)
+# done = nothing left to do for the core (patched by us, or native support), and the
+# library is CarPlay Ultra-Lite's build exactly when the DiPO build is
 core_done() {
-    case "$(core_state)" in APPLIED|NATIVE) return 0 ;; esac
-    return 1
+    local _p
+    case "$(core_state)" in APPLIED|NATIVE) ;; *) return 1 ;; esac
+    [ -n "$SUM_CORE_ULTRA" ] || return 0
+    _p=$(core_path) || return 1
+    if ultra_wanted; then
+        sum_eq "$_p" "$SUM_CORE_ULTRA"
+    else
+        ! sum_eq "$_p" "$SUM_CORE_ULTRA"
+    fi
 }
 
 check_core() {
@@ -562,6 +608,22 @@ apply_core() {
     local _p _st
     _p=$(core_path) || return 1
     _st=$(core_state)
+    if ultra_wanted; then
+        apply_core_ultra "$_p" "$_st"
+        return $?
+    fi
+    if [ "$_st" = APPLIED ] && [ -n "$SUM_CORE_ULTRA" ] && sum_eq "$_p" "$SUM_CORE_ULTRA"; then
+        # CarPlay Ultra-Lite's library is live but not wanted any more: back to the Wi-Fi patch only
+        if [ ! -s "$BACKUP_DIR/libCarPlayCore.so" ] || ! lp_apply "$CORE_RECIPE" "$BACKUP_DIR/libCarPlayCore.so" "$BACKUP_DIR/libCarPlayCore.patched" \
+            || ! put_lib "$BACKUP_DIR/libCarPlayCore.patched" "$_p"; then
+            rm -f "$BACKUP_DIR/libCarPlayCore.patched"
+            log "FAIL: could not put the Wi-Fi-only libCarPlayCore.so back"
+            return 1
+        fi
+        rm -f "$BACKUP_DIR/libCarPlayCore.patched"
+        log "OK: $_p back to the Wi-Fi patch only (CarPlay Ultra-Lite left out)"
+        return 0
+    fi
     case "$_st" in
         APPLIED) log "libCarPlayCore.so already patched"; return 0 ;;
         NATIVE) log "libCarPlayCore.so accepts Wi-Fi natively - skipped"; return 0 ;;
@@ -583,6 +645,82 @@ apply_core() {
         return 1
     fi
     log "OK: $_p patched with lpatch (Wi-Fi CarPlay sessions allowed)"
+    return 0
+}
+
+# apply_core_ultra <path> <state>: CarPlay Ultra-Lite's library (built from the stock snapshot or
+# the live stock file by scripts/build.sh); the live library must be stock, ours, or the Wi-Fi patch
+apply_core_ultra() {
+    local _p="$1" _st="$2"
+    if sum_eq "$_p" "$SUM_CORE_ULTRA"; then
+        log "libCarPlayCore.so: CarPlay Ultra-Lite build already live"
+        return 0
+    fi
+    case "$_st" in
+        PATCHABLE|APPLIED) ;;
+        *) log "FAIL: libCarPlayCore.so status $_st - CarPlay Ultra-Lite's library needs the stock one"; return 1 ;;
+    esac
+    if [ "$_st" = APPLIED ] && [ ! -s "$BACKUP_DIR/libCarPlayCore.so" ]; then
+        log "FAIL: libCarPlayCore.so is patched but there is no stock snapshot"
+        return 1
+    fi
+    if ! sum_is "$FILES/libCarPlayCore.so" "$SUM_CORE_ULTRA"; then
+        log "FAIL: CarPlay Ultra-Lite libCarPlayCore.so payload missing or corrupt"
+        return 1
+    fi
+    if ! put_lib "$FILES/libCarPlayCore.so" "$_p"; then
+        log "FAIL: could not write $_p"
+        return 1
+    fi
+    if [ "$(core_state)" != APPLIED ]; then
+        log "FAIL: $_p did not verify after writing"
+        return 1
+    fi
+    log "OK: $_p is CarPlay Ultra-Lite's build (Wi-Fi sessions + vehicle state protocol, display panels)"
+    return 0
+}
+
+# apply_ultra_files: the on/theme/conf files for the CarPlay Ultra-Lite build, or their removal
+apply_ultra_files() {
+    local _mode=full
+    if ! ultra_wanted; then
+        remove_ultra_files
+        return 0
+    fi
+    [ -s "$ULTRA_MODE_FILE" ] && read -r _mode < "$ULTRA_MODE_FILE"
+    mkdir -p "$ULTRA_PKG" 2>/dev/null || true
+    : > "$ULTRA_ON" || { log "FAIL: write $ULTRA_ON"; return 1; }
+    chmod 644 "$ULTRA_ON" 2>/dev/null || true
+    if [ "$_mode" = climate ]; then
+        rm -f "$ULTRA_THEME" 2>/dev/null
+        mkdir -p "$ULTRA_DIPO" 2>/dev/null || true
+        echo "carplay_ultra=false" > "$ULTRA_CONF" || { log "FAIL: write $ULTRA_CONF"; return 1; }
+        chown 1000:1000 "$ULTRA_CONF" 2>/dev/null || chown 1000.1000 "$ULTRA_CONF" 2>/dev/null || true
+        chmod 644 "$ULTRA_CONF" 2>/dev/null || true
+        log "CarPlay Ultra-Lite: climate only, classic CarPlay look"
+    else
+        echo "$ULTRA_THEME_ID" > "$ULTRA_THEME" || { log "FAIL: write $ULTRA_THEME"; return 1; }
+        chmod 644 "$ULTRA_THEME" 2>/dev/null || true
+        rm -f "$ULTRA_CONF" 2>/dev/null
+        if cpev_wanted; then
+            log "CarPlay Ultra-Lite: theme $ULTRA_THEME_ID in the CarPlay identification (re-pair the iPhone once)"
+        else
+            log "CarPlay Ultra-Lite: no EV build of Iap2ServerApp (UWP-NO-EV?), so no CarPlay theme; climate and the Vehicle page only"
+        fi
+    fi
+    return 0
+}
+
+# remove_ultra_files: everything CarPlay Ultra-Lite left outside /system (its log stays)
+remove_ultra_files() {
+    local _f
+    rm -f "$ULTRA_ON" "$ULTRA_THEME" "$ULTRA_CONF" 2>/dev/null
+    for _f in "$ULTRA_DIPO"/cpc-*; do
+        [ -e "$_f" ] && rm -f "$_f" 2>/dev/null
+    done
+    iptables -D INPUT -j UWP_ULTRA 2>/dev/null
+    iptables -F UWP_ULTRA 2>/dev/null
+    iptables -X UWP_ULTRA 2>/dev/null
     return 0
 }
 

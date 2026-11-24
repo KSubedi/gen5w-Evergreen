@@ -29,6 +29,11 @@
 #                           gives up): the install must be refused
 #   MOCK_NO_EV=1            UWP-NO-EV on the install drive: the plain turn-by-turn
 #                           build instead of the EV one (implies MOCK_USB_DESCRIPTOR=1)
+#   MOCK_ULTRA=1|climate    UWP-CARPLAY-ULTRA on the install drive (climate: its text says
+#                           climate-only): the CarPlay Ultra-Lite builds of DiPO and
+#                           libCarPlayCore.so must be live after install (with the theme file,
+#                           or DiPO's climate-only conf), and gone with their files after
+#                           uninstall (implies MOCK_USB_DESCRIPTOR=1)
 #   MOCK_OWNER_WIFI=1       after the install the owner turns the Wi-Fi client on
 #                           (android.hardware.wifi.xml, persist.wifi.state=3, wifi_on=1):
 #                           the uninstall must leave it on and everything else stock (#17)
@@ -157,6 +162,14 @@ find "$X/pkg" -name '*.sh' | while read -r f; do
 done
 [ "$MOCK_WIFI_CLIENT" = 1 ] && MOCK_USB_DESCRIPTOR=1 && : > "$R/storage/usb0/LEAFIA-WIFI-CLIENT"
 [ "$MOCK_NO_EV" = 1 ] && MOCK_USB_DESCRIPTOR=1 && : > "$R/storage/usb0/UWP-NO-EV"
+if [ -n "$MOCK_ULTRA" ]; then
+    MOCK_USB_DESCRIPTOR=1
+    if [ "$MOCK_ULTRA" = climate ]; then echo climate-only > "$R/storage/usb0/UWP-CARPLAY-ULTRA"; else : > "$R/storage/usb0/UWP-CARPLAY-ULTRA"; fi
+fi
+# ultra_sum <name>: the CarPlay Ultra-Lite build's md5 from the package's manifests
+ultra_sum() { cat "$X"/pkg/patches/*/manifest | awk -v n="$1" '$1=="3_bridge+ultra" && $3==n {print $5; exit}'; }
+ULTRA_PKG="$R/data/nemesis/apps/wireless.carplay.aa"
+ULTRA_CONF="$R/data/data/com.daudio.app.dipo/files/uwp-carplay-ultra.conf"
 [ "$MOCK_USB_DESCRIPTOR" = 1 ] && printf '[nemesis]\nversion=1.0\ntype=install\npath=packages/wireless.carplay.aa.zip\n' > "$R/storage/usb0/NEMESIS.data"
 
 (cd "$R" && find system -type f -exec md5sum {} \; | sort -k2) > "$X/before.md5"
@@ -197,6 +210,23 @@ if "$SH" "$PRE_HOOK" > "$X/pre.log" 2>&1; then
         _a=$(adb_props); echo "adb after install: $_a"; [ "$_a" = "enable=0 port=5555" ] || ok=0
     fi
     [ "$MOCK_USB_DESCRIPTOR" = 1 ] && echo "usb drive after install: $(ls "$R/storage/usb0" | tr '\n' ' ')"
+    if [ -n "$MOCK_ULTRA" ]; then
+        _d=$(md5sum < "$R/system/app/HKMC_DiPO.apk" | cut -c1-32); _c=$(md5sum < "$R/system/lib/libCarPlayCore.so" | cut -c1-32)
+        [ "$_d" = "$(ultra_sum HKMC_DiPO)" ] && echo "CarPlay Ultra-Lite DiPO live" || { echo "DiPO is not the CarPlay Ultra-Lite build ($_d)"; ok=0; }
+        [ "$_c" = "$(ultra_sum libCarPlayCore.so)" ] && echo "CarPlay Ultra-Lite libCarPlayCore.so live" || { echo "libCarPlayCore.so is not the CarPlay Ultra-Lite build ($_c)"; ok=0; }
+        [ -f "$ULTRA_PKG/carplay-ultra.on" ] || { echo "carplay-ultra.on missing"; ok=0; }
+        if [ "$MOCK_ULTRA" = climate ]; then
+            [ ! -f "$ULTRA_PKG/carplay-ultra.theme" ] && grep -q '^carplay_ultra=false$' "$ULTRA_CONF" 2>/dev/null \
+                && echo "climate only: no theme file, DiPO conf carplay_ultra=false" || { echo "climate-only files wrong"; ok=0; }
+        else
+            _t=$(cat "$ULTRA_PKG/carplay-ultra.theme" 2>/dev/null)
+            [ "$_t" = 44C9FA31EC:985:19.0 ] && [ ! -f "$ULTRA_CONF" ] && echo "theme file: $_t" || { echo "theme file wrong: '$_t'"; ok=0; }
+        fi
+    elif [ -n "$(ultra_sum HKMC_DiPO)" ]; then
+        _d=$(md5sum < "$R/system/app/HKMC_DiPO.apk" | cut -c1-32)
+        [ "$_d" != "$(ultra_sum HKMC_DiPO)" ] && [ ! -f "$ULTRA_PKG/carplay-ultra.on" ] && echo "no CarPlay Ultra-Lite (not asked for)" \
+            || { echo "CarPlay Ultra-Lite installed without UWP-CARPLAY-ULTRA"; ok=0; }
+    fi
     _n=$(grep -c '^disable ' "$X/pm.calls" 2>/dev/null || true); echo "apps stopped for the swap: ${_n:-0}"
     _l=$(stopped_left); [ -z "$_l" ] || if [ "$MOCK_ANDROID_DOWN" = 1 ]; then echo "apps still stopped after install (Android down: started on the next run with Android up): $_l"; else echo "apps left stopped after install: $_l"; ok=0; fi
     # each Dalvik cache entry the install left must be the odex beside its APK
@@ -253,6 +283,10 @@ if "$SH" "$PRE_HOOK" > "$X/pre.log" 2>&1; then
         else
             echo "adb after uninstall: $_a"; [ "$_a" = "enable=1 port=" ] || ok=0
         fi
+    fi
+    if [ -n "$MOCK_ULTRA" ]; then
+        _u=$(ls "$ULTRA_PKG"/carplay-ultra.* "$ULTRA_CONF" 2>/dev/null | tr '\n' ' ')
+        [ -z "$_u" ] && echo "CarPlay Ultra-Lite files removed" || { echo "CarPlay Ultra-Lite files left: $_u"; ok=0; }
     fi
     _l=$(stopped_left); [ -z "$_l" ] || if [ "$MOCK_ANDROID_DOWN" = 1 ]; then echo "apps still stopped after uninstall (Android down: started on the next run with Android up): $_l"; else echo "apps left stopped after uninstall: $_l"; ok=0; fi
     _left=$(ls "$R/data/dalvik-cache" | grep '^system@app@' | tr '\n' ' ')

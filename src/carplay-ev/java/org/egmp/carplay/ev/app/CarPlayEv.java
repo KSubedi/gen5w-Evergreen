@@ -40,6 +40,13 @@ public final class CarPlayEv {
     static final String SESSION = "/system/lib/libiap2session.so";
     /** An empty file here (control kit carplay-ev-off) turns it off at the next start. */
     static final String OFF = "/data/nemesis/apps/wireless.carplay.aa/carplay-ev.disabled";
+    /**
+     * CarPlay Ultra-Lite's theme (test build, src/carplay-ultra): part 3_bridge writes the theme asset
+     * id ("id:version:sdk") here only when the CarPlay Ultra-Lite build of DiPO is installed. It goes
+     * into the wireless transport group (24) of the identification, with the empty parameter 5 iOS
+     * needs beside it (identity.c). No file: the identification is the same as without it.
+     */
+    static final String THEME = "/data/nemesis/apps/wireless.carplay.aa/carplay-ultra.theme";
     static final int ENGINE_ELECTRIC = 2, CONNECTOR_CCS = 0, CONNECTOR_AC = 2;
     static final long PERIOD_MS = 10000;
 
@@ -118,10 +125,47 @@ public final class CarPlayEv {
     /** The vehicle identity: electric, its name, one DC (CCS) and one AC (J1772) connector. */
     private static synchronized void arm() throws Exception {
         if (armed || source == null) return;
+        String theme = theme();
         int rc = NativeIdentity.configure(source.displayName.getBytes("UTF-8"), ENGINE_ELECTRIC,
-                CONNECTOR_CCS, source.dcW, CONNECTOR_AC, source.acW, new byte[0]);
-        if (rc == 0) { armed = true; log("identity armed: electric, CCS " + source.dcW + " W, J1772 " + source.acW + " W"); }
+                CONNECTOR_CCS, source.dcW, CONNECTOR_AC, source.acW, theme.getBytes("UTF-8"));
+        if (rc != 0 && theme.length() > 0) {   // the theme must never cost the EV identity
+            log("CarPlay theme " + theme + " not accepted (native=" + rc + "); identity without it");
+            theme = "";
+            rc = NativeIdentity.configure(source.displayName.getBytes("UTF-8"), ENGINE_ELECTRIC,
+                    CONNECTOR_CCS, source.dcW, CONNECTOR_AC, source.acW, new byte[0]);
+        }
+        if (rc == 0) {
+            armed = true;
+            log("identity armed: electric, CCS " + source.dcW + " W, J1772 " + source.acW + " W"
+                    + (theme.length() > 0 ? ", CarPlay theme " + theme : ""));
+        }
         else log("identity not armed: native=" + rc);
+    }
+
+    /** The CarPlay Ultra-Lite theme id from THEME, or "" (no file, or not a plain printable id). */
+    static String theme() {
+        File f = new File(THEME);
+        if (!f.isFile() || f.length() > 96) return "";
+        try {
+            FileInputStream in = new FileInputStream(f);
+            try {
+                byte[] b = new byte[(int) f.length()];
+                int n = 0;
+                while (n < b.length) {
+                    int r = in.read(b, n, b.length - n);
+                    if (r < 0) break;
+                    n += r;
+                }
+                String t = new String(b, 0, n, "US-ASCII").trim();
+                for (int i = 0; i < t.length(); i++) if (t.charAt(i) < 0x21 || t.charAt(i) > 0x7e) return "";
+                return t;
+            } finally {
+                in.close();
+            }
+        } catch (Exception e) {
+            log("CarPlay theme file not read: " + e);
+            return "";
+        }
     }
 
     private static void enableGroups() throws Exception {

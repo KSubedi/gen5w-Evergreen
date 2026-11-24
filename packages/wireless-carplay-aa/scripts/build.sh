@@ -12,6 +12,13 @@
 # plain line for the same part and file, unless an empty UWP-NO-EV (or EVERGREEN-NO-EV) file sits
 # next to our NEMESIS.data on the install drive. A car with no +ev lines builds as
 # before. $BUILD_DIR/ev records which way it went (1 or 0) for the install log.
+#
+# CarPlay Ultra-Lite (test build, src/carplay-ultra): "3_bridge+ultra" lines are the
+# CarPlay Ultra-Lite builds of DiPO and libCarPlayCore.so. They are built only when a
+# file named UWP-CARPLAY-ULTRA sits next to our NEMESIS.data on the install drive, and
+# replace the plain DiPO line. If one doesn't fit this unit, the install goes on without
+# CarPlay Ultra-Lite. A file whose text holds "climate-only" keeps the classic CarPlay
+# look (no theme). $BUILD_DIR/ultra records 1 or 0, $BUILD_DIR/ultra-mode full|climate.
 BUILD_DIR=/data/nemesis/build/wireless.carplay.aa
 TBT_BACKUP=/data/nemesis/backup/projection.tbt
 MENU_BACKUP=/data/nemesis/backup/projection.menu
@@ -30,10 +37,14 @@ lp_md5() {
 }
 
 # the stock copy of a system file: a part's snapshot when it exists (the live
-# file may already be modified), otherwise the live file
+# file may already be modified), otherwise the live file. libCarPlayCore.so: part
+# 3_bridge's snapshot is the stock library (it holds the bridge builds of the apps,
+# so it is only used for the library).
+BRIDGE_BACKUP=/data/nemesis/backup/wireless.carplay.bt
 stock_src() {
-    local _b
-    for _b in "$TBT_BACKUP/${1##*/}" "$MENU_BACKUP/${1##*/}"; do
+    local _b _bridge=
+    [ "${1##*/}" = libCarPlayCore.so ] && _bridge="$BRIDGE_BACKUP/libCarPlayCore.so"
+    for _b in "$TBT_BACKUP/${1##*/}" "$MENU_BACKUP/${1##*/}" $_bridge; do
         [ -s "$_b" ] && { echo "$_b"; return; }
     done
     echo "$1"
@@ -94,17 +105,46 @@ ev_wanted() {
     return 0
 }
 
-# has_ev_line <manifest> <part> <name>: the manifest has an EV build of that file
+# has_ev_line <manifest> <part> <name> [suffix]: the manifest has an EV (or <suffix>) build of that file
 has_ev_line() {
     local _p _k _n _x _s
     while read -r _p _k _n _x _s; do
-        [ "$_p" = "$2+ev" ] && [ "$_n" = "$3" ] && return 0
+        [ "$_p" = "$2+${4:-ev}" ] && [ "$_n" = "$3" ] && return 0
     done < "$1"
     return 1
 }
 
+# the install drive's UWP-CARPLAY-ULTRA file (next to our NEMESIS.data), or nothing
+ultra_marker() {
+    local _d
+    for _d in /storage/usb0 /storage/usb1 /storage/usb2 /mnt/media_rw/usb0 /mnt/media_rw/usb1 /mnt/media_rw/usb2; do
+        [ -f "$_d/UWP-CARPLAY-ULTRA" ] || continue
+        grep -q 'wireless\.carplay\.aa\.zip' "$_d/NEMESIS.data" 2>/dev/null && { echo "$_d/UWP-CARPLAY-ULTRA"; return 0; }
+    done
+    return 1
+}
+
+# build_ultra <manifest>: every "+ultra" line, or none (a mismatch removes what was built)
+build_ultra() {
+    local _part _kind _name _patch _want _n=0
+    while read -r _part _kind _name _patch _want; do
+        case "$_part" in *+ultra) ;; *) continue ;; esac
+        _part=${_part%+ultra}
+        if ! build_one "$_part" "$_kind" "$_name" "$_patch" "$_want" optional; then
+            log "CarPlay Ultra-Lite: $_name doesn't fit this unit - installing without it"
+            while read -r _part _kind _name _patch _want; do
+                case "$_part" in *+ultra) rm -f "$BUILD_DIR/${_part%+ultra}/$_name.apk" "$BUILD_DIR/${_part%+ultra}/$_name" 2>/dev/null ;; esac
+            done < "$1"
+            return 1
+        fi
+        _n=$((_n + 1))
+    done < "$1"
+    log "CarPlay Ultra-Lite (test build): $_n file(s) built"
+    return 0
+}
+
 build_payloads() {
-    local _v _m _part _kind _name _patch _want _ev=0 _evn=0
+    local _v _m _part _kind _name _patch _want _ev=0 _evn=0 _ultra=0 _marker
     _v=$(car_variant) || { log "FAIL: no patch set for this car"; return 1; }
     if [ "$_v" = auto ]; then   # the universal build (scripts/universal.sh)
         universal_rebuilt || universal_build || return 1
@@ -124,9 +164,22 @@ build_payloads() {
             log "UWP-NO-EV on the install drive: turn-by-turn build without the EV features"
         fi
     fi
+    echo full > "$BUILD_DIR/ultra-mode"
+    if _marker=$(ultra_marker); then
+        if ! grep -q '^[^ ]*+ultra ' "$_m"; then
+            log "UWP-CARPLAY-ULTRA on the install drive, but this car has no CarPlay Ultra-Lite build yet"
+        elif build_ultra "$_m"; then
+            _ultra=1
+            if grep -q 'climate-only' "$_marker" 2>/dev/null; then
+                echo climate > "$BUILD_DIR/ultra-mode"
+                log "CarPlay Ultra-Lite: climate only, classic CarPlay look (climate-only in UWP-CARPLAY-ULTRA)"
+            fi
+        fi
+    fi
     while read -r _part _kind _name _patch _want; do
         [ -n "$_part" ] || continue
         case "$_part" in
+            *+ultra) continue ;;   # build_ultra did them
             *+ev)
                 [ $_ev = 1 ] || continue
                 _part=${_part%+ev}
@@ -134,11 +187,14 @@ build_payloads() {
                 ;;
             *)
                 [ $_ev = 1 ] && has_ev_line "$_m" "$_part" "$_name" && continue
+                [ $_ultra = 1 ] && has_ev_line "$_m" "$_part" "$_name" ultra && continue
                 ;;
         esac
         build_one "$_part" "$_kind" "$_name" "$_patch" "$_want" || return 1
     done < "$_m"
     echo $_ev > "$BUILD_DIR/ev"
+    echo $_ultra > "$BUILD_DIR/ultra"
+    [ $_ultra = 1 ] || rm -f "$BUILD_DIR/3_bridge/libCarPlayCore.so" 2>/dev/null
     # a set without a library line (the car's Android Auto library has no patch yet):
     # part 2 leaves the library stock, so only Android Auto turn-by-turn on the cluster is missing
     rm -f "$BUILD_DIR/2_tbt/no-lib" 2>/dev/null

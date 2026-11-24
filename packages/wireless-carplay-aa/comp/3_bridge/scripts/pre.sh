@@ -4,6 +4,7 @@ export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system
 
 log "preinstall wireless.carplay.bt"
 pick_iap_sum
+pick_dipo_sum
 if [ ! -x /system/xbin/nemesis ]; then
     log "FAIL: /system/xbin/nemesis missing"
     exit 1

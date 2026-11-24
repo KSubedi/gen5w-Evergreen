@@ -4,12 +4,14 @@ export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system
 
 log "postinstall wireless.carplay.bt"
 pick_iap_sum
+pick_dipo_sum
 check_sums || exit 1
 check_core || exit 1
 snapshot_props || exit 1
 save_sums || exit 1
 apply_props || exit 1
 if is_applied && core_done && cpev_done; then
+    apply_ultra_files || exit 1
     log "bridge APKs and libCarPlayCore.so already live - props updated, no reboot needed"
     sync
     exit 0
@@ -40,6 +42,16 @@ if ! apply_core; then
 fi
 if ! apply_cpev; then
     log "Apple Maps EV routing install failed - putting everything back"
+    restore_cpev
+    restore_all force
+    restore_core
+    restore_props
+    sys_ro
+    exit 1
+fi
+if ! apply_ultra_files; then
+    log "CarPlay Ultra-Lite files could not be written - putting everything back"
+    remove_ultra_files
     restore_cpev
     restore_all force
     restore_core

@@ -41,7 +41,8 @@
         ],
         "/system/app/HKMC_DiPO.apk": [
           "154204dd700d02a6d47b4d7b6550c8f6",
-          "4d7452a71fc2c120032ef1734d15f0fb"
+          "4d7452a71fc2c120032ef1734d15f0fb",
+          "68c5b2b01387b3617bf9660808d9ddec"
         ],
         "/system/app/HKMC_GPM.apk": [
           "7c6df0f570677157326b105b6b87bfc2",
@@ -51,9 +52,12 @@
           "b1fc88d42954c41e7944e9247647e9ad"
         ],
         "/system/app/Iap2ServerApp.apk": [
-          "531f5831f249614956399f36a212f4ff",
           "75d7fea4d2009be6aa5c840118f58c94",
-          "7e90fa7d8a161ade71e11dc15e56c410"
+          "7e90fa7d8a161ade71e11dc15e56c410",
+          "c6e2948becf36c31d9483e58f8b95572"
+        ],
+        "/system/lib/libCarPlayCore.so": [
+          "67a5fb56b6546e0696910215c4a300dd"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
           "7ada7d23a79cb4fbef198b500532bb7b",
@@ -108,9 +112,9 @@
           "b1fc88d42954c41e7944e9247647e9ad"
         ],
         "/system/app/Iap2ServerApp.apk": [
-          "531f5831f249614956399f36a212f4ff",
           "75d7fea4d2009be6aa5c840118f58c94",
-          "7e90fa7d8a161ade71e11dc15e56c410"
+          "7e90fa7d8a161ade71e11dc15e56c410",
+          "c6e2948becf36c31d9483e58f8b95572"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
           "7ada7d23a79cb4fbef198b500532bb7b",
@@ -174,9 +178,9 @@
           "e01f7ef64d1d824930b656129f77c6bc"
         ],
         "/system/app/Iap2ServerApp.apk": [
-          "531f5831f249614956399f36a212f4ff",
           "75d7fea4d2009be6aa5c840118f58c94",
-          "7e90fa7d8a161ade71e11dc15e56c410"
+          "7e90fa7d8a161ade71e11dc15e56c410",
+          "c6e2948becf36c31d9483e58f8b95572"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
           "7ada7d23a79cb4fbef198b500532bb7b",
@@ -235,9 +239,9 @@
           "e01f7ef64d1d824930b656129f77c6bc"
         ],
         "/system/app/Iap2ServerApp.apk": [
-          "531f5831f249614956399f36a212f4ff",
           "75d7fea4d2009be6aa5c840118f58c94",
-          "7e90fa7d8a161ade71e11dc15e56c410"
+          "7e90fa7d8a161ade71e11dc15e56c410",
+          "c6e2948becf36c31d9483e58f8b95572"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
           "7ada7d23a79cb4fbef198b500532bb7b",

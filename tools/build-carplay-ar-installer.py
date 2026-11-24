@@ -105,7 +105,7 @@ def merge(trees, work):
     return out, car, variants
 
 
-def build(patches, output, enable_ar, trace=True):
+def build(patches, output, enable_ar, trace=True, version=VERSION, ultra=None):
     if not enable_ar:
         raise ValueError("explicit --enable-ar is required for this experimental installer")
     output = Path(output).absolute()
@@ -134,7 +134,7 @@ def build(patches, output, enable_ar, trace=True):
                 modes = {name: (inner.getinfo(name).external_attr >> 16) & 0o777 for name in files}
         original = files["NEMESIS.data"].decode()
         original = field(original, "name", "Ultimate Wireless Projection (" + car["title"] + ")")
-        original = field(original, "package-version", VERSION)
+        original = field(original, "package-version", version)
         original = field(original, "short-desc", '"Wireless CarPlay/AA + AR HUD; ' + car["short"] + ' only"')
         original = field(original, "detailed-desc", '"Ultimate Wireless Projection: wireless CarPlay and Android Auto with navigation on the factory AR HUD, and EV routing for Android Auto. Uninstall restores stock. See README-AR.txt."')
         original = field(original, "os", '"' + car["products"].replace("|", ",") + '"')
@@ -174,7 +174,7 @@ def build(patches, output, enable_ar, trace=True):
             entry["activation"] = "explicit-experimental-installer"
             entry["trace_enabled"] = bool(trace and entry['schema']==2)
         files["AR_BUILD.json"] = (json.dumps(data, indent=2)+"\n").encode()
-        files["AR_INSTALL.json"] = (json.dumps({"version": VERSION, "product": car["products"],
+        files["AR_INSTALL.json"] = (json.dumps({"version": version, "product": car["products"],
             "enable_requested": True, "source_build_report_sha256": hashlib.sha256(source_report.read_bytes()).hexdigest(),
             "on_car_tested": False}, indent=2)+"\n").encode()
         readme = (ROOT / "kits/ar-installer/README.txt").read_bytes()
@@ -191,8 +191,12 @@ def build(patches, output, enable_ar, trace=True):
         if "path=packages/wireless.carplay.aa.zip" not in descriptor:
             raise ValueError("unexpected base install descriptor")
         outer_files = {"NEMESIS.data": (combo / "NEMESIS.data").read_bytes(), "NEMESIS.sh": gated((combo / "NEMESIS.sh").read_bytes(), car),
-                       "AR_VERSION": (VERSION + "\n").encode(), "hotspot.sh": (ROOT / "kits/ar-control/NEMESIS.sh").read_bytes(),
+                       "AR_VERSION": (version + "\n").encode(), "hotspot.sh": (ROOT / "kits/ar-control/NEMESIS.sh").read_bytes(),
                        "packages/wireless.carplay.aa.zip": archive(files, modes), "README-AR.txt": readme}
+        if ultra:
+            # CarPlay Ultra-Lite test build (src/carplay-ultra): its opt-in file next to NEMESIS.data
+            # on the drive, so scripts/build.sh picks the "+ultra" builds
+            outer_files["UWP-CARPLAY-ULTRA"] = b"climate-only\n" if ultra == "climate-only" else b""
         output.parent.mkdir(parents=True, exist_ok=True)
         # Only publish a finished zip; never clobber an earlier installer.
         with output.open("xb") as stream:
@@ -209,17 +213,21 @@ if __name__ == "__main__":
     p.add_argument("--out", type=Path, help="default: dist/UltimateWirelessProjection_<car label>_<version>.zip")
     p.add_argument("--enable-ar", action="store_true")
     p.add_argument("--no-trace", action="store_true", help="omit ar-trace.enabled (release candidates)")
+    p.add_argument("--version", default=VERSION, help="package version (test builds; default %(default)s)")
+    p.add_argument("--carplay-ultra", nargs="?", const="full", choices=["full", "climate-only"],
+                   help="put UWP-CARPLAY-ULTRA on the drive (CarPlay Ultra-Lite test build; the patch tree "
+                        "needs its 3_bridge+ultra lines, tools/build-carplay-ultra.py --patches)")
     a = p.parse_args()
     try:
         out = a.out
         if out is None and len(a.patches) > 1:
-            out = ROOT / "dist" / ("UltimateWirelessProjection_" + VERSION + ".zip")
+            out = ROOT / "dist" / ("UltimateWirelessProjection_" + a.version + ".zip")
         elif out is None:
             report = json.loads((a.patches[0].resolve().parent / "ar-build.json").read_text())
             car = CARS.get(report.get("variant"))
             if car is None:
                 p.exit(1, "no installer name for variant %r\n" % report.get("variant"))
-            out = ROOT / "dist" / ("UltimateWirelessProjection_" + car["label"] + "_" + VERSION + ".zip")
-        build(a.patches, out, a.enable_ar, not a.no_trace)
+            out = ROOT / "dist" / ("UltimateWirelessProjection_" + car["label"] + "_" + a.version + ".zip")
+        build(a.patches, out, a.enable_ar, not a.no_trace, a.version, a.carplay_ultra)
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         p.exit(1, str(error)+"\n")

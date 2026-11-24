@@ -216,6 +216,9 @@ jobs:
           sh tools/test-ev-select.sh
           sh tools/test-ev-select.sh mksh
 
+      - name: CarPlay Ultra-Lite test port (HMG-API stand-in on the JVM, compiles for Android 4.4)
+        run: sh tools/test-carplay-ultra.sh
+
       - name: EV log copier service
         run: |
           sh tools/test-evlog-offload.sh

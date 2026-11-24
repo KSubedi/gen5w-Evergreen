@@ -33,3 +33,11 @@ kind=sh
 path=svc/wifi-client-warn.sh
 uid=root
 mode=restart
+
+# CarPlay Ultra-Lite test build: firewall rule, its root helper, log copy (idle unless installed with UWP-CARPLAY-ULTRA)
+[service.2]
+name=carplay-ultra
+kind=sh
+path=svc/carplay-ultra.sh
+uid=root
+mode=restart

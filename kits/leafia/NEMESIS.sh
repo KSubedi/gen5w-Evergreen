@@ -361,8 +361,11 @@ for _f in $N/logs/* $N/logs/*/*; do
     [ "$_n" != "$_rel" ] && _n="${_n}_${_rel#*/}"
     copy_file "$_f" "$LOGS/nemesis-logs/$_n"
 done
+# CarPlay Ultra-Lite test build (copied out of DiPO's files by the carplay-ultra service):
+# private, it holds DiPO's CarPlay lines and the car's AirPlay identifiers
+copy_file $N/carplay.ultra.log "$LOGS/carplay-ultra.log"
 logcat -d -v time -s TccCarPlay:V CarPlay_:V DiPOManager:V Iap2Server:V iAP2:V GalReceiver:V GPM:V \
-    PhoneProjection:V BTCMStateMachine:I EV6AAC:V AndroidRuntime:V DEBUG:V ActivityManager:W \
+    PhoneProjection:V BTCMStateMachine:I EV6AAC:V CarPlayUltra:V AndroidRuntime:V DEBUG:V ActivityManager:W \
     PackageManager:W > "$LOGS/logcat-projection.txt" 2>&1
 logcat -d -v time '*:W' > "$LOGS/logcat-warnings.txt" 2>&1
 # the tags above are best guesses; the full buffers catch whatever they miss
