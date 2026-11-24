@@ -5,9 +5,9 @@
 Ultimate Wireless Projection is a [NEMESIS](https://github.com/xwtk/hmg_nemesis) package. It started as a fork of [Evergreen](https://github.com/zpoon/gen5w-Evergreen), which continues [HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus). Development here moves fast, so it is now maintained as its own project; see [Credits](#credits) for everyone whose work it builds on.
 
 > [!IMPORTANT]
-> **Tested car:** 2022 Kia EV6 GT-Line, USA, Gen5W head-unit firmware **260507**, with the factory AR HUD. **Hyundai Ioniq 5 (US, 260903)** and **Kia EV6 (Canada, 260206)** builds are in testing. Each installer only installs on its own car and firmware: see [Cars and port status](#cars-and-port-status). Want it on your Hyundai, Kia or Genesis? See [Help port it to your car](#help-port-it-to-your-car).
+> **Tested car:** 2022 Kia EV6 GT-Line, USA, Gen5W head-unit firmware **260507**, with the factory AR HUD. A **Hyundai Ioniq 5 (US, 260903)** has been driven too, and a **Kia EV6 (Canada, 260206)** build is in testing. Each installer only installs on its own car and firmware: see [Cars and port status](#cars-and-port-status). Want it on your Hyundai, Kia or Genesis? See [Help port it to your car](#help-port-it-to-your-car).
 
-**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.124-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
+**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.125-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
 
 ## Features
 
@@ -131,7 +131,7 @@ If an install failed, attach the `INSTALL-LOG` folder from the drive instead. Se
 | Car | Head-unit firmware | Status | Installer |
 |---|---|---|---|
 | Kia EV6, US (2022–2024) | 260507 | ✅ Driven and confirmed (CarPlay and Android Auto) | `UltimateWirelessProjection_EV6_US_260507_<version>.zip` |
-| Hyundai Ioniq 5, US (2022–2024) | 260903 | 🧪 Built, waiting for its first drive ([#1](https://github.com/KSubedi/ultimate-wireless-projection/issues/1)) | `UltimateWirelessProjection_IONIQ5_US_260903_<version>.zip` |
+| Hyundai Ioniq 5, US (2022–2024) | 260903 | ✅ Driven and confirmed (CarPlay, AR HUD, Apple Maps EV routing; [#1](https://github.com/KSubedi/ultimate-wireless-projection/issues/1)) | `UltimateWirelessProjection_IONIQ5_US_260903_<version>.zip` |
 | Kia EV6, Canada (2022–2024) | 260206 | 🧪 Built, waiting for its first drive ([#2](https://github.com/KSubedi/ultimate-wireless-projection/issues/2)) | `UltimateWirelessProjection_EV6_CA_260206_<version>.zip` |
 
 Both get everything in the [feature table](#features): the AR HUD and the EV features need the car's factory AR HUD and the 77.4 kWh battery (Apple Maps EV routing turns itself off on other packs).
@@ -162,7 +162,7 @@ Bold: most wanted. EV features need a Hyundai Motor Group EV; the AR HUD needs a
 
 ## Help port it to your car
 
-It runs on the Kia EV6 (US, 260507), with the Ioniq 5 (US, 260903) in testing. The same head unit runs in many Hyundai, Kia and Genesis cars ([list](#port-help-wanted)), and the AR work carries over to other cars with an AR HUD. Porting starts with five minutes in your car:
+It runs on the Kia EV6 (US, 260507) and the Hyundai Ioniq 5 (US, 260903), with the Canadian EV6 in testing. The same head unit runs in many Hyundai, Kia and Genesis cars ([list](#port-help-wanted)), and the AR work carries over to other cars with an AR HUD. Porting starts with five minutes in your car:
 
 1. Download **UWP-Porting-Kit.zip** from the [releases](https://github.com/KSubedi/ultimate-wireless-projection/releases), unzip it onto an empty USB drive and run it through NEMESIS. It's read-only and changes nothing on the car.
 2. Zip the `UWP-PORT/attach-to-issue` folder it writes and attach it to a [port request](https://github.com/KSubedi/ultimate-wireless-projection/issues/new?template=port-request.yml).
