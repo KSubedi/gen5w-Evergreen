@@ -24,7 +24,7 @@ toast "CarPlay Ultra-Lite diagnostics: collecting, about 20 seconds"
     echo "--- DiPO files"; ls -la $DIPO 2>&1
     for f in $DIPO/cpc-*; do
         case "$f" in *.key|*'cpc-*') continue ;; esac
-        echo "$f: $(cat "$f" 2>/dev/null | head -c 200)"
+        v=; read -r v < "$f" 2>/dev/null; echo "${f##*/}=$v"
     done
     echo "--- services"; nemesis service status wireless.carplay.aa/carplay-ultra 2>&1
     echo "--- processes"; ps 2>&1 | grep -e dipo -e iap2 -e carplay -e hostapd
