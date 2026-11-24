@@ -12,6 +12,15 @@
 #             car on the iPhone and pair again.
 #   theme     the theme id back: restart, forget and pair again.
 #   status    change nothing.
+# One piece at a time, from everything on (run "on" and restart first, so the Java side runs with
+# every listener; these take effect on the next connection and last until the head unit restarts):
+#   full      every addition on, as installed
+#   nofeat    full without the extra /info feature bits (cpc-feat)
+#   featna    full with only the non-audio feature bits (upstream's livi_nonaudio, 205203a462)
+#   noxfeat   full without enhancedRequestCarUI (cpc-xfeat)
+#   nouisync  full without the theme layout channel (cpc-uisync)
+#   nocluster full without the Ultra virtual cluster (cpc-ultra 0)
+#   cluster1  full with the plain 800x480 virtual cluster instead of the theme's (cpc-ultra 1)
 # Every run writes ULTRA-CONTROL-<date-time>.txt on this drive with what is set now.
 # Only DiPO's cpc-* and uwp-carplay-ultra.conf files and our package's carplay-ultra.theme change;
 # never /system.
@@ -39,8 +48,21 @@ case "$MODE" in
     on)      rm -f "$CONF" "$DIPO/cpc-nocluster"; MSG="Defaults back: restart the head unit now." ;;
     notheme) rm -f "$THEME"; MSG="Theme out: restart the head unit, then forget the car on the iPhone and pair again." ;;
     theme)   echo "$THEME_ID" > "$THEME"; chmod 644 "$THEME"; MSG="Theme back: restart the head unit, then forget the car on the iPhone and pair again." ;;
+    full|nofeat|featna|noxfeat|nouisync|nocluster|cluster1)
+             put cpc-ultra 2; put cpc-uisync 1; put cpc-xfeat 1; put cpc-feat 205253ac62; put cpc-extras 1
+             put cpc-version 1; put cpc-dock 1; rm -f "$DIPO/cpc-nocluster"
+             case "$MODE" in
+                 nofeat) rm -f "$DIPO/cpc-feat" ;;
+                 featna) put cpc-feat 205203a462 ;;
+                 noxfeat) put cpc-xfeat 0 ;;
+                 nouisync) put cpc-uisync 0 ;;
+                 nocluster) put cpc-ultra 0 ;;
+                 cluster1) put cpc-ultra 1 ;;
+             esac
+             put cpc-on ""
+             MSG="$MODE set. Connect the phone now (no restart needed)." ;;
     status)  MSG="Status saved on the drive." ;;
-    *)       MSG="Write off, climate, bare, on, notheme, theme or status in ULTRA_MODE on the drive." ;;
+    *)       MSG="Unknown ULTRA_MODE word: see the top of NEMESIS.sh." ;;
 esac
 {
     echo "$(date) mode=${MODE:-none}"; echo "$MSG"
