@@ -1,4 +1,4 @@
-ULTIMATE WIRELESS PROJECTION 1.3.0.125 -- AR HUD (TEST BUILD)
+ULTIMATE WIRELESS PROJECTION 1.3.0.126 -- AR HUD
 Wireless CarPlay and Android Auto, with navigation on the factory AR HUD.
 https://github.com/KSubedi/ultimate-wireless-projection
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
@@ -7,6 +7,16 @@ The owner tested 1.2.0.102 for three hours of driving with generally good result
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.126: ONE INSTALLER FOR EVERY CAR
+UltimateWirelessProjection_1.3.0.126.zip installs on every car with a build:
+Kia EV6 US (260507), Kia EV6 Canada (260206) and Hyundai Ioniq 5 US (260903).
+On the car it picks that car's own patch set from the head unit's product id,
+as the base package always has, and refuses any other car. The cars' builds
+are the same as in 1.3.0.125; nothing changes in how they work.
+- The control kits are no longer published with the release. Turning AR or
+  Apple Maps EV routing off: uninstall in NEMESIS Manager, or ask on an
+  issue for a kit.
 
 NEW IN 1.3.0.125: HYUNDAI IONIQ 5 (US, 260903)
 A second car: the US Ioniq 5 on head-unit firmware 260903 gets the same build
@@ -506,7 +516,7 @@ AFTER THE DRIVE
    identifiers; they do hold timings, distances, speeds and battery data.
    Recording continues, so you can do this after every drive.
    (UWP-AR-export-stop-clean.zip, in the controls zip, also exports but
-   stops recording for good. This version supports 104 to 1.3.0.125.)
+   stops recording for good. This version supports 104 to 1.3.0.126.)
 4. In the issue, give the approximate clock time of anything odd, the app
    (Apple Maps, Google Maps, Waze...), what the phone showed versus the HUD,
    and whether leaving CarPlay or Android Auto and coming back changed it. No interaction

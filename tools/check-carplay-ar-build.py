@@ -17,10 +17,27 @@ def digest(path):
 
 
 def validate(patches, report):
+    """One car's report, or a unified installer's: {"unified": true, "schema": 2, "variants":
+    {<patch set>: <that car's report>}}, each checked against its own patch set."""
     patches, report = Path(patches).resolve(), Path(report).resolve()
     data = json.loads(report.read_text())
     if not isinstance(data, dict):
         raise ValueError("AR report must be an object")
+    if data.get("unified"):
+        variants = data.get("variants")
+        if data.get("schema") != 2 or not isinstance(variants, dict) or not variants:
+            raise ValueError("unified AR report needs schema 2 and its cars' reports")
+        for name, sub in variants.items():
+            if not isinstance(sub, dict) or sub.get("variant") != name:
+                raise ValueError("unified AR report: entry " + str(name) + " is not that car's report")
+            if bool(sub.get("enabled_by_default")) != bool(data.get("enabled_by_default")):
+                raise ValueError("unified AR report: every car must be opted in the same way")
+            validate_data(patches, sub)
+        return data
+    return validate_data(patches, data)
+
+
+def validate_data(patches, data):
     variant = data.get("variant")
     if data.get("schema") not in (1,2) or not isinstance(variant, str) or Path(variant).name != variant or variant in (".", ".."):
         raise ValueError("unsupported AR build report")

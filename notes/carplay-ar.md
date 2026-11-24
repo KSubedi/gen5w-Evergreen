@@ -1159,3 +1159,17 @@ site identical to the EV6 US's. The 260206 vehicle framework: the same transacti
 preconditioning methods, reset timer and AR trap API (hashes added to the EV gates). Mock head
 unit with the owner's stock files: EV, no-EV and a failed install uninstall to stock; the
 installer refuses a US EV6.
+
+## 1.3.0.126: one installer for every car
+
+`build-carplay-ar-installer.py --patches <tree>` given once per car builds one installer,
+`UltimateWirelessProjection_<version>.zip`. `merge()` validates each car's AR build, requires them to
+come from one base (every file outside the cars' own folders identical), copies each car's folder
+into one patch tree, and writes a unified report (`{"unified": true, "schema": 2, "variants":
+{<set>: <report>}}`), which `check-carplay-ar-build.py` validates car by car. On the head unit
+nothing new is needed: the base package already picks `patches/<set>` from `patches/cars` by
+product id; the descriptor's `os=`, `ar-pre.sh` and the one-drive `NEMESIS.sh` list exactly the
+built cars' products (anything else, such as an Ioniq 5 on 260507, is refused before any change).
+The installer is 12.9 MB with three cars (about 1.4 MB per car's AR deltas). Mock head unit, each
+car with its owner's stock files: EV, no-EV and a failed install all uninstall to stock. The
+control kits are no longer published (the tools still build them).

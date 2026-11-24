@@ -7,7 +7,7 @@ Ultimate Wireless Projection is a [NEMESIS](https://github.com/xwtk/hmg_nemesis)
 > [!IMPORTANT]
 > **Tested car:** 2022 Kia EV6 GT-Line, USA, Gen5W head-unit firmware **260507**, with the factory AR HUD. A **Hyundai Ioniq 5 (US, 260903)** has been driven too, and a **Kia EV6 (Canada, 260206)** build is in testing. Each installer only installs on its own car and firmware: see [Cars and port status](#cars-and-port-status). Want it on your Hyundai, Kia or Genesis? See [Help port it to your car](#help-port-it-to-your-car).
 
-**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.125-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
+**[⬇ Download the latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.126-beta.1)** · [Report a problem](https://github.com/KSubedi/ultimate-wireless-projection/issues/new/choose) · [Contributing](CONTRIBUTING.md)
 
 ## Features
 
@@ -60,7 +60,7 @@ From [egmp-carplay-ev-routing](https://github.com/isaacwisdom/egmp-carplay-ev-ro
 - **One USB drive does everything:** the first time you plug it in it installs; every time after that it saves the logs.
 - **A failed install leaves the car untouched** and saves an `INSTALL-LOG` folder to the drive. Updating over a version whose install failed works.
 - **Uninstall restores stock**, including the projection settings (wired CarPlay stays on).
-- **Control kits** turn AR on or off, switch between basic and advanced AR, tune the arrow, and stop recording, without reinstalling.
+- **One installer for every supported car:** it picks your car's build from the head unit's product id and refuses cars it has no build for.
 - **Private logs:** no road names, locations, Wi-Fi names, passwords or phone identifiers.
 
 ## What's different from other packages
@@ -93,7 +93,7 @@ This isn't just "wireless on". The AR HUD was tuned over about 20 test builds, e
 
 You need [NEMESIS](https://github.com/xwtk/hmg_nemesis) 1.15 or newer on the head unit.
 
-1. Download your car's installer (`UltimateWirelessProjection_<car>_<version>.zip`, see [Cars and port status](#cars-and-port-status)) from the [releases](https://github.com/KSubedi/ultimate-wireless-projection/releases).
+1. Download `UltimateWirelessProjection_<version>.zip` from the [latest release](https://github.com/KSubedi/ultimate-wireless-projection/releases/tag/v1.3.0.126-beta.1). The same file works on every car in [Cars and port status](#cars-and-port-status).
 2. Unzip it onto an empty USB drive (exFAT or FAT32). The top of the drive should show `NEMESIS.data`, `NEMESIS.sh` and `packages`. **Keep this drive**: it also collects the logs.
 3. Park with the car in READY and wait until the head unit has fully started. Plug in the drive and approve the NEMESIS prompt.
 4. The head unit restarts by itself when the install is done. Remove the drive while it restarts.
@@ -128,13 +128,13 @@ If an install failed, attach the `INSTALL-LOG` folder from the drive instead. Se
 
 ### Cars with a build
 
-| Car | Head-unit firmware | Status | Installer |
-|---|---|---|---|
-| Kia EV6, US (2022–2024) | 260507 | ✅ Driven and confirmed (CarPlay and Android Auto) | `UltimateWirelessProjection_EV6_US_260507_<version>.zip` |
-| Hyundai Ioniq 5, US (2022–2024) | 260903 | ✅ Driven and confirmed (CarPlay, AR HUD, Apple Maps EV routing; [#1](https://github.com/KSubedi/ultimate-wireless-projection/issues/1)) | `UltimateWirelessProjection_IONIQ5_US_260903_<version>.zip` |
-| Kia EV6, Canada (2022–2024) | 260206 | 🧪 Built, waiting for its first drive ([#2](https://github.com/KSubedi/ultimate-wireless-projection/issues/2)) | `UltimateWirelessProjection_EV6_CA_260206_<version>.zip` |
+| Car | Head-unit firmware | Status |
+|---|---|---|
+| Kia EV6, US (2022–2024) | 260507 | ✅ Driven and confirmed (CarPlay and Android Auto) |
+| Hyundai Ioniq 5, US (2022–2024) | 260903 | ✅ Driven and confirmed (CarPlay, AR HUD, Apple Maps EV routing; [#1](https://github.com/KSubedi/ultimate-wireless-projection/issues/1)) |
+| Kia EV6, Canada (2022–2024) | 260206 | 🧪 Built, waiting for its first drive ([#2](https://github.com/KSubedi/ultimate-wireless-projection/issues/2)) |
 
-Both get everything in the [feature table](#features): the AR HUD and the EV features need the car's factory AR HUD and the 77.4 kWh battery (Apple Maps EV routing turns itself off on other packs).
+They all use the same installer, `UltimateWirelessProjection_<version>.zip`, and get everything in the [feature table](#features): the AR HUD and the EV features need the car's factory AR HUD and the 77.4 kWh battery (Apple Maps EV routing turns itself off on other packs).
 
 ### Ready to build: Evergreen already supports the car
 

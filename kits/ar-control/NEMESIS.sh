@@ -119,7 +119,7 @@ if [ "$MODE" = disable ]; then
     exit 0
 fi
 case "$(getprop ro.build.product)" in CVEV.USA.*.260507|CVEV.CAN.*.260206|NEEV.USA.*.260903|NEEV23.USA.*.260903|NEEV23SE.USA.*.260903) ;; *) echo "No AR build for this car (EV6 US 260507, EV6 Canada 260206, Ioniq 5 US 260903 so far)."; exit 1 ;; esac
-if [ ! -f "$PKG/AR_BUILD.json" ] || ! grep -q -e '"variant": "ev6"' -e '"variant": "ev6_ca"' -e '"variant": "neev23_260903"' "$PKG/AR_BUILD.json"; then
+if [ ! -f "$PKG/AR_BUILD.json" ] || ! grep -q -e '"variant": "ev6"' -e '"variant": "ev6_ca"' -e '"variant": "neev23_260903"' -e '"unified": true' "$PKG/AR_BUILD.json"; then
     echo "The generated EV6 CarPlay AR prototype is not installed."
     exit 1
 fi

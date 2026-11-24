@@ -109,7 +109,8 @@ python3 tools/build-carplay-ar-installer.py --patches <private out>/patches --en
 Pass `--variant <patch set>` (default `ev6`) to both builder steps. Builds exist for the EV6 US 260507 (`ev6`) and the Ioniq 5 US 260903 (`neev23_260903`). The Ioniq 5's CarPlay app needed one adaptation: its obfuscator named the AR fields one letter on, which the build check and `ArHudRoute` now recognise. A new car needs:
 - its fingerprints reviewed;
 - an entry in `CARS` in `tools/build-carplay-ar-installer.py`, which sets the installer's name and firmware gate;
-- its variant added to the verified framework list in `tools/check-carplay-ar-build.py` and to the product patterns in the control kits;
+- its variant added to the verified framework list in `tools/check-carplay-ar-build.py` and to the product patterns in `kits/ar-control` and `kits/ar-finish`;
+- its AR patch tree added to the unified installer build (`build-carplay-ar-installer.py --patches <tree>` once per car, all from one commit);
 - a first drive with logs, to confirm the HUD's AR types and the arrow timing. The [AR development notes](notes/carplay-ar.md) describe each piece and how it was tuned.
 
 ### 4. Test
