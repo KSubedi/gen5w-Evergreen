@@ -443,6 +443,8 @@ public final class ArHudRuntimeTest {
             check(c.type==71,"sign style: outside the window the icon is kept");
             write(file,"exit_side=generic\n");ArHudTuning.reload();
             check(ArHudRuntime.resolveIcon(0,exit,true)==86,"generic mode keeps icon 86");
+            check(ArHudRuntime.resolveIcon(0,exit,false)==0,"AR off: a zero icon stays zero (traced, not recovered)");
+            check(ArHudRuntime.resolveIcon(71,exit,false)==71,"AR off: a stock icon is kept");
             ArHudRuntime.update(c,86,0,0,300,0,0,0,0,0,exit,29400,true);
             check(c.type==86,"generic mode never sends a native exit");
             file.delete();ArHudTuning.reload();

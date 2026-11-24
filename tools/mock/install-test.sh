@@ -38,6 +38,8 @@
 #   MOCK_PP_SETTINGS=1      while installed, the head unit's Phone Projection pages rewrite
 #                           its projection settings (wired CarPlay off): the uninstall must put
 #                           the stock values back, or leave them for the new version on an update
+#   MOCK_HUD_ARTIST=<value> ro.product.opt.hud.artist (default true: a factory AR HUD);
+#                           empty for a car without one, where the AR installer turns AR off
 #   MOCK_FAIL_PROJECTION=1  part 1's post step fails after it changed build.prop and
 #                           featurexml (writing the CarPlay feature file fails): the install
 #                           must undo it, leave /system stock, and a later uninstall must pass
@@ -55,6 +57,7 @@ done
 QEMU=$(command -v qemu-arm-static)
 ZIP=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); PROD=$2; TD=$3; SRC=$4
 SH=${MOCK_SH:-/bin/sh}
+HUD_ARTIST=${MOCK_HUD_ARTIST-true}
 # The unit has no locales and its tools work on bytes. Under a UTF-8 locale a
 # host grep (busybox, musl regex) stops matching at invalid UTF-8 bytes, which
 # hides part 2's receiver marker inside the rebuilt library.
@@ -101,6 +104,7 @@ cat > "$X/stub/getprop" <<E
 case "\$1" in
  ro.build.product) echo $PROD ;;
  ro.mobis.targetdir) echo $R/system/onebin/$TD ;;
+ ro.product.opt.hud.artist) echo $HUD_ARTIST ;;
  persist.*) cat $X/prop_\$1 2>/dev/null || echo "" ;;
  sys.boot_completed) [ "$MOCK_ANDROID_DOWN" = 1 ] || echo 1 ;;
  *) echo "" ;;

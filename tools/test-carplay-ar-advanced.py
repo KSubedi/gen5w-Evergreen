@@ -314,10 +314,10 @@ class AdvancedTest(unittest.TestCase):
         script=work/'service.sh';script.write_text(source)
         subprocess.run(['sh',str(script)],timeout=10,capture_output=True)
         lines=(work/'logged').read_text().splitlines()
-        self.assertEqual(lines,['-p w -t EvergreenAR v126 wifi kernel_s=10.602161 event=ap_up',
-                                '-p w -t EvergreenAR v126 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
-                                '-p w -t EvergreenAR v126 wifi kernel_s=4121.925019 event=deauth reason=4',
-                                '-p w -t EvergreenAR v126 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
+        self.assertEqual(lines,['-p w -t EvergreenAR v128 wifi kernel_s=10.602161 event=ap_up',
+                                '-p w -t EvergreenAR v128 wifi kernel_s=3977.580579 event=ch_switch freq=5785',
+                                '-p w -t EvergreenAR v128 wifi kernel_s=4121.925019 event=deauth reason=4',
+                                '-p w -t EvergreenAR v128 wifi kernel_s=18015.159439 event=deauth_by_phone reason=8'])
         self.assertNotIn(':af',(work/'logged').read_text())
         self.assertFalse((work/'logs/.wifi').exists())
 

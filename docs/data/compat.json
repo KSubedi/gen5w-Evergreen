@@ -32,6 +32,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -88,6 +89,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -153,6 +155,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -213,6 +216,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -276,6 +280,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -331,6 +336,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -385,6 +391,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -439,6 +446,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -492,6 +500,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -545,6 +554,7 @@
         "/system/app/HKMC_BtSettings.apk": [
           "4b56912c836261cafecad6ae2b1407a6",
           "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
           "93ecaa97597a79be2a10728e45c72b33",
           "a8ca2abd8235c57a50d580aed8a2de3e",
           "b977e268fbe73cb5637c4413647a7dea",
@@ -566,24 +576,82 @@
           "7e90fa7d8a161ade71e11dc15e56c410"
         ]
       }
+    },
+    {
+      "id": "hyundai-sonata-hybrid-us-260206",
+      "name": "Hyundai Sonata Hybrid",
+      "region": "US",
+      "chip": "TCC897x",
+      "product_prefix": "DN822HEV.USA.",
+      "years": "2022",
+      "firmware": "V015.011.260206",
+      "status": "testing",
+      "verified": [
+        "Sandbox install and uninstall on this firmware's own files"
+      ],
+      "notes": "Its projection apps run the same code as the Kia EV6 US 260507; regular HUD, so the AR HUD stays off. Awaiting the first real-car test (issue #3).",
+      "stock": {
+        "/system/app/HKMC_DiPO.apk": "f6a716fb4d47144481547a8ef4faa64f",
+        "/system/app/HKMC_DiPO.odex": "a557538824192f1658b1a17a2b319e87",
+        "/system/app/HKMC_GPM.apk": "da452c993653153b34d7234f95dd6a4a",
+        "/system/app/HKMC_GPM.odex": "5570e3bb1e6d0cb6f4799aba16a9e96a",
+        "/system/app/HKMC_Navi_ExSL.apk": "750a397d3e5105fa34b5e4f8b3669d55",
+        "/system/app/HKMC_Navi_ExSL.odex": "a99960605bca792ab1724a5f7388e70e",
+        "/system/app/Iap2ServerApp.apk": "fde208439f993986a60396e759797a01",
+        "/system/app/Iap2ServerApp.odex": "ca77dff5d8aa9a0720ad9f86cd1fab73",
+        "/system/lib/libautoreceiver_infobank.so": "48ee793af8b86052503b8c952b034731"
+      },
+      "built": {
+        "/system/app/HKMC_BtSettings.apk": [
+          "4b56912c836261cafecad6ae2b1407a6",
+          "575ac7eb4e01e0111b444697b9f6a4e8",
+          "805f2367469eb0ad3855f05c71c0dec0",
+          "93ecaa97597a79be2a10728e45c72b33",
+          "a8ca2abd8235c57a50d580aed8a2de3e",
+          "b977e268fbe73cb5637c4413647a7dea",
+          "cd98c36db6857ed174757c6010a36494",
+          "e7c90e78f45f7e6b9c90ddd7a238b566"
+        ],
+        "/system/app/HKMC_DiPO.apk": [
+          "110e414fd539d753529abc158665e742",
+          "5161dafb4c9c8d0fcbf732b78212003d"
+        ],
+        "/system/app/HKMC_GPM.apk": [
+          "d822f347670f5b159430fde9cfde5d1a"
+        ],
+        "/system/app/HKMC_Navi_ExSL.apk": [
+          "3525bc9f391f13b053d6b76fc171d1d2"
+        ],
+        "/system/app/Iap2ServerApp.apk": [
+          "75d7fea4d2009be6aa5c840118f58c94",
+          "7e90fa7d8a161ade71e11dc15e56c410"
+        ],
+        "/system/lib/libautoreceiver_infobank.so": [
+          "c08410a8d32a615b1aa805cd8a243d52"
+        ]
+      }
     }
   ],
   "universal": {
     "code": {
       "/system/app/HKMC_DiPO.odex": [
+        "495d4c22fbdf68e4251b5727447872df",
         "77a5160a52ab0f93ab2b14db884b3343",
         "8a71b8287cdc9683495ff19dab6c932b"
       ],
       "/system/app/HKMC_GPM.odex": [
+        "44357da7947a674b7a68e3715a390f17",
         "b0a8811e819ffa2cdb87a2dbc54905ec",
         "fcd9285700d766d4a75ef9b089dba1e3"
       ],
       "/system/app/HKMC_Navi_ExSL.odex": [
         "16e7883de1f5382e086cadca85f73800",
+        "24b8359414e5be8f566900923bd28b3b",
         "7dc811232a9171a18c53c337672a4e9c"
       ],
       "/system/app/Iap2ServerApp.odex": [
-        "30a34f8331e3c74a18c0241a28a036ea"
+        "30a34f8331e3c74a18c0241a28a036ea",
+        "ac63fada887e5acc594d96b100238692"
       ]
     },
     "files": {
