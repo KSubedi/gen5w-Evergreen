@@ -14,13 +14,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 desc = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "packages/wireless-carplay-aa/NEMESIS.data")
 cars = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "patches/cars")
 
-kv, section = {}, ""
+kv, section, seen, dupes = {}, "", set(), []
 for line in open(desc, encoding="utf-8"):
     line = line.strip()
     if not line or line[0] in "#;":
         continue
     if line.startswith("["):
         section = line.strip("[]")
+        if section in seen:
+            dupes.append(section)
+        seen.add(section)
         continue
     if section == "nemesis" and "=" in line:
         k, v = line.split("=", 1)
@@ -30,7 +33,7 @@ for line in open(desc, encoding="utf-8"):
         kv[k.strip()] = v
 
 dotted = re.compile(r"\d+(\.\d+)*")
-errs = []
+errs = ["section [%s] appears more than once" % d for d in dupes]
 if not dotted.fullmatch(kv.get("version", "")):
     errs.append("version must be dotted numbers")
 if not dotted.fullmatch(kv.get("package-version", "")):

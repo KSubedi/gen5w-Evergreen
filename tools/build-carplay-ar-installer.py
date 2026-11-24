@@ -143,8 +143,10 @@ def build(patches, output, enable_ar, trace=True, version=VERSION, ultra=None):
         if data['schema']==2:
             original=field(original,'postinstall','scripts/ar-post.sh')
         if data['schema']==2:
-            original += "\n[service.2]\nname=ar-debug\nkind=sh\npath=svc/ar-debug.sh\nuid=root\nmode=restart\n"
-            original += "\n[service.3]\nname=ar-baseline\nkind=sh\npath=svc/ar-baseline.sh\nuid=root\nmode=restart\n"
+            # numbered after the base package's own services (it has carplay-ultra as service.2)
+            nxt = 1 + max([int(x) for x in re.findall(r"(?m)^\[service\.(\d+)\]", original)] or [-1])
+            original += "\n[service.%d]\nname=ar-debug\nkind=sh\npath=svc/ar-debug.sh\nuid=root\nmode=restart\n" % nxt
+            original += "\n[service.%d]\nname=ar-baseline\nkind=sh\npath=svc/ar-baseline.sh\nuid=root\nmode=restart\n" % (nxt + 1)
         # Validate the FINAL descriptor, after all experimental overrides.
         # NEMESIS permits dotted numbers only, not SemVer prerelease suffixes.
         checked_descriptor = Path(temp) / "NEMESIS.data"
