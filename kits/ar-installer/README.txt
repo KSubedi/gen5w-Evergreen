@@ -1,4 +1,4 @@
-ULTIMATE WIRELESS PROJECTION 1.3.0.127 -- AR HUD
+ULTIMATE WIRELESS PROJECTION 1.3.0.128 -- AR HUD
 Wireless CarPlay and Android Auto, with navigation on the factory AR HUD.
 https://github.com/KSubedi/ultimate-wireless-projection
 Target: Kia EV6 USA, head-unit firmware 260507, factory AR HUD.
@@ -7,6 +7,13 @@ The owner tested 1.2.0.102 for three hours of driving with generally good result
 This test build applies what the 1.2.0.104 diagnostic drive showed. Its
 changes are host-tested and need their own car test.
 NEMESIS package versions remain numeric.
+
+NEW IN 1.3.0.128: SONATA HYBRID TURN-BY-TURN FIX
+On the Sonata Hybrid, a maneuver the car's CarPlay app has no symbol for (for
+example a long "continue" on the same road) was never sent, so the cluster and
+HUD kept showing the turn you had just made until the next maneuver it knew.
+Its CarPlay app now gets Evergreen's fallback symbols for those maneuvers, as
+the Ioniq 5 and Sportage 260507 builds already have. Other cars: no change.
 
 NEW IN 1.3.0.127: HYUNDAI SONATA HYBRID (US, 260206)
 A fourth car, in testing: the US Sonata Hybrid on head-unit firmware 260206

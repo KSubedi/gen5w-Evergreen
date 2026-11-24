@@ -165,7 +165,15 @@ public final class ArHudRuntime implements Runnable {
         } catch(RuntimeException unavailable){ArHudDebug.event("icon_gate_failed");return original;}
     }
     static int resolveIcon(int original,ArHudSample s,boolean advanced) {
-            if(!advanced || original!=0)return original;
+            if(original!=0)return original;
+            if(!advanced){
+                // No AR (e.g. a car without the AR HUD): DiPO drops this maneuver. Trace the
+                // phone's raw maneuver so a log shows which ones the symbol tables miss.
+                if(ArHudDebug.on())ArHudDebug.event("icon_gate original=0 ar=off raw="+(s==null?-1:s.type)+
+                        " angle="+(s==null?0:s.angle)+" traffic="+(s==null?-1:s.drivingSide)+" junction="+(s==null?-1:s.junction)+
+                        " state="+(s==null?-1:s.state));
+                return original;
+            }
             int exitSide=s==null?0:exitSide(s,SystemClock.elapsedRealtime());
             int recovered=s==null?0:ArHudTurns.recoverIcon(s.type,s.drivingSide,s.junction,exitSide);
             if(ArHudDebug.on())ArHudDebug.event("icon_gate original="+original+" recovered="+recovered+" raw="+(s==null?-1:s.type)+

@@ -1197,3 +1197,23 @@ maintainer chose to port 260206 (the owner's NEMESIS setup; no TCC897x unit seen
 - **Mock** (owner's stock, mksh): install in full mode, no-EV, NEMESIS 1.15 with Android down
   and a failed install all uninstall to stock, AR off; refused on 260903. EV6 US/CA and
   Ioniq 5 260903 in the same installer: unchanged, AR on.
+
+## 1.3.0.128: Sonata Hybrid turn-by-turn fallback (#3)
+
+The first drive (1.3.0.127, wired CarPlay) showed one stuck stretch, 22:11:41-22:13:22: the phone
+sent maneuver 10 (about 1 km) every second, but DiPO sent no frame, so the cluster and HUD kept
+the finished turn until the roundabout (maneuver 11). DiPO's stock table gave symbol 0, which is
+never sent. The `ev6` set the Sonata was ported from predates Evergreen's `leafiaFallback`
+(31fbb32: rebuilt then only for neev, nq5 and the universal list). On the AR cars
+`ArHudRuntime.resolveIcon` recovers symbol-0 maneuvers, but only with AR on, so the Sonata
+(AR off) was the first to show it.
+
+- The EV6's DiPO code is the universal `77a5160a`; its universal patches (with the fallback)
+  applied to the EV6's code differ from the `ev6` build only in `e/u` (the fallback method,
+  field and call sites; the same change in tbt and bridge). The Sonata's DiPO classes are the
+  EV6's, so its `dn8hev` DiPO deltas now rebuild that dex (universal lines regenerated). AR
+  inspection unchanged in outcome.
+- The maneuver's type isn't in the trace. `resolveIcon` now logs `icon_gate original=0 ar=off
+  raw=...` with AR off, so the next drive shows which maneuvers the tables still miss (the
+  fallback has nothing for no-turn 0 or start-route 11).
+- Other cars: no change (their sets as in 1.3.0.127; recorder v128).

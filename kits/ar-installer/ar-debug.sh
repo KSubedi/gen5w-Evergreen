@@ -6,7 +6,7 @@ DIR=/data/nemesis/wireless.carplay.aa-ar-debug
 PARENT=$$
 mkdir -p "$DIR" || exit 1
 chmod 700 "$DIR" || exit 1
-echo "AR debug v127 starting $(date); bounded 32x1MiB; own EvergreenAR tag only" > "$DIR/STATUS.txt"
+echo "AR debug v128 starting $(date); bounded 32x1MiB; own EvergreenAR tag only" > "$DIR/STATUS.txt"
 sync
 
 # The head unit's hotspot changes Wi-Fi channel by itself, and the phone can drop shortly
@@ -46,7 +46,7 @@ wifi_events() {
             case "$_t" in *[!0-9.]*) continue ;; esac
             [ "$_s" -gt "$_last_s" ] || { [ "$_s" -eq "$_last_s" ] && [ "$_u" -gt "$_last_u" ]; } || continue
             _last_s=$_s; _last_u=$_u
-            log -p w -t EvergreenAR "v127 wifi kernel_s=$_t event=$_e${_x:+ $_x}"
+            log -p w -t EvergreenAR "v128 wifi kernel_s=$_t event=$_e${_x:+ $_x}"
         done < "$DIR/.wifi"
         rm -f "$DIR/.wifi"
         _n=0
