@@ -15,7 +15,7 @@ case "$(wifi_hw)" in
         exit 1 ;;
     unknown) log "Wi-Fi chip: not started yet (no wlan interface, no driver error)" ;;
 esac
-decide_mode
+decide_mode || exit 1
 if [ "$MODE" = basic ]; then
     log "basic mode: $MODE_WHY - installing wireless projection only (wireless Android Auto)"
     if ! has_wifi_module; then

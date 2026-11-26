@@ -233,34 +233,18 @@ wifi_hw() {
 # is for: we only support each car's newest firmware, so the owner should update.
 # Full mode leaves the rebuilt apps in the build dir for the parts.
 decide_mode() {
-    MODE=full
-    MODE_WHY=""
-    MODE_UPDATE=""
-    if ! car_name >/dev/null; then
-        # no patch set of its own: the universal build fits if every projection
-        # app runs code we have patches for (scripts/universal.sh)
-        . ./scripts/build.sh
-        if check_cluster_api && universal_build && build_optional; then
-            log "car: no patch set of its own; universal build ($(getprop ro.build.product 2>/dev/null))"
-        else
-            clean_build
-            rm -rf patches/auto 2>/dev/null
-            MODE_WHY="no build for this car/firmware yet ($(getprop ro.build.product 2>/dev/null))"
-        fi
-    elif ! check_cluster_api; then
-        MODE_WHY="cluster API missing for turn-by-turn"
-    else
-        . ./scripts/build.sh
-        if ! build_payloads; then
-            clean_build
-            MODE_WHY="this firmware's projection apps don't match the build for $(car_name) (only each car's newest firmware is supported: update the head unit's software)"
-            MODE_UPDATE=1
-        fi
-    fi
-    if [ -n "$MODE_WHY" ]; then
-        MODE=basic
-        PARTS=$BASIC_PARTS
-        PARTS_REV=$BASIC_PARTS
+    MODE=wireless
+    PARTS="1_projection 3_bridge 4_audio"
+    PARTS_REV="4_audio 3_bridge 1_projection"
+    [ "$(getprop ro.build.product)" = "CEEV.SGP.0000.V005.001.260907" ] || {
+        log "FAIL: this test build is for the Singapore IONIQ 6 on 260907"
+        return 1
+    }
+    . ./scripts/build.sh
+    if ! build_payloads; then
+        clean_build
+        log "FAIL: stock projection files do not match this build"
+        return 1
     fi
 }
 

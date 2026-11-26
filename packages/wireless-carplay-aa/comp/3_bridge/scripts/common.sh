@@ -31,8 +31,8 @@ FILES=/data/nemesis/build/wireless.carplay.aa/3_bridge
 CARS_DIR=../../patches
 . ../../scripts/cars.sh
 VARIANT=$(car_variant) || VARIANT=unknown
-SUM_TBT_DIPO_APK=$(built_sum 2_tbt HKMC_DiPO)
-SUM_TBT_IAP_APK=$(built_sum 2_tbt Iap2ServerApp)
+SUM_TBT_DIPO_APK=$(stock_sum HKMC_DiPO.apk)
+SUM_TBT_IAP_APK=$(stock_sum Iap2ServerApp.apk)
 SUM_DIPO_APK=$(built_sum 3_bridge HKMC_DiPO)
 SUM_IAP_APK=$(built_sum 3_bridge Iap2ServerApp)
 if [ -z "$SUM_DIPO_APK" ] && [ -s "$BACKUP_DIR/sums" ]; then
@@ -171,13 +171,13 @@ check_sums() {
     sum_is "$FILES/HKMC_DiPO.apk" "$SUM_DIPO_APK" || return 1
     sum_is "$FILES/Iap2ServerApp.apk" "$SUM_IAP_APK" || return 1
     if is_tbt; then
-        log "projection.tbt files are live - ok"
+        log "stock projection files are live - ok"
     elif is_applied; then
         log "bridge files are already live"
     else
         log "live HKMC_DiPO.apk md5=$(file_md5 $APP_DIR/HKMC_DiPO.apk)"
         log "live Iap2ServerApp.apk md5=$(file_md5 $APP_DIR/Iap2ServerApp.apk)"
-        log "FAIL: DiPO/Iap2Server are not projection.tbt's build - install projection.tbt first"
+        log "FAIL: DiPO/Iap2Server are not the expected stock files"
         return 1
     fi
     log "checksums ok"
